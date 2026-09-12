@@ -1,5 +1,5 @@
 import { EditorState } from '@codemirror/state'
-import { EditorView } from '@codemirror/view'
+import { EditorView, drawSelection } from '@codemirror/view'
 import { history, historyKeymap, defaultKeymap } from '@codemirror/commands'
 import { keymap } from '@codemirror/view'
 import { useEffect, useRef } from 'react'
@@ -39,15 +39,24 @@ export default function PromptEditor({ specs, values, onChange }: Props): JSX.El
           if (!update.docChanged) return
           onChangeRef.current(parseDocument(update.state.doc.toString(), specs))
         }),
-        // 光标是**浏览器原生**的：扩展里没有 drawSelection()，所以 CodeMirror
-        // 不画 .cm-cursor 元素（实测该元素不存在）。原生光标的颜色只认
-        // caret-color，写 border-left-color 是打在不存在的元素上。
-        // 不声明 dark 的话 CodeMirror 按亮色主题走，原生光标是黑的 ——
-        // 在这个深色背景上完全看不见（用户实机指出）。
+        // drawSelection() 让 CodeMirror 自己画光标与选区，而不是用浏览器原生的。
+        // 这不是锦上添花 —— 本编辑器里分隔符被 replace 藏掉、空段没有任何字符，
+        // 那些位置**没有文本节点**可锚定，实测 getSelection().anchorNode 是
+        // .cm-content 这个 DIV 本身、光标矩形为 {0,0,0}，于是原生光标会画到
+        // 不可预测的地方（实机表现为「跑到最右侧」「有时看不见」）。
+        // CodeMirror 用自己的坐标计算定位 .cm-cursor，widget 之间也算得准。
+        drawSelection(),
+        // 不要再设 .cm-content 的 caret-color：drawSelection 已把原生光标设为
+        // 透明，再上色会出现两个光标。
         EditorView.theme(
           {
             '&': { fontFamily: 'var(--mono)', fontSize: '15px' },
-            '.cm-content': { caretColor: 'var(--accent)' },
+            '.cm-cursor, .cm-dropCursor': {
+              borderLeftColor: 'var(--accent)',
+              borderLeftWidth: '2px',
+            },
+            '.cm-selectionBackground': { background: 'hsl(212 55% 48% / .38)' },
+            '&.cm-focused .cm-selectionBackground': { background: 'hsl(212 60% 52% / .5)' },
           },
           { dark: true },
         ),

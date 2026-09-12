@@ -81,6 +81,11 @@ body {
   background: hsl(var(--h) 48% 58%); color: #0f1115;
   border-radius: 3px; padding: 0 6px; margin-right: 7px;
   white-space: nowrap; user-select: none;
+  /* line-height 必须写死。不写就从 .cm-content 继承 2.05，而那是相对
+     **本元素**的 12px 算的 —— 芯片高 24.6px，框的内容区只有 15px，
+     芯片比容器高，只能溢出到框外（实机上表现为徽章整体下坠、压住框的下边线）。
+     1.25 × 12px = 15px，正好等于内容区高度。 */
+  line-height: 1.25;
 }
 
 /* 空段：整块是一个 inline-block widget。高度写死成与非空段一致（实测 21px），
