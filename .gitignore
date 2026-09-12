@@ -10,3 +10,7 @@ Thumbs.db
 # 构建前手动放进 resources/tagdb/，文件清单见 README。
 resources/tagdb/*
 !resources/tagdb/.gitkeep
+
+# 执行过程的中间件：账本、任务简报、审查包。只提交源码
+.superpowers/
+.worktrees/
