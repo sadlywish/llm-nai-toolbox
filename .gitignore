@@ -14,3 +14,7 @@ resources/tagdb/*
 # 执行过程的中间件：账本、任务简报、审查包。只提交源码
 .superpowers/
 .worktrees/
+
+# 内部设计规格与实现计划：过程文档，不提交。
+# README 要链接的内容另出公开版本，见 docs/design.md
+docs/superpowers/
