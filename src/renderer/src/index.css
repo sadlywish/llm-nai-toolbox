@@ -50,7 +50,9 @@ body {
 /* 15px 是姊妹项目「画师串工具箱」在实屏上试出来的值，它的注释写着
    「13px 偏小；15px 之后每屏少约两行」。行高从 2.35 收到 2.05 补偿字号变大，
    免得每行占地翻上去。 */
-.prompt-editor .cm-content { padding: 14px 16px; line-height: 2.05; }
+/* padding-left 只留 2px：每个框自带 14px 左外边距（见 .blk-run 的说明），
+   两者相加才是视觉上的左边距 */
+.prompt-editor .cm-content { padding: 14px 16px 14px 2px; line-height: 2.05; }
 .prompt-editor .cm-focused { outline: none; }
 
 /* ── 一个段 = 一个框，徽章是框内的 ::before 伪元素 ──────────────
@@ -77,7 +79,13 @@ body {
   box-shadow: inset 0 0 0 1px hsl(var(--h) 45% 52% / .42);
   border-radius: 4px;
   padding: 3px 8px 3px 4px;
-  margin-right: 14px;
+  /* 间距用**左**外边距，不用右外边距。藏掉分隔符的那个零宽 replace 元素排在
+     本框的右外边距**之后**，用 margin-right 时光标会被画到那 14px 间隙的远端、
+     紧贴下一个框（实测 caret x=513.2，而本框右缘 499.8、下一框左缘 513.8），
+     表现为「光标从后一个标签往前移，却显示在后一个标签的头部」。
+     改成 margin-left 后间隙归下一个框，光标落点回到本框边缘。
+     首个框的多余缩进由 .cm-content 的 padding-left 抵掉。 */
+  margin-left: 14px;
   line-height: 15px;
 }
 

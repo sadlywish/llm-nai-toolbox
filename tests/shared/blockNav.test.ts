@@ -3,6 +3,7 @@ import { MAIN_FIELDS } from '@shared/fields'
 import { BLOCK_SEP, blockRanges, emptyValues, serializeFields } from '@shared/blockDoc'
 import {
   changeTouchesSeparator,
+  prefersBackwardAssoc,
   clampToBlock,
   fieldIndexAt,
   resolveBackspace,
@@ -116,5 +117,29 @@ describe('clampToBlock × fieldIndexAt 的契约', () => {
       expect(clampToBlock(DOC, TRIO, r.to)).toBe(r.to)
       expect(fieldIndexAt(DOC, clampToBlock(DOC, TRIO, r.from))).toBe(r.index)
     }
+  })
+})
+
+describe('prefersBackwardAssoc', () => {
+  it('非空段的末尾要往前靠 —— 那个位置只能是「本段末尾」', () => {
+    expect(prefersBackwardAssoc(DOC, TRIO, 6)).toBe(true)
+    expect(prefersBackwardAssoc(DOC, TRIO, 13)).toBe(true)
+  })
+
+  it('段内部不需要往前靠', () => {
+    expect(prefersBackwardAssoc(DOC, TRIO, 3)).toBe(false)
+  })
+
+  it('段的内容起点不需要往前靠', () => {
+    expect(prefersBackwardAssoc(DOC, TRIO, 1)).toBe(false)
+  })
+
+  it('空段不往前靠 —— 它的 from === to，往前靠会把光标画到上一段去', () => {
+    // DOC 里 style 是空段，from === to === 7
+    expect(prefersBackwardAssoc(DOC, TRIO, 7)).toBe(false)
+  })
+
+  it('文档起点不往前靠', () => {
+    expect(prefersBackwardAssoc(DOC, TRIO, 0)).toBe(false)
   })
 })

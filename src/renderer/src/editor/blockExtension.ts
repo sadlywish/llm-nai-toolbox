@@ -1,4 +1,10 @@
-import { Annotation, EditorState, type Extension, type Transaction } from '@codemirror/state'
+import {
+  Annotation,
+  EditorSelection,
+  EditorState,
+  type Extension,
+  type Transaction,
+} from '@codemirror/state'
 import {
   Decoration,
   type DecorationSet,
@@ -11,7 +17,13 @@ import {
 import { WEIGHT_STEP } from '@renderer/prompt/weight'
 import { buildBlockDecorations } from '@shared/blockDecorations'
 import { BLOCK_SEP, isWellFormed, stripSeparators } from '@shared/blockDoc'
-import { changeTouchesSeparator, clampToBlock, resolveBackspace, resolveDelete } from '@shared/blockNav'
+import {
+  changeTouchesSeparator,
+  clampToBlock,
+  prefersBackwardAssoc,
+  resolveBackspace,
+  resolveDelete,
+} from '@shared/blockNav'
 import { adjustWeightInBlock } from '@shared/blockWeight'
 import type { FieldSpec } from '@shared/fields'
 
@@ -185,6 +197,16 @@ function selectionGuard(specs: readonly FieldSpec[]): Extension {
     const sel = tr.selection.main
     const anchor = clampToBlock(doc, specs, sel.anchor)
     const head = clampToBlock(doc, specs, sel.head)
+
+    // 光标停在非空段末尾时，显式关联到**前一个**字符。不这么做，CodeMirror 会
+    // 向后解析（分隔符被 replace 藏掉、零宽度），把光标画在后一段框的左边缘 ——
+    // 表现为「光标从后一个标签往前移，却显示在后一个标签的头部」。
+    // 那个位置只有「上一段末尾」一种合理解释，详见 prefersBackwardAssoc。
+    if (anchor === head && prefersBackwardAssoc(doc, specs, head)) {
+      if (head === sel.head && sel.assoc < 0) return tr
+      return [tr, { selection: EditorSelection.cursor(head, -1) }]
+    }
+
     if (anchor === sel.anchor && head === sel.head) return tr
     // 返回 [tr, 修正] 而不是只返回 { selection }：后者会丢掉原事务的
     // effects、annotations 与 userEvent。Plan 2 接上补全之后，被吞掉的
@@ -217,7 +239,8 @@ function blockKeymap(specs: readonly FieldSpec[]): Extension {
         const guard = resolveBackspace(doc, sel.head)
         if (guard === null) return false
         if (guard.kind === 'block') return true
-        view.dispatch({ selection: { anchor: guard.to } })
+        // assoc = -1：落点是上一段的末尾，要画在那一段框内而不是本段框的左边缘
+        view.dispatch({ selection: EditorSelection.cursor(guard.to, -1) })
         return true
       },
     },
