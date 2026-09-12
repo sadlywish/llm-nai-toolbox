@@ -1,0 +1,242 @@
+<title>分块编辑器三种画法</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --ground: #15171b;
+    --panel: #1d2025;
+    --panel-2: #22262c;
+    --line: #2f343d;
+    --line-soft: #272b32;
+    --ink: #d8dce3;
+    --ink-dim: #98a1ad;
+    --ink-faint: #6b737f;
+    --accent: #4a9eff;
+    --danger: #ff6b63;
+
+    --h-count: 210;
+    --h-character: 250;
+    --h-series: 285;
+    --h-style: 320;
+    --h-artist: 30;
+    --h-appearance: 50;
+    --h-tags: 85;
+    --h-environment: 120;
+    --h-nltags: 160;
+    --h-quality: 190;
+
+    --sans: "IBM Plex Sans", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", "Microsoft YaHei", "PingFang SC", ui-monospace, monospace;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .wrap {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding-inline: 20px;
+    padding-block: 40px 64px;
+  }
+
+  .head { display: flex; flex-direction: column; gap: 12px; }
+  .eyebrow {
+    font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 500;
+  }
+  h1 {
+    margin: 0; font-size: 27px; font-weight: 600; letter-spacing: -.01em;
+    text-wrap: balance;
+  }
+  .lede { margin: 0; max-width: 62ch; color: var(--ink-dim); }
+  .lede b { color: var(--ink); font-weight: 500; }
+
+  .rule { height: 1px; background: var(--line); margin-block: 32px; border: 0; }
+
+  .state { margin-block: 0 40px; }
+  .state-head {
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .tag {
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    color: #0f1115; background: var(--accent);
+    padding: 2px 8px; border-radius: 3px; letter-spacing: .04em;
+  }
+  .state h2 { margin: 0; font-size: 18px; font-weight: 600; }
+  .note { margin: 0 0 18px; color: var(--ink-dim); max-width: 68ch; font-size: 13px; }
+
+  .editor {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .editor-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 7px 12px;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--line);
+    font-size: 11.5px; color: var(--ink-dim);
+  }
+  .editor-bar .left { display: flex; align-items: center; gap: 10px; }
+  .chip {
+    font-family: var(--mono); font-size: 10.5px;
+    border: 1px solid var(--line); border-radius: 3px;
+    padding: 1px 6px; color: var(--ink-faint);
+  }
+  .budget { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .budget b { color: var(--ink); font-weight: 500; }
+
+  .f { --h: 210; }
+  .f-count       { --h: var(--h-count); }
+  .f-character   { --h: var(--h-character); }
+  .f-series      { --h: var(--h-series); }
+  .f-style       { --h: var(--h-style); }
+  .f-artist      { --h: var(--h-artist); }
+  .f-appearance  { --h: var(--h-appearance); }
+  .f-tags        { --h: var(--h-tags); }
+  .f-environment { --h: var(--h-environment); }
+  .f-nltags      { --h: var(--h-nltags); }
+  .f-quality     { --h: var(--h-quality); }
+
+  .err {
+    color: var(--danger); background: hsl(4 80% 60% / .16);
+    border-radius: 2px; text-decoration: underline wavy var(--danger) 1px;
+    text-underline-offset: 3px;
+  }
+  .caret {
+    display: inline-block; width: 1.5px; height: 1.05em; vertical-align: -.18em;
+    background: var(--accent); margin-inline: 1px;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .caret { animation: blink 1.1s steps(1, end) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+  }
+
+  .flow {
+    padding: 14px 16px;
+    font-family: var(--mono); font-size: 12.5px; line-height: 2.35;
+    overflow-wrap: anywhere;
+  }
+  .run {
+    background: hsl(var(--h) 48% 56% / .13);
+    box-shadow: inset 0 0 0 1px hsl(var(--h) 45% 52% / .38);
+    border-radius: 3px;
+    padding: 3px 6px 3px 3px;
+  }
+  .run.active {
+    background: hsl(var(--h) 50% 58% / .24);
+    box-shadow: inset 0 0 0 1px hsl(var(--h) 60% 60% / .75);
+  }
+  .run.blank {
+    background: hsl(var(--h) 40% 55% / .05);
+    box-shadow: inset 0 0 0 1px hsl(var(--h) 35% 48% / .3);
+    /* 空块整块不可拆行：默认的 inline 会让徽章留在上一行、槽位掉到下一行，
+       屏幕上就多出一个没有徽章的孤立小方块 */
+    display: inline-block;
+    vertical-align: top;
+  }
+  .badge {
+    font-size: 9.5px; font-weight: 500; letter-spacing: .03em;
+    background: hsl(var(--h) 45% 48%); color: #0f1115;
+    border-radius: 2px; padding: 1px 4px; margin-right: 5px;
+  }
+  .run.blank .badge { background: hsl(var(--h) 28% 40%); color: #c4cad3; }
+  .slot { display: inline-block; min-width: 2.2em; }
+
+  .common { border: 1px solid var(--line); border-radius: 6px; padding: 18px 20px; background: var(--panel); }
+  .common h3 { margin: 0 0 12px; font-size: 14px; font-weight: 600; }
+  .common ul { margin: 0; padding-left: 18px; display: grid; gap: 7px; color: var(--ink-dim); font-size: 13px; }
+  .common code {
+    font-family: var(--mono); font-size: 12px; color: var(--ink);
+    background: var(--panel-2); border: 1px solid var(--line-soft);
+    border-radius: 3px; padding: 0 4px;
+  }
+</style>
+
+<div class="wrap">
+  <header class="head">
+    <span class="eyebrow">llm-nai-toolbox · 界面预览</span>
+    <h1>分块编辑器三种画法</h1>
+    <p class="lede">已定：<b>内联徽章</b>。文字连续流动不分栏，每段内容前挂一个字段徽章。十个字段<b>恒常渲染</b>——空的也占位，没有「未使用」这一说，所以文档段结构永远是固定十段，不会被创建或销毁。</p>
+  </header>
+
+  <hr class="rule">
+
+  <section class="state">
+    <div class="state-head">
+      <span class="tag">状态 1</span>
+      <h2>填好之后</h2>
+    </div>
+    <p class="note">光标停在 <code style="font-family:var(--mono)">artist</code> 块，块被提亮。<code style="font-family:var(--mono)">style</code> 是空的，仍然占着自己的位置——点它就能落光标开始写。<code style="font-family:var(--mono)">tags</code> 里那个全角逗号被标红。</p>
+
+    <div class="editor">
+      <div class="editor-bar">
+        <span class="left"><span class="chip">提示词</span><span>光标在 artist</span></span>
+        <span class="budget">合计 <b>169</b> / 1471 token</span>
+      </div>
+      <div class="flow">
+        <span class="run f f-count"><span class="badge">count</span>1girl, rating:sensitive, portrait, close-up, from above, from side, depth of field,</span>
+        <span class="run f f-character"><span class="badge">character</span>skadi (arknights),</span>
+        <span class="run f f-series"><span class="badge">series</span>arknights,</span>
+        <span class="run blank f f-style"><span class="badge">style</span><span class="slot"></span></span>
+        <span class="run active f f-artist"><span class="badge">artist</span>0.4::artist:houkisei::, 0.6::artist:modare::, 0.8::artist:manzai sugar::, 0.8::artist:haku89::, 0.4::artist:sihana156::<span class="caret"></span>,</span>
+        <span class="run f f-appearance"><span class="badge">appearance</span>grey hair, white hair, long hair, very long hair, red eyes, hair between eyes, hair ornament, bare shoulders, breasts, parted lips,</span>
+        <span class="run f f-tags"><span class="badge">tags</span>looking at viewer, upper body, blurry foreground, dappled sunlight, light rays, sunbeam, lens flare, bokeh<span class="err">，</span>light particles,</span>
+        <span class="run f f-environment"><span class="badge">environment</span>forest, in forest, tree, bushes, foreground branches and leaves partially obscuring view, dense foliage,</span>
+        <span class="run f f-nltags"><span class="badge">nltags</span>斜上方侧面视角的胸部以上特写肖像，斯卡蒂位于画面右侧，镜头从上方斜侧拍向她。</span>
+        <span class="run f f-quality"><span class="badge">quality</span>best quality, amazing quality</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="state">
+    <div class="state-head">
+      <span class="tag">状态 2</span>
+      <h2>刚打开，全空</h2>
+    </div>
+    <p class="note">十个字段一个不少地摆在那儿，像一排等着填的槽位。空块用更淡的底色和徽章与有内容的区分开，但仍然可点、可落光标。这也是 LLM 回填前的样子。</p>
+
+    <div class="editor">
+      <div class="editor-bar">
+        <span class="left"><span class="chip">提示词</span><span>光标在 count</span></span>
+        <span class="budget">合计 <b>0</b> / 1471 token</span>
+      </div>
+      <div class="flow">
+        <span class="run blank active f f-count"><span class="badge">count</span><span class="slot"><span class="caret"></span></span></span>
+        <span class="run blank f f-character"><span class="badge">character</span><span class="slot"></span></span>
+        <span class="run blank f f-series"><span class="badge">series</span><span class="slot"></span></span>
+        <span class="run blank f f-style"><span class="badge">style</span><span class="slot"></span></span>
+        <span class="run blank f f-artist"><span class="badge">artist</span><span class="slot"></span></span>
+        <span class="run blank f f-appearance"><span class="badge">appearance</span><span class="slot"></span></span>
+        <span class="run blank f f-tags"><span class="badge">tags</span><span class="slot"></span></span>
+        <span class="run blank f f-environment"><span class="badge">environment</span><span class="slot"></span></span>
+        <span class="run blank f f-nltags"><span class="badge">nltags</span><span class="slot"></span></span>
+        <span class="run blank f f-quality"><span class="badge">quality</span><span class="slot"></span></span>
+      </div>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section class="common">
+    <h3>随之确定的行为</h3>
+    <ul>
+      <li>光标落在哪一块，输入就归哪一块——该块提亮，顶栏写出当前字段名，归属永远看得见。</li>
+      <li>块边界删不穿：退格到块首跳到上一块末尾，不会把两块并成一块；空块也删不掉，只会跳过去。</li>
+      <li>每块单独计 token，顶栏给合计与 <code>1471</code> 上限；超限在点生成之前就拦下，并指出最长的那块。</li>
+      <li>全角逗号只在 TAG 类块标红（上图 <code>tags</code> 里那个），<code>nltags</code> 块是自然语言，不标。</li>
+      <li>从别处粘进来的整段提示词落在当前块，不自动拆分；要拆另点「交给 LLM 拆分到各块」。</li>
+      <li>补全走本地标签库：光标在 <code>artist:</code> 前缀词内只搜画师，在 <code>character</code> 块优先角色类，其余走通用类。</li>
+      <li>拼接发给 NAI 时空块整段跳过，不会留下多余的逗号——屏幕上占位，输出里不占位。</li>
+    </ul>
+  </section>
+</div>

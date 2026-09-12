@@ -150,9 +150,8 @@ Electron 31 + electron-vite + React 18 + TypeScript(strict) + zustand + CodeMirr
 
 | 文件 | 内容 |
 |---|---|
-| [设计规格](docs/superpowers/specs/2026-09-12-llm-nai-toolbox-design.md) | 17 节，架构、字段、编辑器、LLM 层、标签库、历史、容错清单 |
-| [分块编辑器预览](docs/superpowers/specs/2026-09-12-block-editor-mockup.html) | 双击打开，看编辑器长什么样 |
-| [计划 1：工程骨架 + 分块编辑器](docs/superpowers/plans/2026-09-12-plan1-skeleton-and-block-editor.md) | 9 个任务，逐步可测 |
+| [设计说明](docs/design.md) | 架构、进程模型、一次 LLM 轮次的形状、分块编辑器的段结构、标签库、历史、容错清单 |
+| [分块编辑器预览](docs/block-editor-preview.html) | 双击打开，看编辑器长什么样 |
 
 ---
 
