@@ -1,0 +1,12 @@
+node_modules/
+out/
+dist/
+release/
+*.log
+.DS_Store
+Thumbs.db
+
+# 标签库随安装包分发，加起来 80MB+，不进仓库。
+# 构建前手动放进 resources/tagdb/，文件清单见 README。
+resources/tagdb/*
+!resources/tagdb/.gitkeep
