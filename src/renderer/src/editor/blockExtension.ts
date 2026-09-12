@@ -92,29 +92,52 @@ function decorationsFor(specs: readonly FieldSpec[], view: EditorView): Decorati
   if (!isWellFormed(doc, specs)) return Decoration.none
   const cursor = view.state.selection.main.head
   const decos = buildBlockDecorations(doc, specs, cursor)
-  const emptyFields = new Set(decos.filter((d) => d.kind === 'blank').map((d) => d.field))
   const activeFields = new Set(decos.filter((d) => d.kind === 'active').map((d) => d.field))
+
+  // 每段的 mark 向后多吃一个字符 —— 也就是**下一段的分隔符**。
+  // 这是光标落点正确的关键：分隔符被 replace 藏掉，若它落在 mark 外面，
+  // 光标会被画到那个零宽元素处（即本框右内边距之后），看着比文字末尾右偏一个
+  // 内边距的距离（实测偏 7.4px）。收进 mark 内部之后，它排在文字之后、
+  // 内边距之前，光标就落在文字末尾。
+  // 副作用是好的：空段的 mark 因此有了 1 个字符的长度，不再是零长度，
+  // 于是空段与非空段走同一条渲染路径 —— 只有「末段且为空」还得靠 widget，
+  // 因为它后面没有分隔符可吃（markEnd 会等于 from）。
+  // 空段仍然只能走 widget：它的 mark 范围会是 [from, from+1)，而那一个字符
+  // 恰好就是下一段分隔符的 replace 范围，两者完全重合 —— mark 会被整个吞掉，
+  // 框压根不渲染（实测空状态下 .blk-run 数量为 0）。+1 这一招只对非空段成立，
+  // 因为它的 mark 比 replace 长，能存活。
+  const emptyFields = new Set(decos.filter((d) => d.kind === 'blank').map((d) => d.field))
+  const markEndOf = new Map<string, number>()
+  for (const d of decos) {
+    if (d.kind !== 'block') continue
+    markEndOf.set(d.field, Math.min(d.to + 1, doc.length))
+  }
 
   const ranges = decos.flatMap((d) => {
     switch (d.kind) {
-      case 'badge':
-        return [
-          emptyFields.has(d.field)
-            ? Decoration.replace({
-                widget: new EmptyPillWidget(d.field, d.hue, activeFields.has(d.field)),
-              }).range(d.from, d.to)
-            // 非空段：只把分隔符藏掉，徽章由 .blk-run::before 画在框内
-            : Decoration.replace({}).range(d.from, d.to),
-        ]
-      case 'block':
-        // 空段整块由 EmptyPillWidget 画；它的范围是零长度，mark 也构造不出来
+      case 'badge': {
+        // d.from / d.to 是本段前面那个分隔符；本段内容起点即 d.to
+        if (emptyFields.has(d.field)) {
+          return [
+            Decoration.replace({
+              widget: new EmptyPillWidget(d.field, d.hue, activeFields.has(d.field)),
+            }).range(d.from, d.to),
+          ]
+        }
+        // 只把分隔符藏掉，徽章由 .blk-run::before 画在框内
+        return [Decoration.replace({}).range(d.from, d.to)]
+      }
+      case 'block': {
         if (emptyFields.has(d.field)) return []
+        const end = markEndOf.get(d.field) ?? d.to
+        if (end <= d.from) return []
         return [
           Decoration.mark({
             class: activeFields.has(d.field) ? 'blk-run blk-active' : 'blk-run',
             attributes: { style: `--h:${d.hue}`, 'data-field': d.field },
-          }).range(d.from, d.to),
+          }).range(d.from, end),
         ]
+      }
       case 'comma':
         return [Decoration.mark({ class: 'blk-comma' }).range(d.from, d.to)]
       default:
