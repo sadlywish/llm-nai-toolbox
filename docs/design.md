@@ -105,13 +105,41 @@ llm-nai-toolbox 的架构与关键取舍。使用方法见 [README](../README.md
 
 ## 本地标签库
 
-随安装包分发，分文件惰性加载：`tags_index_v2`(29MB) 启动后异步载入，`tags_detail_v2`(41MB)、`tag_browse`、`tag_gloss`、`character_features` 各自首次用到才加载。
+随安装包分发。计划 2 只加载 `tags_index_v2`(29MB)，启动后异步读盘；`tags_detail_v2`(41MB)、`tag_browse`、`tag_gloss`、`character_features` 留给计划 3，各自首次用到才加载。
 
-插件用的是同步 `readFileSync` + `JSON.parse`，搬到 Electron 主进程会卡住启动，所以改了加载策略。
+插件用的是同步 `readFileSync`，搬到 Electron 主进程会卡住启动，所以改成 `fs/promises`。但 `JSON.parse` 与建索引仍是同步的：**实测整个加载 3949ms**（读盘 85ms + parse 210ms + 建两份索引约 3.6s），常驻 heap 554MB。这段时间主进程被占住，界面照常（渲染是独立进程），只是发往主进程的补全请求会排队——所以 `loading` 状态必须在同步段开始**之前**播出去，`load()` 里那个 `await readFile` 提供的让出点保证了这一点。
 
-**缺文件时对应的 LLM 工具直接不注册**，并在界面写明是哪个文件。不注册一个会失败的工具，也不静默降级。
+索引常驻进程生命周期，不做淘汰。554MB 是接受的代价，不是异常。
 
-检索沿用插件的三层：CJK 变体归一化 → Levenshtein 编辑距离 → Trigram 倒排索引预筛。标签转义风格取 NovelAI 的——它的加权语法不是 `()`，按 SD 那套转义反而会把反斜杠写进提示词。
+**缺文件时不静默降级**：状态分 `missing`（文件没放）与 `error`（读不了、解析失败、或某一类为空），`detail` 里点名是哪个文件、哪几类，界面照抄。类别判空是**逐类**而不是只判全空——旧版 schema 或被截断的文件会让三类为空而总数非零，那时挂 `ready` 等于给用户一个半残的库还不告诉他。
+
+### 检索与补全是两套东西
+
+这是本模块最要紧的一条分界，两侧不共用打分路径。
+
+| | 检索（`shared/tagdb/search.ts`，从插件搬运） | 补全（`shared/tagdb/completionMatch.ts`，新写） |
+|---|---|---|
+| 用途 | LLM 递来一个完整查询串，找出规范 tag | 用户逐字输入，过滤候选 |
+| 形态 | **解析器**：精度优先，短查询被主动拒绝 | **过滤器**：召回优先，每次按键的成本才是约束 |
+| 匹配 | CJK 归一 + trigram 预筛 + Levenshtein | 词首匹配（照抄 a1111-sd-webui-tagcomplete 的 `(^\|[^a-zA-Z])`） |
+| 收口 | `searchOne` 的「≥0.85 全给、0.5~0.85 只给最高一个」 | 不收口，全量返回 |
+| 索引 | trigram 倒排，键建在 `normalize`（**删**下划线括号） | 词首倒排，键建在 `foldForCompletion`（**留**符号） |
+
+把解析器当过滤器用是行不通的，不是慢一点的问题：`getCandidates` 对 1 字符查询返回 null，2 字符的拉丁查询在 trigram 索引里零命中（`extractTrigrams` 对非 CJK 长名只产 trigram）。`calcSimilarity` 里那句 `hasCjk(nq) ? nq.length >= 2 : nq.length >= 3` 旁边记着事故：`nq="W"` 时一次查询返回 168 万字符。
+
+补全的候选分三档排序，档内规则不同：
+
+| 档 | 内容 | 档内排序 |
+|---|---|---|
+| 0 | 折叠后与查询完全相等 | 图数降序 |
+| 1 | 词首命中 | 图数降序 |
+| 2 | 完整检索（`matchEntry` ≥ 0.5），仅当查询长到 trigram 索引能用 | 分数降序，同分图数 |
+
+档 2 的作用是捞回**词中间**的子串：查 `ress` 能命中 `red_dress`、`sundress`、`caress`，而词首档一个都给不了。**它不提供拼写纠错**——`getCandidates` 先按 trigram 预筛，`bleu` 与 `bluehair` 的 trigram 交集为空，Levenshtein 段根本走不到。
+
+预筛与校验共用同一套「词首」定义（`matchStarts`），所以索引必然覆盖匹配器能接受的每个位置——这是构造保证，不是测试保证。
+
+实测跨进程延迟（中位数）：单字符 `s` 查画师 17898 条 / 1037KB / 86ms；`bl` 1158 条 / 78KB / 5ms；`初音` 72 条 / 6KB / 1ms。加载完成后第一次查询约 609ms（V8 冷），之后稳定。**候选全量返回、不设条数上限**，渲染量由 CodeMirror 的 `maxRenderedOptions` 兜住——结果集大小与渲染成本是两件事。
 
 ---
 
