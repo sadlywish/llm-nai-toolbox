@@ -1,19 +1,9 @@
 import { readFile } from 'fs/promises'
+import type { TagdbStatus } from '@shared/ipc'
 import type { TagEntry, TagIndex } from '@shared/tagdb/search'
 import { buildIndex, collectNames } from '@shared/tagdb/search'
 import { completionKeys, foldForCompletion } from '@shared/tagdb/completionMatch'
 import { TAGDB_FILES, tagdbFilePath } from './paths'
-
-export type TagdbState = 'idle' | 'loading' | 'ready' | 'missing' | 'error'
-
-export interface TagdbStatus {
-  state: TagdbState
-  /** 正在加载/出问题的文件名，供界面指名道姓 */
-  file: string
-  /** 可直接展示给用户的一句中文说明 */
-  detail: string
-  counts: { artists: number; characters: number; series: number; general: number } | null
-}
 
 export interface Category {
   entries: TagEntry[]
@@ -24,9 +14,13 @@ export interface Category {
    * 与 `index`（trigram 倒排）是两份，各服务一套规则，都不能省：
    *  - `index` 的键建在 `normalize` 的结果上，那个函数**删掉**了下划线与
    *    括号，所以它无法回答「哪些名字有个词以 bl 开头」；
-   *  - 而 `getCandidates` 对 1 字符查询直接 `return null`（退化成全表扫 +
-   *    每条 levenshtein），2 字符的拉丁查询在 trigram 索引里更是零命中
-   *    （`extractTrigrams` 对非 CJK 长名只产 trigram）。逐字补全走不了它。
+   *  - 而 `getCandidates` 对 1 字符查询 `return null`、调用处 `complete.ts`
+   *    写的是 `?? []`，null 变空数组，**不会**退化成全表扫描；2 字符的拉丁
+   *    查询在 trigram 索引里则通常零命中（`extractTrigrams` 对非 CJK 长名
+   *    只产 trigram）。真正挡住短查询走 trigram 索引的是 `normalize`（删掉
+   *    下划线与括号）与 `foldForCompletion`（下划线折成空格）对词边界的
+   *    看法分歧，细节见 `complete.ts` 的 `fullMatchEnabled`。逐字补全因此
+   *    走不了它。
    *
    * 实测规模（四类合计约 170872 条、70 万个名字）：posting 总量 192.6 万个
    * 下标（约 7.3 MB），287444 种键。最大的桶是 artists 的 `")"` 28625 条
@@ -56,21 +50,37 @@ export interface TagdbCategories {
  * tags_index_v2.json 的条目只有 tag/count/zh/ja/en/other/series；
  * 检索算法还会读 zhFull/zhShort/zhNick（完整译名/缩写/昵称），
  * 缺了会在 collectNames 里变成 undefined 并让 for..of 抛错。
+ *
+ * 两层校验，不只判「有没有」：
+ *  - 元素本身不是对象（字符串、数字……）就整条跳过——旧写法会让它落进
+ *    `e.tag` 这类属性访问，取到 undefined 后被 `String(undefined ?? '')`
+ *    抹成合法却毫无意义的 `tag: ''`，报表里凭空多出一条空标签；
+ *  - 该是数组的字段类型不对（`{ zh: "蓝发" }`，字符串而不是数组）就退化成
+ *    `[]`，不能就地断言成 `string[]` 直接收下——那会把一个字符串塞进本该是
+ *    数组的字段，`collectNames` 对它 `for..of` 倒是不会抛错（字符串可迭代），
+ *    但吐出来的是一个个汉字，不是名字，补全索引会被这些假「名字」污染。
  */
 export function fillEntries(raw: unknown): TagEntry[] {
   if (!Array.isArray(raw)) return []
-  return raw.map((e: Record<string, unknown>) => ({
-    tag: String(e.tag ?? ''),
-    count: Number(e.count ?? 0),
-    zh: (e.zh as string[]) ?? [],
-    zhFull: (e.zhFull as string[]) ?? [],
-    zhShort: (e.zhShort as string[]) ?? [],
-    zhNick: (e.zhNick as string[]) ?? [],
-    ja: (e.ja as string[]) ?? [],
-    en: (e.en as string[]) ?? [],
-    other: (e.other as string[]) ?? [],
-    series: (e.series as string[]) ?? [],
-  }))
+  const asStringArray = (x: unknown): string[] => (Array.isArray(x) ? x : [])
+  const out: TagEntry[] = []
+  for (const e of raw as unknown[]) {
+    if (typeof e !== 'object' || e === null) continue
+    const rec = e as Record<string, unknown>
+    out.push({
+      tag: String(rec.tag ?? ''),
+      count: Number(rec.count ?? 0),
+      zh: asStringArray(rec.zh),
+      zhFull: asStringArray(rec.zhFull),
+      zhShort: asStringArray(rec.zhShort),
+      zhNick: asStringArray(rec.zhNick),
+      ja: asStringArray(rec.ja),
+      en: asStringArray(rec.en),
+      other: asStringArray(rec.other),
+      series: asStringArray(rec.series),
+    })
+  }
+  return out
 }
 
 /**
@@ -118,7 +128,6 @@ export function buildCompletionIndex(entries: TagEntry[]): Map<string, number[]>
 export class TagdbLoader {
   private _status: TagdbStatus = {
     state: 'idle',
-    file: TAGDB_FILES.index,
     detail: '尚未开始加载',
     counts: null,
   }

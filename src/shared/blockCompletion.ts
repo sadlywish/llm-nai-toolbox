@@ -52,6 +52,8 @@ export function completionTargetAt(
   // 这一支也覆盖「在非 artist 字段里写 @wlop」的情形 —— 写了前缀就是要画师。
   const artistHit = findArtistSpans(text).find((s) => local >= s.start && local <= s.end)
   if (artistHit) {
+    // 现在这一支永远不会命中——ARTIST_RE 的词身首字符必须非空白，name 不
+    // 可能是空串。留着是防着 ARTIST_RE 以后被放宽，别把它当死代码删掉。
     if (artistHit.name.length === 0) return null
     const from = artistHit.end - artistHit.name.length
     return {

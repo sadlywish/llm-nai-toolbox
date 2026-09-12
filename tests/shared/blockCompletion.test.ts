@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import type { FieldSpec } from '@shared/fields'
 import { CHARACTER_FIELDS, MAIN_FIELDS, fieldByName } from '@shared/fields'
 import { blockRanges, serializeFields } from '@shared/blockDoc'
 import { completionTargetAt } from '@shared/blockCompletion'
 
-const rangeOf = (doc: string, specs: readonly { name: string }[], name: string) => {
-  const hit = blockRanges(doc, specs as never).find((r) => r.name === name)
+const rangeOf = (doc: string, specs: readonly FieldSpec[], name: string) => {
+  const hit = blockRanges(doc, specs).find((r) => r.name === name)
   if (hit === undefined) throw new Error(`没有字段 ${name}`)
   return hit
 }

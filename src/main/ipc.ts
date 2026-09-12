@@ -1,6 +1,6 @@
 import { BrowserWindow, ipcMain } from 'electron'
 import { IPC, type TagdbCompleteInput } from '@shared/ipc'
-import { completeFrom } from './tagdb/complete'
+import { COMPLETION_PREFERS, completeFrom } from './tagdb/complete'
 import { TagdbLoader } from './tagdb/loader'
 import { resolveTagdbDir } from './tagdb/paths'
 
@@ -13,7 +13,9 @@ import { resolveTagdbDir } from './tagdb/paths'
  *  - 第二次 `ipcMain.handle` **抛错**（实测：`Attempted to register a second
  *    handler for 'tagdb:complete'`），异常发生在 `activate` 回调里，窗口建不出来；
  *  - 还会再构造一个 `TagdbLoader` 并再加载一遍 —— 实测那是 **3949ms** 与
- *    **554MB** 的重复开销。
+ *    **554MB** 的重复开销。554MB 本身不是异常数字：两份索引常驻内存、
+ *    进程活多久占多久，没有淘汰机制，这是量过之后接受的代价；这里说的
+ *    「开销」专指白白再付一次，bug 是重复加载，不是常驻本身。
  *
  * 所以状态推送改为广播给**当前所有窗口**。加载之后才出现的新窗口不靠推送，
  * 它在挂载时会用 `tagdb:status:get` 主动拉一次（见 Task 7 的 store）。
@@ -22,9 +24,19 @@ import { resolveTagdbDir } from './tagdb/paths'
  * 实测完整加载 **3949ms**（读盘 85ms + JSON.parse 210ms + 建两份索引约 3.6s），
  * 后两段是同步的、会占住主线程 —— 这正是必须先把 `loading` 播出去的原因。
  */
+// 见上面的函数注释：违反「只能调一次」目前只会得到 Electron 那句不指名道姓的
+// 「second handler」异常，排查者得先怀疑到这里才行。这里提前拦一道，把违反的
+// 是哪条契约说清楚。
+let registered = false
+
 export function registerIpc(
   appInfo: { isPackaged: boolean; resourcesPath: string; appRoot: string },
 ): void {
+  if (registered) {
+    throw new Error('registerIpc 只能在整个应用生命周期里调用一次，见函数注释')
+  }
+  registered = true
+
   const dir = resolveTagdbDir(appInfo)
 
   const loader = new TagdbLoader(dir, (status) => {
@@ -36,6 +48,11 @@ export function registerIpc(
   })
 
   ipcMain.handle(IPC.tagdbComplete, (_e, input: TagdbCompleteInput) => {
+    // 这是主进程唯一对外暴露的入口——渲染进程 contextIsolation，理论上只有
+    // 我们自己写的 preload 会调它，但入口就是入口，不能假定调用方一定守规矩。
+    if (typeof input?.query !== 'string' || !COMPLETION_PREFERS.includes(input.prefer)) {
+      return { ok: false as const, status: loader.status }
+    }
     const cats = loader.categories
     if (cats === null) return { ok: false as const, status: loader.status }
     return {

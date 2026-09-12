@@ -3,7 +3,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { TagdbLoader, buildCompletionIndex, fillEntries } from '../../src/main/tagdb/loader'
-import type { TagdbStatus } from '../../src/main/tagdb/loader'
+import type { TagdbStatus } from '../../src/shared/ipc'
 import { TAGDB_FILES } from '../../src/main/tagdb/paths'
 
 function fixtureDir(content: unknown | null): string {
@@ -32,6 +32,24 @@ describe('fillEntries', () => {
   it('入参不是数组时给空数组，不抛错', () => {
     expect(fillEntries(null)).toEqual([])
     expect(fillEntries({})).toEqual([])
+  })
+
+  it('数组元素本身不是对象时跳过，不产生 tag 为空串的垃圾条目', () => {
+    const entries = fillEntries([
+      'not an object',
+      42,
+      { tag: 'x', count: 1, zh: [], ja: [], en: [], other: [], series: [] },
+    ])
+    expect(entries).toHaveLength(1)
+    expect(entries[0].tag).toBe('x')
+  })
+
+  it('该是数组的字段却是字符串（如 { zh: "蓝发" }）时该字段退化成空数组，不让半个坏条目蒙混过关', () => {
+    const [e] = fillEntries([
+      { tag: 'x', count: 1, zh: '蓝发', ja: [], en: [], other: [], series: [] },
+    ])
+    expect(e.tag).toBe('x')
+    expect(e.zh).toEqual([])
   })
 })
 
@@ -103,7 +121,6 @@ describe('TagdbLoader', () => {
     const l = new TagdbLoader(fixtureDir(null), () => {})
     await l.load()
     expect(l.status.state).toBe('missing')
-    expect(l.status.file).toBe('tags_index_v2.json')
     expect(l.status.detail).toContain('tags_index_v2.json')
     expect(l.categories).toBeNull()
   })

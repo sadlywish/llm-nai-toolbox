@@ -1,4 +1,5 @@
 import type { CompletionPrefer } from '@shared/blockCompletion'
+import type { CompletionItem } from '@shared/ipc'
 import {
   COMPLETION_KEY_LEN,
   foldForCompletion,
@@ -20,14 +21,6 @@ const FULL_MATCH_MIN_SCORE = 0.5
 const TIER_EXACT = 0
 const TIER_WORD_START = 1
 const TIER_FULL_MATCH = 2
-
-export interface CompletionItem {
-  tag: string
-  /** Danbooru 图数。3 张图和 3 万张图的 tag 值不值得用，差别很大 */
-  count: number
-  zh: string[]
-  series: string[]
-}
 
 /** 内部用：带上档位与分数，排完序就丢掉。 */
 interface Ranked {
@@ -52,6 +45,12 @@ const CATEGORY: Record<CompletionPrefer, keyof TagdbCategories> = {
   series: 'series',
   general: 'general',
 }
+
+/**
+ * `CompletionPrefer` 的全部取值，供 ipc.ts 校验外部传入的 `prefer` 用——
+ * 别处手写一遍这四个字符串，两份列表迟早会漂移。
+ */
+export const COMPLETION_PREFERS = Object.keys(CATEGORY) as CompletionPrefer[]
 
 function toItem(entry: TagEntry): CompletionItem {
   return { tag: entry.tag, count: entry.count, zh: entry.zh, series: entry.series }
@@ -142,8 +141,9 @@ export function completeFrom(
   limit?: number,
 ): CompletionItem[] {
   const raw = query.trim()
-  if (raw.length === 0) return []
-  // 先折叠再 trim：'_' 会折成空格，折完才知道它其实是空查询
+  // 先折叠再 trim：'_' 会折成空格，折完才知道它其实是空查询。
+  // raw 为空时 foldForCompletion('') 恒为 ''，下面这条判断已经兜住了，
+  // 不必在这之前再单独判一次 raw
   const fq = foldForCompletion(raw).trim()
   if (fq.length === 0) return []
 

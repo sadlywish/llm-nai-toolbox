@@ -1,11 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { IPC, type TagdbCompleteInput } from '@shared/ipc'
-import type { CompletionItem } from '../main/tagdb/complete'
-import type { TagdbStatus } from '../main/tagdb/loader'
-
-export type TagdbCompleteResult =
-  | { ok: true; items: CompletionItem[] }
-  | { ok: false; status: TagdbStatus }
+import {
+  IPC,
+  type TagdbCompleteInput,
+  type TagdbCompleteResult,
+  type TagdbStatus,
+} from '@shared/ipc'
 
 const api = {
   appVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
