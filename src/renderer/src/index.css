@@ -93,6 +93,12 @@ body {
   height: 15px; line-height: 15px; padding: 0 6px;
   margin-right: 7px;
   white-space: nowrap; user-select: none;
+  /* 上抬 2px。基线对齐会把芯片压低：15px 正文的基线在内容区顶部下约 11.7px
+     （ascent≈0.78em），而 12px 芯片自身的基线在它顶部下约 9.8px，
+     差值约 1.9px —— 芯片因此下坠、吃掉下边的 3px 内边距。
+     伪元素没有 DOM 节点、量不到矩形，这个值是按字体度量算的，并由实机确认。
+     改动 font-size 或 line-height 时必须重新算这一项。 */
+  vertical-align: 2px;
 }
 
 /* 空段的框：**必须和非空段处在同一种布局环境**，即同样是 display: inline。
