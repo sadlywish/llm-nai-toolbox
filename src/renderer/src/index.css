@@ -39,21 +39,26 @@ body {
 
 .pane-bar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 10px; font-size: 11.5px; color: var(--ink-dim);
+  padding: 7px 12px; font-size: 13px; color: var(--ink-dim);
   background: var(--panel-2); border-bottom: 1px solid var(--line);
 }
 .pane-budget { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .pane-budget b { color: var(--ink); font-weight: 500; }
-.pane-warn { margin: 0; padding: 8px 10px; color: var(--danger); font-size: 12px; border-top: 1px solid var(--line); }
+.pane-warn { margin: 0; padding: 9px 12px; color: var(--danger); font-size: 13px; border-top: 1px solid var(--line); }
 
 .prompt-editor .cm-editor { background: transparent; }
-.prompt-editor .cm-content { padding: 12px 14px; line-height: 2.35; }
+/* 15px 是姊妹项目「画师串工具箱」在实屏上试出来的值，它的注释写着
+   「13px 偏小；15px 之后每屏少约两行」。行高从 2.35 收到 2.05 补偿字号变大，
+   免得每行占地翻上去。 */
+.prompt-editor .cm-content { padding: 14px 16px; line-height: 2.05; }
 .prompt-editor .cm-focused { outline: none; }
 
+/* 12px 是实屏上能看清的下限。原先 9.5px 抄的是网页稿的数值，
+   而那份稿子是在浏览器里按 2 倍放大看的 —— 1 倍实屏下根本读不出字。 */
 .blk-badge {
-  font-size: 9.5px; font-weight: 500; letter-spacing: .03em;
-  background: hsl(var(--h) 45% 48%); color: #0f1115;
-  border-radius: 2px; padding: 1px 4px; margin-right: 5px;
+  font-size: 12px; font-weight: 600; letter-spacing: .02em;
+  background: hsl(var(--h) 45% 52%); color: #0f1115;
+  border-radius: 3px; padding: 2px 6px; margin-right: 6px;
   white-space: nowrap;
 }
 

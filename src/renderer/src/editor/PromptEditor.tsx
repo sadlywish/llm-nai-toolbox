@@ -39,7 +39,7 @@ export default function PromptEditor({ specs, values, onChange }: Props): JSX.El
           if (!update.docChanged) return
           onChangeRef.current(parseDocument(update.state.doc.toString(), specs))
         }),
-        EditorView.theme({ '&': { fontFamily: 'var(--mono)', fontSize: '12.5px' } }),
+        EditorView.theme({ '&': { fontFamily: 'var(--mono)', fontSize: '15px' } }),
       ],
     })
 
