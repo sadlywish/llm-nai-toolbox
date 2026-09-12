@@ -26,10 +26,7 @@ import type { FieldSpec } from '@shared/fields'
 export const externalSync = Annotation.define<boolean>()
 
 /**
- * 空段的整块。
- *
- * 空段一个字符都没有，mark 无从附着（零长度会让 `Decoration.mark().range()`
- * 当场抛 RangeError），所以整块由这一个 widget 占位。
+ * 空段的整块。空段一个字符都没有，零长度无法附着 mark，只能整块由 widget 占位。
  * 它只提供带 `data-field` 的外框，徽章由 `.blk-run::before` 画 —— 与非空段
  * 共用同一条 CSS 规则，两条渲染路径只有一种视觉。
  */
@@ -56,32 +53,25 @@ class EmptyPillWidget extends WidgetType {
     return pill
   }
 
-  // 必须放行事件，否则 eventBelongsToEditor 遇到它就 return false，
-  // CodeMirror 自己的 pointer 逻辑不跑，点空段没反应
   ignoreEvent(): boolean {
     return false
   }
 }
 
 /**
- * 段落装饰：一个段渲染成一个框，徽章在框**里面**（定稿示意稿的形态）。
+ * 段落装饰：一个段渲染成一个框，徽章是框内的 `::before` 伪元素。
  *
- * ── 徽章为什么是 CSS 伪元素，而不是 widget ──────────────────
- * 试过两条 widget 路线，都失败了，实测结论：
- *  · mark 范围取 [from, to)，徽章是分隔符上的 replace widget
- *    → widget 渲染成 mark 的**兄弟节点**，徽章在框外；
- *  · 把 mark 范围放大到 [sepAt, to) 想把 widget 包进去
- *    → **replace widget 不会被 mark 裹住**，CodeMirror 把它提到行级；
- *      非空段实测 `.blk-run` 里查不到 `.blk-badge`，空段则更糟，
- *      mark 范围与 replace 完全重合时整个 mark 被吞掉、框压根不渲染。
+ * ── 为什么徽章只能是伪元素 ──────────────────────────────────
+ * **widget 在 CodeMirror 里进不了 mark 内部**，两种都实测过：
+ *  · 分隔符上的 `Decoration.replace({widget})` → 渲染成 mark 的兄弟节点；
+ *  · 段起点、`side: 1` 的 `Decoration.widget` → 同样在 mark 外（实测
+ *    `.blk-run` 里查不到 `.blk-badge`，且出现游离徽章）。
+ * 伪元素天生在元素内部，是唯一能让框裹住徽章的机制。
+ * 代价是它没有 DOM 节点、`getBoundingClientRect` 量不到，所以对齐不能靠调参，
+ * 必须靠**构造**保证 —— 见 index.css 里把 line-height 全部写死成像素的理由。
  *
- * 所以徽章改由 `.blk-run::before { content: attr(data-field) }` 画 ——
- * 伪元素天生在元素内部，框裹住徽章这件事由 CSS 保证，不跟装饰模型对抗。
  * 分隔符本身用不带 widget 的 `Decoration.replace({})` 藏掉。
- *
- * 另外 active 不再是独立 mark，而是直接加在 block mark 的 class 上：
- * 同一个元素、`data-field` 就在手边，既省掉一层嵌套，也避免了
- * 「active 靠继承拿 --h、装饰顺序一变就静默失效」那类问题。
+ * active 直接加在 block mark 的 class 上，不另开一层 mark。
  */
 function decorationsFor(specs: readonly FieldSpec[], view: EditorView): DecorationSet {
   const doc = view.state.doc.toString()
@@ -90,34 +80,36 @@ function decorationsFor(specs: readonly FieldSpec[], view: EditorView): Decorati
   if (!isWellFormed(doc, specs)) return Decoration.none
   const cursor = view.state.selection.main.head
   const decos = buildBlockDecorations(doc, specs, cursor)
-  // 'blank' 与 'active' 只当信号用，不各自成装饰
   const emptyFields = new Set(decos.filter((d) => d.kind === 'blank').map((d) => d.field))
   const activeFields = new Set(decos.filter((d) => d.kind === 'active').map((d) => d.field))
 
-  const ranges = decos
-    .filter((d) => d.kind === 'badge' || d.kind === 'block' || d.kind === 'comma')
-    // 空段整块由 EmptyPillWidget 画，不再需要 block mark（而且它是零长度）
-    .filter((d) => !(d.kind === 'block' && emptyFields.has(d.field)))
-    .map((d) => {
-      switch (d.kind) {
-        case 'badge':
-          return emptyFields.has(d.field)
+  const ranges = decos.flatMap((d) => {
+    switch (d.kind) {
+      case 'badge':
+        return [
+          emptyFields.has(d.field)
             ? Decoration.replace({
                 widget: new EmptyPillWidget(d.field, d.hue, activeFields.has(d.field)),
               }).range(d.from, d.to)
             // 非空段：只把分隔符藏掉，徽章由 .blk-run::before 画在框内
-            : Decoration.replace({}).range(d.from, d.to)
-        case 'block':
-          return Decoration.mark({
+            : Decoration.replace({}).range(d.from, d.to),
+        ]
+      case 'block':
+        // 空段整块由 EmptyPillWidget 画；它的范围是零长度，mark 也构造不出来
+        if (emptyFields.has(d.field)) return []
+        return [
+          Decoration.mark({
             class: activeFields.has(d.field) ? 'blk-run blk-active' : 'blk-run',
             attributes: { style: `--h:${d.hue}`, 'data-field': d.field },
-          }).range(d.from, d.to)
-        case 'comma':
-          return Decoration.mark({ class: 'blk-comma' }).range(d.from, d.to)
-        default:
-          throw new Error(`未预期的装饰种类：${d.kind}`)
-      }
-    })
+          }).range(d.from, d.to),
+        ]
+      case 'comma':
+        return [Decoration.mark({ class: 'blk-comma' }).range(d.from, d.to)]
+      default:
+        // 'blank' 与 'active' 只当信号用
+        return []
+    }
+  })
   return Decoration.set(ranges, true)
 }
 
