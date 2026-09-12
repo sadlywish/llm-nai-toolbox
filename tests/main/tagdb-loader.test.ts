@@ -1,9 +1,10 @@
-import { mkdtempSync, writeFileSync } from 'fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { TagdbLoader, buildCompletionIndex, fillEntries } from '../../src/main/tagdb/loader'
 import type { TagdbStatus } from '../../src/main/tagdb/loader'
+import { TAGDB_FILES } from '../../src/main/tagdb/paths'
 
 function fixtureDir(content: unknown | null): string {
   const dir = mkdtempSync(join(tmpdir(), 'tagdb-'))
@@ -131,5 +132,25 @@ describe('TagdbLoader', () => {
     const n = seen.length
     await l.load()
     expect(seen.length).toBe(n)
+  })
+
+  it('文件读不了但存在时是 error，不是 missing —— 「找不到」会把人支到错误方向', async () => {
+    // 造一个同名的**目录**：readFile 会失败，但 code 是 EISDIR 而非 ENOENT
+    const dir = mkdtempSync(join(tmpdir(), 'tagdb-'))
+    mkdirSync(join(dir, TAGDB_FILES.index))
+    const l = new TagdbLoader(dir, () => {})
+    await l.load()
+    expect(l.status.state).toBe('error')
+    expect(l.status.detail).toContain(TAGDB_FILES.index)
+  })
+
+  it('并发调用 load 时，两个调用者都等到真正加载完成', async () => {
+    const l = new TagdbLoader(fixtureDir(SAMPLE), () => {})
+    const first = l.load()          // 故意不 await
+    await l.load()                  // 第二个调用者
+    // 关键：第二个 await 返回时，加载必须**真的**完成了
+    expect(l.status.state).toBe('ready')
+    expect(l.categories).not.toBeNull()
+    await first
   })
 })

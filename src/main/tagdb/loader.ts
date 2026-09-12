@@ -123,7 +123,7 @@ export class TagdbLoader {
     counts: null,
   }
   private _categories: TagdbCategories | null = null
-  private _started = false
+  private _loadPromise: Promise<void> | null = null
 
   constructor(
     private readonly dir: string,
@@ -143,22 +143,42 @@ export class TagdbLoader {
     this.onStatus(this._status)
   }
 
-  async load(): Promise<void> {
-    if (this._started) return
-    this._started = true
+  /**
+   * 幂等：并发调用共享同一次加载。
+   *
+   * 不能用布尔量守卫 —— 布尔量在第一个 await 之前就置位了，第二个调用者会
+   * 立刻拿到一个已完成的 promise，`await` 返回时 `categories` 其实还是 null。
+   * 缓存 promise 才能让所有调用者等到同一次真正的完成。
+   */
+  load(): Promise<void> {
+    this._loadPromise ??= this.run()
+    return this._loadPromise
+  }
 
+  private async run(): Promise<void> {
     const path = tagdbFilePath(this.dir, TAGDB_FILES.index)
     this.set({ state: 'loading', detail: `正在加载 ${TAGDB_FILES.index}` })
 
     let raw: string
     try {
       raw = await readFile(path, 'utf-8')
-    } catch {
-      this.set({
-        state: 'missing',
-        detail: `找不到 ${TAGDB_FILES.index}。请把它放进 ${this.dir}，标签补全在此之前不可用。`,
-        counts: null,
-      })
+    } catch (e) {
+      // 分开两种失败：文件确实没放，和文件在但读不了（权限、被占用、同名目录）。
+      // 混成一句「找不到」会把人支到错误的方向去查。
+      const code = (e as NodeJS.ErrnoException).code
+      if (code === 'ENOENT') {
+        this.set({
+          state: 'missing',
+          detail: `找不到 ${TAGDB_FILES.index}。请把它放进 ${this.dir}，标签补全在此之前不可用。`,
+          counts: null,
+        })
+      } else {
+        this.set({
+          state: 'error',
+          detail: `读取 ${TAGDB_FILES.index} 失败：${String(e)}。请检查文件权限或是否被其他程序占用。`,
+          counts: null,
+        })
+      }
       return
     }
 
