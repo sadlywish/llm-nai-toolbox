@@ -45,6 +45,18 @@ describe('fullMatchEnabled：档 2 的门槛', () => {
     expect(fullMatchEnabled('初')).toBe(false)
     expect(fullMatchEnabled('初音')).toBe(true)
   })
+
+  it('门槛真的挡住了档 2 —— 短查询不该捞出「归一化抹掉词边界」才成立的匹配', () => {
+    // 这条 fixture 是唯一能观测到门槛的形态，别改：
+    //   normalize('a_b') === 'ab'        → 长度 2，trigram 索引里有 bigram 'ab'
+    //   foldForCompletion('a_b') === 'a b' → 词首键是 ['a ', 'b']，**没有** 'ab'
+    // 所以查 'ab' 时档 1 漏掉 a_b，档 2 却能给它打 1.0 分。
+    // 门槛在 → a_b 不出现；门槛被摘掉 → a_b 会出现。
+    const tricky = cat([e('a_b', 100), e('ab_c', 200)])
+    expect(completeFrom({ ...CATS, general: tricky }, 'ab', 'general').map((i) => i.tag)).toEqual([
+      'ab_c',
+    ])
+  })
 })
 
 describe('completeFrom：类别路由', () => {

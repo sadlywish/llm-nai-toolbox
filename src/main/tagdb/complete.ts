@@ -33,7 +33,16 @@ export interface CompletionItem {
 interface Ranked {
   item: CompletionItem
   tier: number
-  /** 只有档 2 有意义；档 0/1 统一填 1，好让一个比较函数吃三档 */
+  /**
+   * 只有档 2 有意义；档 0/1 统一填 **1**，好让一个比较函数吃三档。
+   *
+   * 填 1（而不是 0 或 undefined）是有意的：1 是分数上界，所以
+   * 「先比档位再比分数」与「先比分数再比档位」两种写法结果恒等
+   * —— 档 2 的分数 <1 时排在后面，等于 1 时打平再由档位决定。
+   * 比较器因此对这两个子句的先后不敏感，改动顺序不会悄悄改变行为。
+   * 若哪天把这里改成 0，那个等价性立刻消失，比较器的子句顺序就变成
+   * 承重的了。
+   */
   score: number
 }
 
@@ -52,18 +61,26 @@ function toItem(entry: TagEntry): CompletionItem {
  * 档 2（完整检索逻辑）能不能用。传入的是 `normalize` 的结果 —— 因为档 2 走
  * 的是 trigram 倒排索引，那个索引的键就建在 `normalize` 上。
  *
- * 这个判据是照抄的，不是我定的：
- *  - `getCandidates` 对 `nq.length <= 1` 直接 `return null`（退化成全表扫 +
- *    每条跑 Levenshtein），所以 1 个字符绝不能走档 2；
- *  - 2 个字符的**拉丁**查询在 trigram 索引里零命中：`extractTrigrams` 对非
- *    CJK 且长度 ≥3 的名字只产 trigram，`bluehair` 只有 `blu/lue/ueh/…`，
- *    查询 `bl` 产出的 bigram 不在索引里；
- *  - 2 个字符含 CJK 则可以：`extractTrigrams` 的 `cjk || s.length < 3` 分支
- *    给 CJK 名字建了 bigram。
+ * 判据本身照抄 `calcSimilarity` 的那一行
+ * （`const enough = hasCjk(nq) ? nq.length >= 2 : nq.length >= 3`），
+ * 旁边记着 `nq="W"` 一次返回 168 万字符的事故。
  *
- * 同一行判据在 `calcSimilarity` 里写过一遍（`const enough = hasCjk(nq) ?
- * nq.length >= 2 : nq.length >= 3`），旁边记着 `nq="W"` 一次返回 168 万字符
- * 的事故。
+ * **但这道门槛在这里挡的不是那个事故**，理由要说准（实测过）：
+ *  - `getCandidates` 对 `nq.length <= 1` 确实 `return null`，可本函数的调用处
+ *    写的是 `?? []`，null 直接变空数组，**不会**退化成全表扫描。所以「1 个
+ *    字符会全表扫 + 每条跑 Levenshtein」对这份代码不成立，别这么注释。
+ *  - 2 个字符的**拉丁**查询在 trigram 索引里通常零命中：`extractTrigrams`
+ *    对非 CJK 且长度 ≥3 的名字只产 trigram，`bluehair` 只有 `blu/lue/ueh/…`，
+ *    查询 `bl` 产出的 bigram 不在索引里。
+ *  - 真正被挡住的是这一类：`normalize` 会**删掉**下划线，而
+ *    `foldForCompletion` 把它折成**空格**，两者对词边界的看法因此会分歧。
+ *    实测 `normalize('a_b') === 'ab'`（长度 2，于是索引里有 bigram `ab`），
+ *    而 `foldForCompletion('a_b') === 'a b'`，词首键是 `['a ', 'b']`、没有
+ *    `'ab'`。于是查 `ab` 时档 1 漏掉 `a_b`、档 2 却能给它打出 1.0 分。
+ *    门槛关掉，短查询就会捞出这种「只因为归一化抹掉了词边界才成立」的匹配
+ *    —— 用户打两个字母时并没打算要它。
+ *  - 2 个字符含 CJK 则放行：`extractTrigrams` 的 `cjk || s.length < 3` 分支
+ *    给 CJK 名字建了 bigram，命中是真命中。
  */
 export function fullMatchEnabled(nq: string): boolean {
   return hasCjk(nq) ? nq.length >= 2 : nq.length >= 3
@@ -105,7 +122,8 @@ function prefilterWordStart(cat: Category, fq: string): Iterable<number> {
  *
  * 档 2 是搬运来的检索逻辑，它内部的 `nt.includes(nq)` 分支能捞到**词中间**
  * 的子串 —— 查 `ress` 命中 `red_dress` / `sundress`，而词首档一个都给不了。
- * 短查询时档 2 关掉，因为那时它要么零命中要么退化成全表扫描。
+ * 短查询时档 2 关掉，理由见 `fullMatchEnabled`（**不是**「会全表扫」，那句
+ * 对这份代码不成立）。
  *
  * **档 2 不提供拼写纠错**：`getCandidates` 先按 trigram 预筛，`bleu` 与
  * `bluehair` 的 trigram 集合交集为空，`calcSimilarity` 里的 Levenshtein
