@@ -30,6 +30,13 @@ describe('serializeFields', () => {
     expect(doc.split(BLOCK_SEP)).toHaveLength(TRIO.length + 1)
     expect(parseDocument(doc, TRIO).count).toBe('ab')
   })
+
+  it('值里混进换行会被剥掉——回灌（LLM 写回）绕开 guardFilter，净化只能在这里做', () => {
+    const doc = serializeFields({ count: 'a\nb\r\nc', style: '', character: '' }, TRIO)
+    expect(doc).not.toMatch(/[\r\n]/)
+    expect(isWellFormed(doc, TRIO)).toBe(true)
+    expect(parseDocument(doc, TRIO).count).toBe('abc')
+  })
 })
 
 describe('往返一致性', () => {

@@ -17,6 +17,19 @@ export function stripSeparators(text: string): string {
   return text.split(BLOCK_SEP).join('')
 }
 
+/**
+ * 段内文本的净化：分隔符与换行都不许出现在字段值里。
+ *
+ * 换行和分隔符同罪 —— 分块文档必须是**单行**，所有按字符位置算的逻辑都靠这条
+ * （见下面「位置的几何」）。`isWellFormed` 只数分隔符、看不见换行，所以拦截
+ * 必须在写入前做，而不是事后校验。`stripSeparators` 单独保留、契约不变——
+ * 这只是它多出来的一个兄弟，服务需要连换行一起挡的调用点（`serializeFields`
+ * 与渲染端 `guardFilter` 的粘贴/换行剥离分支）。
+ */
+export function sanitizeFieldText(s: string): string {
+  return stripSeparators(s).replace(/[\r\n]/g, '')
+}
+
 export function emptyValues(specs: readonly FieldSpec[]): FieldValues {
   const out: FieldValues = {}
   for (const spec of specs) out[spec.name] = ''
@@ -28,7 +41,7 @@ export function serializeFields(
   specs: readonly FieldSpec[],
 ): string {
   return specs
-    .map((spec) => BLOCK_SEP + stripSeparators(values[spec.name] ?? ''))
+    .map((spec) => BLOCK_SEP + sanitizeFieldText(values[spec.name] ?? ''))
     .join('')
 }
 

@@ -16,7 +16,7 @@ import {
 } from '@codemirror/view'
 import { WEIGHT_STEP } from '@renderer/prompt/weight'
 import { buildBlockDecorations } from '@shared/blockDecorations'
-import { BLOCK_SEP, isWellFormed, stripSeparators } from '@shared/blockDoc'
+import { BLOCK_SEP, isWellFormed, sanitizeFieldText } from '@shared/blockDoc'
 import {
   changeTouchesSeparator,
   clampToBlock,
@@ -33,8 +33,10 @@ import { localTagCompletion } from './completion'
  *
  * 回灌必然覆盖全部分隔符，会被 guardFilter 的跨段规则判为非法并整笔吞掉——
  * 不报错也不提示，表现是「store 里 values 变了，编辑器画面不动」。
- * 用注解显式放行：回灌写进去的是 serializeFields 的产物，段结构天然合法，
- * 与「用户手动跨段编辑」不是一回事，不该共用同一条禁令。
+ * 用注解显式放行：这样做是安全的，不是因为段数对得上就够了，而是因为回灌
+ * 写进去的内容出自 `serializeFields`——它用 `sanitizeFieldText` 净化过
+ * 每个字段值，分隔符与换行都已经被剥掉，与「用户手动跨段编辑」（两者都可能
+ * 混进去）不是一回事，不该共用同一条禁令。
  */
 export const externalSync = Annotation.define<boolean>()
 
@@ -150,19 +152,6 @@ function decorationsFor(specs: readonly FieldSpec[], view: EditorView): Decorati
 }
 
 /**
- * 剥掉分隔符与换行。块文档必须是单行——每段内容里的字符位置都要能直接
- * 换算成 blockRanges 的段内坐标，一旦某段内容里混进 `\n`，`.cm-line` 数量
- * 就会变多，凡是按「整篇是一行」假设写的逻辑都会跟着错位。
- *
- * 不改 `stripSeparators`（blockDoc.ts）本身的契约——`serializeFields` 也
- * 用它，扩大它的语义会把换行处理的影响面带到序列化那条路径上，而那里
- * 从未出过这个问题。这里单开一个函数，只服务 guardFilter 这一个调用点。
- */
-function stripSeparatorsAndNewlines(text: string): string {
-  return stripSeparators(text).replace(/[\r\n]/g, '')
-}
-
-/**
  * 段结构守卫。
  *
  * 三条规则，处理方式**故意不同**：
@@ -213,11 +202,13 @@ function guardFilter(specs: readonly FieldSpec[]): Extension {
       return tr
     }
 
-    // 重建这笔改动，插入文本剥掉分隔符与换行。不带 selection——长度变了，
-    // 原来的选区位置已经对不上，交给 CodeMirror 按新内容自行落点
+    // 重建这笔改动，插入文本剥掉分隔符与换行（sanitizeFieldText，与
+    // serializeFields 共用同一把净化函数——见 blockDoc.ts 的说明）。
+    // 不带 selection——长度变了，原来的选区位置已经对不上，交给 CodeMirror
+    // 按新内容自行落点
     const rebuilt: { from: number; to: number; insert: string }[] = []
     tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
-      rebuilt.push({ from: fromA, to: toA, insert: stripSeparatorsAndNewlines(inserted.toString()) })
+      rebuilt.push({ from: fromA, to: toA, insert: sanitizeFieldText(inserted.toString()) })
     })
     // 总闸验的必须是剥离之后的结果——tr.newDoc 是未剥离的版本，验它对不上
     // 真正会写进去的内容。
