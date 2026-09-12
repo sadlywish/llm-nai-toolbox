@@ -5,7 +5,7 @@ import { keymap } from '@codemirror/view'
 import { useEffect, useRef } from 'react'
 import { parseDocument, serializeFields, type FieldValues } from '@shared/blockDoc'
 import type { FieldSpec } from '@shared/fields'
-import { blockExtensions } from './blockExtension'
+import { blockExtensions, externalSync } from './blockExtension'
 
 interface Props {
   /** 字段集。整图传 MAIN_FIELDS，角色传 CHARACTER_FIELDS——组件本身不认识任何一套 */
@@ -60,6 +60,7 @@ export default function PromptEditor({ specs, values, onChange }: Props): JSX.El
     if (next === instance.state.doc.toString()) return
     instance.dispatch({
       changes: { from: 0, to: instance.state.doc.length, insert: next },
+      annotations: externalSync.of(true),
     })
   }, [values, specs])
 

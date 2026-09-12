@@ -1,4 +1,4 @@
-import { EditorState, type Extension, type Transaction } from '@codemirror/state'
+import { Annotation, EditorState, type Extension, type Transaction } from '@codemirror/state'
 import {
   Decoration,
   type DecorationSet,
@@ -14,6 +14,16 @@ import { BLOCK_SEP, stripSeparators } from '@shared/blockDoc'
 import { changeTouchesSeparator, clampToBlock, resolveBackspace, resolveDelete } from '@shared/blockNav'
 import { adjustWeightInBlock } from '@shared/blockWeight'
 import type { FieldSpec } from '@shared/fields'
+
+/**
+ * 标记「这一笔是程序化的整篇回灌」，例如 LLM 把字段写回编辑器。
+ *
+ * 回灌必然覆盖全部分隔符，会被 guardFilter 的跨段规则判为非法并整笔吞掉——
+ * 不报错也不提示，表现是「store 里 values 变了，编辑器画面不动」。
+ * 用注解显式放行：回灌写进去的是 serializeFields 的产物，段结构天然合法，
+ * 与「用户手动跨段编辑」不是一回事，不该共用同一条禁令。
+ */
+export const externalSync = Annotation.define<boolean>()
 
 /** 字段徽章。整块替换掉分隔符那一个字符，所以分隔符本身永远不可见 */
 class BadgeWidget extends WidgetType {
@@ -69,36 +79,38 @@ function decorationsFor(specs: readonly FieldSpec[], view: EditorView): Decorati
   const doc = view.state.doc.toString()
   const cursor = view.state.selection.main.head
   const decos = buildBlockDecorations(doc, specs, cursor)
-  // 空段的 active 是零长度 mark，会被下面的过滤丢掉；先把区间记下来交给 BlankWidget
+  // 空段的 active 是零长度 mark，根本构造不出来；先把区间记下来交给 BlankWidget 自己画
   const activeAt = new Set(
     decos.filter((d) => d.kind === 'active').map((d) => `${d.from}:${d.to}`),
   )
-  const ranges = decos.map((d) => {
-    switch (d.kind) {
-      case 'badge':
-        return Decoration.replace({ widget: new BadgeWidget(d.label, d.hue) }).range(d.from, d.to)
-      case 'block':
-        return Decoration.mark({
-          class: 'blk-run',
-          attributes: { style: `--h:${d.hue}`, 'data-field': d.field },
-        }).range(d.from, d.to)
-      case 'blank':
-        // 空段没有字符可 mark，只能用 widget 占一个可点的空位
-        return Decoration.widget({
-          widget: new BlankWidget(d.hue, activeAt.has(`${d.from}:${d.to}`)),
-          side: 1,
-        }).range(d.from)
-      case 'active':
-        return Decoration.mark({ class: 'blk-active' }).range(d.from, d.to)
-      case 'comma':
-        return Decoration.mark({ class: 'blk-comma' }).range(d.from, d.to)
-    }
-  })
-  // 零长度的 mark 会被 CodeMirror 拒绝，先滤掉
-  return Decoration.set(
-    ranges.filter((r) => r.from !== r.to || r.value.spec.widget !== undefined),
-    true,
-  )
+  const ranges = decos
+    // 零长度的 mark 必须在 .range() **调用之前**滤掉。
+    // Decoration.mark(...).range(from, to) 在 from >= to 时当场抛 RangeError，
+    // 不是留到 Decoration.set() 阶段再筛——事后过滤是死代码。
+    // 而 ViewPlugin 崩一次就被 deactivate 且永不重试，整个装饰系统永久失效。
+    .filter((d) => !(d.from === d.to && (d.kind === 'block' || d.kind === 'active')))
+    .map((d) => {
+      switch (d.kind) {
+        case 'badge':
+          return Decoration.replace({ widget: new BadgeWidget(d.label, d.hue) }).range(d.from, d.to)
+        case 'block':
+          return Decoration.mark({
+            class: 'blk-run',
+            attributes: { style: `--h:${d.hue}`, 'data-field': d.field },
+          }).range(d.from, d.to)
+        case 'blank':
+          // 空段没有字符可 mark，只能用 widget 占一个可点的空位
+          return Decoration.widget({
+            widget: new BlankWidget(d.hue, activeAt.has(`${d.from}:${d.to}`)),
+            side: 1,
+          }).range(d.from)
+        case 'active':
+          return Decoration.mark({ class: 'blk-active' }).range(d.from, d.to)
+        case 'comma':
+          return Decoration.mark({ class: 'blk-comma' }).range(d.from, d.to)
+      }
+    })
+  return Decoration.set(ranges, true)
 }
 
 /**
@@ -114,6 +126,8 @@ function decorationsFor(specs: readonly FieldSpec[], view: EditorView): Decorati
 function guardFilter(): Extension {
   return EditorState.transactionFilter.of((tr: Transaction) => {
     if (!tr.docChanged) return tr
+    // 程序化回灌显式放行，理由见 externalSync 的说明
+    if (tr.annotation(externalSync) === true) return tr
 
     const doc = tr.startState.doc.toString()
     let crossesBlock = false
