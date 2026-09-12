@@ -153,4 +153,11 @@ describe('TagdbLoader', () => {
     expect(l.categories).not.toBeNull()
     await first
   })
+
+  it('文件能解析但四类全空时是 error —— 挂着 ready 会让补全静默失灵', async () => {
+    const l = new TagdbLoader(fixtureDir({}), () => {})
+    await l.load()
+    expect(l.status.state).toBe('error')
+    expect(l.categories).toBeNull()
+  })
 })

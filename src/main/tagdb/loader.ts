@@ -189,6 +189,20 @@ export class TagdbLoader {
       const series = fillEntries(data.series)
       const general = fillEntries(data.general)
 
+      const total = artists.length + characters.length + series.length + general.length
+      if (total === 0) {
+        // 文件解析成功但四类全空：对用户来说和「没有标签库」没区别，
+        // 不能挂着 ready 让补全静默失灵。放在建索引之前判断，空文件
+        // 不用白付四次 buildIndex 的代价。
+        this._categories = null
+        this.set({
+          state: 'error',
+          detail: `${TAGDB_FILES.index} 解析成功但一个标签都没有，文件可能不完整，请重新取一份。`,
+          counts: null,
+        })
+        return
+      }
+
       const mk = (entries: TagEntry[]): Category => ({
         entries,
         index: buildIndex(entries),
