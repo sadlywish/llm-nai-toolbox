@@ -140,7 +140,13 @@ export class TagdbLoader {
 
   private set(next: Partial<TagdbStatus>): void {
     this._status = { ...this._status, ...next }
-    this.onStatus(this._status)
+    try {
+      this.onStatus(this._status)
+    } catch {
+      // 监听方的失败不该中断加载。Task 6 里这个回调是 webContents.send，
+      // 窗口销毁后会抛 —— 那是界面的事，标签库该照常载完，
+      // 后来者仍可以通过 `status` / `categories` 读到结果。
+    }
   }
 
   /**

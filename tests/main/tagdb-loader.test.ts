@@ -160,4 +160,13 @@ describe('TagdbLoader', () => {
     expect(l.status.state).toBe('error')
     expect(l.categories).toBeNull()
   })
+
+  it('状态回调抛错时加载照常完成 —— 监听方的失败不该拖垮数据层', async () => {
+    const l = new TagdbLoader(fixtureDir(SAMPLE), () => {
+      throw new Error('Object has been destroyed')
+    })
+    await expect(l.load()).resolves.toBeUndefined()
+    expect(l.status.state).toBe('ready')
+    expect(l.categories).not.toBeNull()
+  })
 })
