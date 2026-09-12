@@ -25,80 +25,63 @@ import type { FieldSpec } from '@shared/fields'
  */
 export const externalSync = Annotation.define<boolean>()
 
-/** 字段徽章。整块替换掉分隔符那一个字符，所以分隔符本身永远不可见 */
-class BadgeWidget extends WidgetType {
-  constructor(
-    private readonly label: string,
-    private readonly hue: number,
-  ) {
-    super()
-  }
-
-  // CodeMirror 会拿它决定能否复用已有 DOM。不实现的话每次更新都重建全部徽章
-  eq(other: BadgeWidget): boolean {
-    return other.label === this.label && other.hue === this.hue
-  }
-
-  toDOM(): HTMLElement {
-    const el = document.createElement('span')
-    el.className = 'blk-badge'
-    el.textContent = this.label
-    el.style.setProperty('--h', String(this.hue))
-    return el
-  }
-
-  ignoreEvent(): boolean {
-    return false
-  }
-}
-
 /**
- * 空段的可点占位。空段没有任何字符，mark 无从附着，只能用 widget 占位。
+ * 空段的整块。
  *
- * 视觉上它是「徽章 + 框」这个整体的右半边：与徽章边缘相接、共用一圈圆角，
- * 详见 index.css 里 .blk-badge / .blk-run / .blk-blank 的注释。
- *
- * active 由它自己画：空段的 active 是零长度 mark，构造不出来。
+ * 空段一个字符都没有，mark 无从附着（零长度会让 `Decoration.mark().range()`
+ * 当场抛 RangeError），所以整块由这一个 widget 占位。
+ * 它只提供带 `data-field` 的外框，徽章由 `.blk-run::before` 画 —— 与非空段
+ * 共用同一条 CSS 规则，两条渲染路径只有一种视觉。
  */
-class BlankWidget extends WidgetType {
+class EmptyPillWidget extends WidgetType {
   constructor(
+    private readonly field: string,
     private readonly hue: number,
     private readonly active: boolean,
   ) {
     super()
   }
 
-  eq(other: BlankWidget): boolean {
-    return other.hue === this.hue && other.active === this.active
+  eq(other: EmptyPillWidget): boolean {
+    return other.field === this.field && other.hue === this.hue && other.active === this.active
   }
 
   toDOM(): HTMLElement {
-    const el = document.createElement('span')
-    el.className = this.active ? 'blk-blank blk-blank-active' : 'blk-blank'
-    el.style.setProperty('--h', String(this.hue))
-    return el
+    const pill = document.createElement('span')
+    pill.className = this.active
+      ? 'blk-run blk-run-empty blk-active'
+      : 'blk-run blk-run-empty'
+    pill.setAttribute('data-field', this.field)
+    pill.style.setProperty('--h', String(this.hue))
+    return pill
   }
 
-  // 必须放行事件：这个 widget 存在的唯一理由就是让零宽度的空段可点。
-  // WidgetType.ignoreEvent 默认为 true，而 eventBelongsToEditor 遇到它为真
-  // 就直接 return false，CodeMirror 自己的 pointer 逻辑根本不跑。
+  // 必须放行事件，否则 eventBelongsToEditor 遇到它就 return false，
+  // CodeMirror 自己的 pointer 逻辑不跑，点空段没反应
   ignoreEvent(): boolean {
     return false
   }
 }
 
 /**
- * 段落装饰。
+ * 段落装饰：一个段渲染成一个框，徽章在框**里面**（定稿示意稿的形态）。
  *
- * ── 为什么徽章在框外，而不是被框裹住 ────────────────────────
- * 定稿示意稿里徽章是包在框里的，实现上做不到：徽章是分隔符上的
- * `Decoration.replace`，而 `Decoration.mark` **不会**把一段被 replace
- * 完全覆盖的范围裹起来——空段的 mark 范围恰好等于 replace 的范围，
- * 于是 mark 被整个吞掉，框压根不渲染（实测空状态下 .blk-run 数量为 0）。
+ * ── 徽章为什么是 CSS 伪元素，而不是 widget ──────────────────
+ * 试过两条 widget 路线，都失败了，实测结论：
+ *  · mark 范围取 [from, to)，徽章是分隔符上的 replace widget
+ *    → widget 渲染成 mark 的**兄弟节点**，徽章在框外；
+ *  · 把 mark 范围放大到 [sepAt, to) 想把 widget 包进去
+ *    → **replace widget 不会被 mark 裹住**，CodeMirror 把它提到行级；
+ *      非空段实测 `.blk-run` 里查不到 `.blk-badge`，空段则更糟，
+ *      mark 范围与 replace 完全重合时整个 mark 被吞掉、框压根不渲染。
  *
- * 所以改由 CSS 达到同样的视觉：徽章与框**边缘相接、共用一圈圆角**，
- * 读起来是一个整体色块。间距加在框的右侧而不是徽章右侧——加在徽章右侧
- * 会让框紧贴下一个徽章、被视觉上归进下一组。
+ * 所以徽章改由 `.blk-run::before { content: attr(data-field) }` 画 ——
+ * 伪元素天生在元素内部，框裹住徽章这件事由 CSS 保证，不跟装饰模型对抗。
+ * 分隔符本身用不带 widget 的 `Decoration.replace({})` 藏掉。
+ *
+ * 另外 active 不再是独立 mark，而是直接加在 block mark 的 class 上：
+ * 同一个元素、`data-field` 就在手边，既省掉一层嵌套，也避免了
+ * 「active 靠继承拿 --h、装饰顺序一变就静默失效」那类问题。
  */
 function decorationsFor(specs: readonly FieldSpec[], view: EditorView): DecorationSet {
   const doc = view.state.doc.toString()
@@ -107,38 +90,32 @@ function decorationsFor(specs: readonly FieldSpec[], view: EditorView): Decorati
   if (!isWellFormed(doc, specs)) return Decoration.none
   const cursor = view.state.selection.main.head
   const decos = buildBlockDecorations(doc, specs, cursor)
-  // 空段的 active 是零长度 mark，根本构造不出来；先把区间记下来交给 BlankWidget 自己画
-  const activeAt = new Set(
-    decos.filter((d) => d.kind === 'active').map((d) => `${d.from}:${d.to}`),
-  )
+  // 'blank' 与 'active' 只当信号用，不各自成装饰
+  const emptyFields = new Set(decos.filter((d) => d.kind === 'blank').map((d) => d.field))
+  const activeFields = new Set(decos.filter((d) => d.kind === 'active').map((d) => d.field))
+
   const ranges = decos
-    // 零长度的 mark 必须在 .range() **调用之前**滤掉。
-    // Decoration.mark(...).range(from, to) 在 from >= to 时当场抛 RangeError，
-    // 不是留到 Decoration.set() 阶段再筛——事后过滤是死代码。
-    // 而 ViewPlugin 崩一次就被 deactivate 且永不重试，整个装饰系统永久失效。
-    .filter((d) => !(d.from === d.to && (d.kind === 'block' || d.kind === 'active')))
+    .filter((d) => d.kind === 'badge' || d.kind === 'block' || d.kind === 'comma')
+    // 空段整块由 EmptyPillWidget 画，不再需要 block mark（而且它是零长度）
+    .filter((d) => !(d.kind === 'block' && emptyFields.has(d.field)))
     .map((d) => {
       switch (d.kind) {
         case 'badge':
-          return Decoration.replace({ widget: new BadgeWidget(d.label, d.hue) }).range(d.from, d.to)
+          return emptyFields.has(d.field)
+            ? Decoration.replace({
+                widget: new EmptyPillWidget(d.field, d.hue, activeFields.has(d.field)),
+              }).range(d.from, d.to)
+            // 非空段：只把分隔符藏掉，徽章由 .blk-run::before 画在框内
+            : Decoration.replace({}).range(d.from, d.to)
         case 'block':
           return Decoration.mark({
-            class: 'blk-run',
+            class: activeFields.has(d.field) ? 'blk-run blk-active' : 'blk-run',
             attributes: { style: `--h:${d.hue}`, 'data-field': d.field },
-          }).range(d.from, d.to)
-        case 'blank':
-          return Decoration.widget({
-            widget: new BlankWidget(d.hue, activeAt.has(`${d.from}:${d.to}`)),
-            side: 1,
-          }).range(d.from)
-        case 'active':
-          // 带上 --h：.blk-active 自己没有这个变量，靠继承会在装饰顺序变动时静默失效
-          return Decoration.mark({
-            class: 'blk-active',
-            attributes: { style: `--h:${d.hue}` },
           }).range(d.from, d.to)
         case 'comma':
           return Decoration.mark({ class: 'blk-comma' }).range(d.from, d.to)
+        default:
+          throw new Error(`未预期的装饰种类：${d.kind}`)
       }
     })
   return Decoration.set(ranges, true)

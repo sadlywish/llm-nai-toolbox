@@ -53,41 +53,53 @@ body {
 .prompt-editor .cm-content { padding: 14px 16px; line-height: 2.05; }
 .prompt-editor .cm-focused { outline: none; }
 
+/* ── 一个段 = 一个框，徽章是框内的伪元素 ─────────────────────
+   徽章用 ::before + content: attr(data-field) 画，而不是 widget ——
+   实测 Decoration.replace 的 widget 不会被 mark 裹住，CodeMirror 会把它
+   提到行级，徽章必然落在框外（详见 blockExtension.ts 的 decorationsFor）。
+   伪元素天生在元素内部，所以「框裹住徽章」这件事由 CSS 保证。
+
+   非空段与空段走两条渲染路径（block mark / EmptyPillWidget），
+   但共用下面这一套规则 —— **改任何一条都要同时想到另一条**。
+   组间间距一律加在**框**的右侧：加在徽章上会让框紧贴下一个徽章、
+   被视觉上归进下一组（它属于前一个）。 */
+.blk-run {
+  background: hsl(var(--h) 48% 56% / .14);
+  box-shadow: inset 0 0 0 1px hsl(var(--h) 45% 52% / .42);
+  border-radius: 4px;
+  padding: 3px 8px 3px 4px;
+  margin-right: 14px;
+}
+
 /* 12px 是实屏上能看清的下限。原先 9.5px 抄的是网页稿的数值，
    而那份稿子是在浏览器里按 2 倍放大看的 —— 1 倍实屏下根本读不出字。 */
-.blk-badge {
+.blk-run::before {
+  content: attr(data-field);
+  display: inline-block;
+  font-family: var(--mono);
   font-size: 12px; font-weight: 600; letter-spacing: .02em;
-  background: hsl(var(--h) 45% 52%); color: #0f1115;
-  border-radius: 3px; padding: 2px 6px; margin-right: 6px;
-  white-space: nowrap;
+  background: hsl(var(--h) 48% 58%); color: #0f1115;
+  border-radius: 3px; padding: 0 6px; margin-right: 7px;
+  white-space: nowrap; user-select: none;
 }
 
-/* 组内（徽章↔自己的内容框）间距由 .blk-badge 的 margin-right 提供，5px；
-   组间（内容框↔下一个徽章）必须明显更大，否则内容框会紧贴下一个徽章、
-   被视觉上归到下一组去 —— 而它属于前一个。空状态下这个错位尤其刺眼，
-   而空状态正是打开应用的默认样子。 */
-.blk-run {
-  background: hsl(var(--h) 48% 56% / .13);
-  box-shadow: inset 0 0 0 1px hsl(var(--h) 45% 52% / .38);
-  border-radius: 3px;
-  padding: 3px 6px 3px 0;
-  margin-right: 18px;
+/* 空段：整块是一个 inline-block widget。高度写死成与非空段一致（实测 21px），
+   免得空框比有内容的框矮一截或高一截；右内边距撑出可点的空地，
+   也给光标一个看得见的落点。 */
+.blk-run-empty {
+  box-sizing: border-box;
+  display: inline-block;
+  height: 21px;
+  padding-right: 2.6em;
+  vertical-align: -5px;
 }
 
-.blk-active { background: hsl(var(--h) 50% 58% / .18); }
-
-/* 组间间距与 .blk-run 一致，理由同上 */
-.blk-blank {
-  display: inline-block; min-width: 2.2em; height: 1.2em;
-  background: hsl(var(--h) 40% 55% / .05);
-  box-shadow: inset 0 0 0 1px hsl(var(--h) 35% 48% / .3);
-  border-radius: 3px; vertical-align: -.25em;
-  margin-right: 18px;
-}
-
-.blk-blank-active {
-  background: hsl(var(--h) 50% 58% / .2);
-  box-shadow: inset 0 0 0 1px hsl(var(--h) 60% 60% / .7);
+/* 光标所在段。与 .blk-run 同在一个元素上（active 是加在 block mark 的 class），
+   所以这条必须排在 .blk-run 之后才能盖住背景。
+   顶栏目前不写字段名，这是唯一的归属提示，提亮幅度要够。 */
+.blk-active {
+  background: hsl(var(--h) 62% 60% / .28);
+  box-shadow: inset 0 0 0 1px hsl(var(--h) 72% 66% / .85);
 }
 
 .blk-comma {
