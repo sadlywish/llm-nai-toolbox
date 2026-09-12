@@ -93,7 +93,8 @@ describe('completionTargetAt', () => {
   })
 
   it('位置 0 不属于任何段 —— 那里只有分隔符，返回 null', () => {
-    const doc = serializeFields({ tags: 'solo' }, MAIN_FIELDS)
+    // 第 0 段必须有内容：段为空时去掉边界检查也返回 null，这条测试就空过了
+    const doc = serializeFields({ count: '1girl', tags: 'solo' }, MAIN_FIELDS)
     expect(completionTargetAt(doc, MAIN_FIELDS, 0)).toBeNull()
   })
 })
