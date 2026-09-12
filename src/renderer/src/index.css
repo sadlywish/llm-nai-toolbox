@@ -57,20 +57,27 @@ body {
   white-space: nowrap;
 }
 
+/* 组内（徽章↔自己的内容框）间距由 .blk-badge 的 margin-right 提供，5px；
+   组间（内容框↔下一个徽章）必须明显更大，否则内容框会紧贴下一个徽章、
+   被视觉上归到下一组去 —— 而它属于前一个。空状态下这个错位尤其刺眼，
+   而空状态正是打开应用的默认样子。 */
 .blk-run {
   background: hsl(var(--h) 48% 56% / .13);
   box-shadow: inset 0 0 0 1px hsl(var(--h) 45% 52% / .38);
   border-radius: 3px;
   padding: 3px 6px 3px 0;
+  margin-right: 18px;
 }
 
 .blk-active { background: hsl(var(--h) 50% 58% / .18); }
 
+/* 组间间距与 .blk-run 一致，理由同上 */
 .blk-blank {
   display: inline-block; min-width: 2.2em; height: 1.2em;
   background: hsl(var(--h) 40% 55% / .05);
   box-shadow: inset 0 0 0 1px hsl(var(--h) 35% 48% / .3);
   border-radius: 3px; vertical-align: -.25em;
+  margin-right: 18px;
 }
 
 .blk-blank-active {
