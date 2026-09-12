@@ -39,7 +39,18 @@ export default function PromptEditor({ specs, values, onChange }: Props): JSX.El
           if (!update.docChanged) return
           onChangeRef.current(parseDocument(update.state.doc.toString(), specs))
         }),
-        EditorView.theme({ '&': { fontFamily: 'var(--mono)', fontSize: '15px' } }),
+        // 光标是**浏览器原生**的：扩展里没有 drawSelection()，所以 CodeMirror
+        // 不画 .cm-cursor 元素（实测该元素不存在）。原生光标的颜色只认
+        // caret-color，写 border-left-color 是打在不存在的元素上。
+        // 不声明 dark 的话 CodeMirror 按亮色主题走，原生光标是黑的 ——
+        // 在这个深色背景上完全看不见（用户实机指出）。
+        EditorView.theme(
+          {
+            '&': { fontFamily: 'var(--mono)', fontSize: '15px' },
+            '.cm-content': { caretColor: 'var(--accent)' },
+          },
+          { dark: true },
+        ),
       ],
     })
 

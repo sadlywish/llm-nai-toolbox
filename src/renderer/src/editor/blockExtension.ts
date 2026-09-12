@@ -52,9 +52,14 @@ class BadgeWidget extends WidgetType {
   }
 }
 
-/** 空段的可点占位。没有它，空段在屏幕上是零宽度，点不中。
- *  active 由它自己画——空段的 active 是零长度 mark，会被 decorationsFor 的
- *  过滤丢掉，不在这里补就没有任何聚焦反馈 */
+/**
+ * 空段的可点占位。空段没有任何字符，mark 无从附着，只能用 widget 占位。
+ *
+ * 视觉上它是「徽章 + 框」这个整体的右半边：与徽章边缘相接、共用一圈圆角，
+ * 详见 index.css 里 .blk-badge / .blk-run / .blk-blank 的注释。
+ *
+ * active 由它自己画：空段的 active 是零长度 mark，构造不出来。
+ */
 class BlankWidget extends WidgetType {
   constructor(
     private readonly hue: number,
@@ -82,6 +87,19 @@ class BlankWidget extends WidgetType {
   }
 }
 
+/**
+ * 段落装饰。
+ *
+ * ── 为什么徽章在框外，而不是被框裹住 ────────────────────────
+ * 定稿示意稿里徽章是包在框里的，实现上做不到：徽章是分隔符上的
+ * `Decoration.replace`，而 `Decoration.mark` **不会**把一段被 replace
+ * 完全覆盖的范围裹起来——空段的 mark 范围恰好等于 replace 的范围，
+ * 于是 mark 被整个吞掉，框压根不渲染（实测空状态下 .blk-run 数量为 0）。
+ *
+ * 所以改由 CSS 达到同样的视觉：徽章与框**边缘相接、共用一圈圆角**，
+ * 读起来是一个整体色块。间距加在框的右侧而不是徽章右侧——加在徽章右侧
+ * 会让框紧贴下一个徽章、被视觉上归进下一组。
+ */
 function decorationsFor(specs: readonly FieldSpec[], view: EditorView): DecorationSet {
   const doc = view.state.doc.toString()
   // 万一还有漏网的破绽，宁可「装饰暂时不画」，也不要让 parseDocument 抛错
@@ -109,15 +127,12 @@ function decorationsFor(specs: readonly FieldSpec[], view: EditorView): Decorati
             attributes: { style: `--h:${d.hue}`, 'data-field': d.field },
           }).range(d.from, d.to)
         case 'blank':
-          // 空段没有字符可 mark，只能用 widget 占一个可点的空位
           return Decoration.widget({
             widget: new BlankWidget(d.hue, activeAt.has(`${d.from}:${d.to}`)),
             side: 1,
           }).range(d.from)
         case 'active':
-          // 与 block 分支一致带上 --h：.blk-active 自己没有这个变量，此前全靠
-          // 嵌套在 .blk-run 里继承内联样式，只因装饰 push 顺序稳定才成立，
-          // 顺序一变高亮就静默消失（见 index.css 的 .blk-active）。
+          // 带上 --h：.blk-active 自己没有这个变量，靠继承会在装饰顺序变动时静默失效
           return Decoration.mark({
             class: 'blk-active',
             attributes: { style: `--h:${d.hue}` },
