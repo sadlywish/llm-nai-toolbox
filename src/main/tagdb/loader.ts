@@ -195,15 +195,18 @@ export class TagdbLoader {
       const series = fillEntries(data.series)
       const general = fillEntries(data.general)
 
-      const total = artists.length + characters.length + series.length + general.length
-      if (total === 0) {
-        // 文件解析成功但四类全空：对用户来说和「没有标签库」没区别，
-        // 不能挂着 ready 让补全静默失灵。放在建索引之前判断，空文件
-        // 不用白付四次 buildIndex 的代价。
+      const loaded = { artists, characters, series, general }
+      const empty = Object.entries(loaded)
+        .filter(([, list]) => list.length === 0)
+        .map(([name]) => name)
+      if (empty.length > 0) {
+        // 逐类判空，不是只判「四类全空」：旧版 schema、文件被截断、或只有一类，
+        // 都会让 total > 0 而挂上 ready —— 那时状态条整条消失，对应字段打字
+        // 静默无候选，用户没有任何线索。宁可整体报错，也不给半个能用的库。
         this._categories = null
         this.set({
           state: 'error',
-          detail: `${TAGDB_FILES.index} 解析成功但一个标签都没有，文件可能不完整，请重新取一份。`,
+          detail: `${TAGDB_FILES.index} 缺少这些类别的数据：${empty.join('、')}。文件可能是旧版本或不完整，请重新取一份。`,
           counts: null,
         })
         return

@@ -79,6 +79,10 @@ describe('isWellFormed / parseDocument', () => {
     expect(isWellFormed(`x${BLOCK_SEP}a${BLOCK_SEP}b${BLOCK_SEP}c`, TRIO)).toBe(false)
   })
 
+  it('段数与首段都对、但段内混进换行也判为损坏——总闸得看见换行', () => {
+    expect(isWellFormed(`${BLOCK_SEP}a\nb${BLOCK_SEP}${BLOCK_SEP}c`, TRIO)).toBe(false)
+  })
+
   it('损坏文档抛错而不是静默修补', () => {
     expect(() => parseDocument(`${BLOCK_SEP}a`, TRIO)).toThrow(/分块文档结构损坏/)
   })

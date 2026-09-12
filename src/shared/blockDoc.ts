@@ -21,10 +21,12 @@ export function stripSeparators(text: string): string {
  * 段内文本的净化：分隔符与换行都不许出现在字段值里。
  *
  * 换行和分隔符同罪 —— 分块文档必须是**单行**，所有按字符位置算的逻辑都靠这条
- * （见下面「位置的几何」）。`isWellFormed` 只数分隔符、看不见换行，所以拦截
- * 必须在写入前做，而不是事后校验。`stripSeparators` 单独保留、契约不变——
- * 这只是它多出来的一个兄弟，服务需要连换行一起挡的调用点（`serializeFields`
- * 与渲染端 `guardFilter` 的粘贴/换行剥离分支）。
+ * （见下面「位置的几何」）。拦截放在写入前做，而不是只靠事后校验：
+ * `isWellFormed` 现在也会看换行，但那是兜底的总闸，不能指望调用方漏做净化
+ * 也能被它悄悄接住变成合法文档 —— 它的职责是「发现损坏」，不是「修补损坏」。
+ * `stripSeparators` 单独保留、契约不变——这只是它多出来的一个兄弟，服务需要
+ * 连换行一起挡的调用点（`serializeFields` 与渲染端 `guardFilter` 的粘贴/
+ * 换行剥离分支）。
  */
 export function sanitizeFieldText(s: string): string {
   return stripSeparators(s).replace(/[\r\n]/g, '')
@@ -47,7 +49,7 @@ export function serializeFields(
 
 export function isWellFormed(doc: string, specs: readonly FieldSpec[]): boolean {
   const parts = doc.split(BLOCK_SEP)
-  return parts.length === specs.length + 1 && parts[0] === ''
+  return parts.length === specs.length + 1 && parts[0] === '' && !/[\r\n]/.test(doc)
 }
 
 /**

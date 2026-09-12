@@ -159,6 +159,19 @@ describe('TagdbLoader', () => {
     await l.load()
     expect(l.status.state).toBe('error')
     expect(l.categories).toBeNull()
+    expect(l.status.detail).toContain('artists')
+    expect(l.status.detail).toContain('characters')
+    expect(l.status.detail).toContain('series')
+    expect(l.status.detail).toContain('general')
+  })
+
+  it('只有一类为空时也是 error，不是「总量非零就 ready」—— 旧版 schema/文件截断只会让一类落空', async () => {
+    const l = new TagdbLoader(fixtureDir({ ...SAMPLE, general: [] }), () => {})
+    await l.load()
+    expect(l.status.state).toBe('error')
+    expect(l.categories).toBeNull()
+    expect(l.status.detail).toContain('general')
+    expect(l.status.detail).not.toContain('artists')
   })
 
   it('状态回调抛错时加载照常完成 —— 监听方的失败不该拖垮数据层', async () => {
