@@ -95,14 +95,15 @@ body {
   white-space: nowrap; user-select: none;
 }
 
-/* 空段：整块是一个 inline-block widget。高度写死 21px = 15px 内容区 + 上下 3px
-   内边距，与非空段的框完全一致；右内边距撑出可点的空地，也给光标落点。 */
+/* 空段的框：**必须和非空段处在同一种布局环境**，即同样是 display: inline。
+   先前写成 inline-block + height + vertical-align 是这轮反复对不齐的根因：
+   inline-block 自带一套内部行盒，徽章在里面按 15px 字号的基线排；而非空段的
+   框是行内元素、在 .cm-line 的行盒里排。两种环境下同一组数值必然一个对一个错，
+   而那个 vertical-align 的偏移量是猜的（实机表现为空框与有内容的框整体错位）。
+   现在空框只在 .blk-run 之上加一条右内边距撑出空地，其余一切继承同一套规则 ——
+   两条渲染路径，一种布局。 */
 .blk-run-empty {
-  box-sizing: border-box;
-  display: inline-block;
-  height: 21px;
   padding-right: 2.6em;
-  vertical-align: -5px;
 }
 
 /* 光标所在段。active 是加在 block mark 的 class 上，与 .blk-run 同元素，
