@@ -325,9 +325,14 @@ export function blockExtensions(specs: readonly FieldSpec[]): Extension[] {
     // PromptEditor 里的展开顺序保证了这一点
     blockKeymap(specs),
     decoPlugin,
-    // 补全要排在 defaultKeymap 之前才能接住方向键/回车（PromptEditor 里的顺序保证了这一点）。
-    // 它的 ArrowUp/ArrowDown 绑定不带修饰键，只在补全面板打开时才生效，
-    // 不会跟上面 blockKeymap 的 Ctrl/Mod-ArrowUp/Down（调权重）冲突。
+    // 补全的键位（方向键/回车/Esc）不靠这里的数组位置：`autocompletion()` 把
+    // 自己的 keymap 包在 `Prec.highest` 里，优先级与扩展顺序无关，且那些绑定
+    // 只在下拉激活时生效，不会抢走没弹下拉时的按键。放在这里纯粹是为了读起来
+    // 顺——挪走也不会改变行为。
+    //
+    // ⚠️ 别把这条和上面 blockKeymap 的顺序混为一谈：**那一条是承重的**。
+    // blockKeymap 必须排在 defaultKeymap 之前才能截住 Backspace/Delete，
+    // 靠的是 PromptEditor 里 blockExtensions(specs) 展开在 keymap 之前。
     localTagCompletion(specs),
     EditorView.lineWrapping,
   ]
