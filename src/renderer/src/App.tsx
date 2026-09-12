@@ -19,6 +19,8 @@ export default function App(): JSX.Element {
     void window.api.appVersion().then(setVersion)
   }, [])
 
+  // TODO(后续计划): 1471 是「base + 全部角色提示词」的合计上限，这里只喂了 main，
+  // 角色完全不进预算；且 totalTokens 是分段求和、低估约 9 token（见其 JSDoc）。
   const total = totalTokens(main, MAIN_FIELDS)
   const over = checkTokenLimit(main, MAIN_FIELDS, MODEL)
 

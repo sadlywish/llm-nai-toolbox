@@ -58,8 +58,14 @@ export interface ParseResult {
   artists: ArtistSpan[]
 }
 
-/** 数字前出现这些字符时，该数字才被当作权重的起始 */
-const DELIMITERS = new Set([',', '，', '{', '[', '(', '|', ':', ' ', '\t', '\n', '\r'])
+/**
+ * 数字前出现这些字符时，该数字才被当作权重的起始。
+ *
+ * `\u001F` 是本工程分块文档的段分隔符（见 shared/blockDoc.ts 的 BLOCK_SEP），
+ * 源工程没有它。不加进来的话，整篇文档喂给 parsePrompt 时紧跟分隔符的
+ * `1.2::x` 不会开权重段，高亮与 Ctrl+↑↓ 会全线错位。
+ */
+const DELIMITERS = new Set([',', '，', '{', '[', '(', '|', ':', ' ', '\t', '\n', '\r', '\u001F'])
 
 function isDelimiter(ch: string | undefined): boolean {
   // undefined 表示字符串开头，同样算分隔位

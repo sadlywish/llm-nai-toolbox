@@ -21,7 +21,7 @@ export interface DecoSpec {
   kind: DecoKind
   field: string
   hue: number
-  /** 徽章文字。非 badge 项与 field 相同，调试时好认 */
+  /** 徽章文字。`badge` 用字段名，`comma` 用命中的那个全角字符本身，其余项与 field 相同。 */
   label: string
 }
 

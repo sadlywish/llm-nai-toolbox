@@ -8,7 +8,9 @@ import type { FieldSpec } from '@shared/fields'
 import { blockExtensions, externalSync } from './blockExtension'
 
 interface Props {
-  /** 字段集。整图传 MAIN_FIELDS，角色传 CHARACTER_FIELDS——组件本身不认识任何一套 */
+  /** 字段集。整图传 MAIN_FIELDS，角色传 CHARACTER_FIELDS —— 组件本身不认识任何一套。
+   *  ⚠️ 必须引用稳定（模块常量或 useMemo 结果）：它是第一个 useEffect 的唯一依赖，
+   *  每次渲染换新引用会重建整个 EditorView，光标当场跳回开头。 */
   specs: readonly FieldSpec[]
   values: FieldValues
   onChange: (values: FieldValues) => void

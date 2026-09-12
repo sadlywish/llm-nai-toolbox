@@ -21,6 +21,12 @@ export function tokensPerBlock(
   }))
 }
 
+/**
+ * ⚠️ 这是**各段独立估算之和**，不等于拼接后的真实 token 数 —— 漏掉了
+ * buildPrompt 用来连接各段的 " , "（整图 10 段约少 9 token，角色 5 段约少 4）。
+ * 方向是低估，与 t5.ts「宁可高估、漏报超限才是真问题」的原则相反。
+ * 后续计划应改成「先拼接、再整篇估算」。
+ */
 export function totalTokens(
   values: FieldValues,
   specs: readonly FieldSpec[],

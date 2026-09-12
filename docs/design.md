@@ -8,6 +8,8 @@ llm-nai-toolbox 的架构与关键取舍。使用方法见 [README](../README.md
 
 把 `koishi-plugin-reforge` 的 LLM 交互层搬到桌面，界面与工程骨架取自「画师串工具箱」，**只保留 NovelAI**，并把「LLM 直接出图」改成「LLM 只回填字段，人确认后出图」。
 
+> 权威定义在代码里：字段看 `src/shared/fields.ts`，段结构看 `src/shared/blockDoc.ts`。本文若与代码冲突，以代码为准。
+
 ---
 
 ## 进程模型

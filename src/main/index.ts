@@ -21,7 +21,9 @@ function createWindow(): void {
 
   // 页面里的外链一律交给系统浏览器，不在应用内开新窗口
   win.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url)
+    // 只放行 http/https。无条件 openExternal 会把 file:、ms-* 这类 scheme
+    // 一并交给系统处理，WIKI 区落地后就是一个可利用面。
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
     return { action: 'deny' }
   })
 
