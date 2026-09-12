@@ -1,0 +1,34 @@
+:root {
+  --ground: #15171b;
+  --panel: #1d2025;
+  --panel-2: #22262c;
+  --line: #2f343d;
+  --ink: #d8dce3;
+  --ink-dim: #98a1ad;
+  --ink-faint: #6b737f;
+  --accent: #4a9eff;
+  --danger: #ff6b63;
+  --mono: "Cascadia Mono", Consolas, "Microsoft YaHei", ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "Microsoft YaHei", system-ui, sans-serif;
+  font-size: 14px;
+}
+
+.app { display: flex; flex-direction: column; height: 100vh; }
+
+.app-header {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 6px 12px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.app-title { font-weight: 600; }
+.app-version { color: var(--ink-faint); font-size: 12px; }
