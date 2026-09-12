@@ -68,6 +68,19 @@ export interface BlockRange {
   to: number
 }
 
+/**
+ * ── 位置的几何 ────────────────────────────────────────────
+ * 各段的闭区间 [from_i, to_i] 互不相交且首尾相接，铺满 1..doc.length：
+ *   from_{i+1} === to_i + 1，中间隔着分隔符那一格；
+ *   因此 sepAt_{i+1} === to_i —— **同一个位置既是第 i 段内容的末尾，
+ *   也是第 i+1 段的分隔符位**。
+ * 1..doc.length 的每个位置都唯一属于某一段。
+ * **唯一不属于任何段的是位置 0**（它在第 0 段的徽章之前）。
+ *
+ * 这条事实被 clampToBlock（blockNav.ts）与 guardFilter（editor/blockExtension.ts）
+ * 共同依赖。两处都曾因误读它而出过 Critical：前者把「段末尾」当成「分隔符上」
+ * 推走了合法落点，后者漏掉了「起点为 0 的插入」。改动任何一处之前先读这段。
+ */
 export function blockRanges(
   doc: string,
   specs: readonly FieldSpec[],

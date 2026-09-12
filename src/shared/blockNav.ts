@@ -1,4 +1,4 @@
-import { BLOCK_SEP, blockRanges } from './blockDoc'
+import { BLOCK_SEP } from './blockDoc'
 import type { FieldSpec } from './fields'
 
 /**
@@ -7,6 +7,11 @@ import type { FieldSpec } from './fields'
  * 判据是「pos 之前有几个分隔符」减一。段末尾（下一个分隔符**之前**）
  * 仍算本段——光标停在 `1girl` 后面时用户的意图是继续写 count，
  * 不是已经进了下一段。
+ *
+ * ⚠️ 位置 0 会被 Math.max(0, count - 1) 兜底夹成第 0 段，那是**夹逼而非真实归属**
+ *（见 blockDoc.ts 的「位置的几何」：0 不属于任何段）。消费方不得据此认为
+ * 0 在第 0 段内 —— 正是这类「函数 A 的兜底被函数 B 当成事实」的误读催生了
+ * clampToBlock 那个 Critical。
  */
 export function fieldIndexAt(doc: string, pos: number): number {
   let count = 0
@@ -55,18 +60,19 @@ export function changeTouchesSeparator(
 }
 
 /**
- * 把落在分隔符上的位置推进该段内容里。
+ * 把落在「不属于任何段」的位置推进第 0 段。
  *
- * 鼠标点在徽章上时 CodeMirror 给出的位置就是分隔符本身，不推的话
- * 接下来第一个字符会插在分隔符前面，落进上一段。
+ * 见 blockDoc.ts 的「位置的几何」：1..doc.length 每个位置都唯一属于某一段，
+ * 只有 0 不属于任何段。不能按 pos === sepAt 推 —— sepAt_i 同时是 to_{i-1}，
+ * 推走就等于没收了「上一段末尾」这个合法落点（曾是 Critical：段首退格、
+ * 空段落点、非末段末尾点选全部失灵）。
  */
 export function clampToBlock(
   doc: string,
-  specs: readonly FieldSpec[],
+  _specs: readonly FieldSpec[],
   pos: number,
 ): number {
-  for (const range of blockRanges(doc, specs)) {
-    if (pos === range.sepAt) return range.from
-  }
-  return pos
+  // _specs 保留不删：签名一改调用点与测试都要跟着动，而后续若要按段做更细的
+  // 落点修正（例如 enum 段禁止落点）还会用上。
+  return pos === 0 ? 1 : pos
 }

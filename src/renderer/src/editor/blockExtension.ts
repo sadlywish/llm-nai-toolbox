@@ -10,7 +10,7 @@ import {
 } from '@codemirror/view'
 import { WEIGHT_STEP } from '@renderer/prompt/weight'
 import { buildBlockDecorations } from '@shared/blockDecorations'
-import { BLOCK_SEP, stripSeparators } from '@shared/blockDoc'
+import { BLOCK_SEP, isWellFormed, stripSeparators } from '@shared/blockDoc'
 import { changeTouchesSeparator, clampToBlock, resolveBackspace, resolveDelete } from '@shared/blockNav'
 import { adjustWeightInBlock } from '@shared/blockWeight'
 import type { FieldSpec } from '@shared/fields'
@@ -73,10 +73,20 @@ class BlankWidget extends WidgetType {
     el.style.setProperty('--h', String(this.hue))
     return el
   }
+
+  // 必须放行事件：这个 widget 存在的唯一理由就是让零宽度的空段可点。
+  // WidgetType.ignoreEvent 默认为 true，而 eventBelongsToEditor 遇到它为真
+  // 就直接 return false，CodeMirror 自己的 pointer 逻辑根本不跑。
+  ignoreEvent(): boolean {
+    return false
+  }
 }
 
 function decorationsFor(specs: readonly FieldSpec[], view: EditorView): DecorationSet {
   const doc = view.state.doc.toString()
+  // 万一还有漏网的破绽，宁可「装饰暂时不画」，也不要让 parseDocument 抛错
+  // 把整个 ViewPlugin 打成永久失活（CodeMirror 捕获后 deactivate 且永不重试）。
+  if (!isWellFormed(doc, specs)) return Decoration.none
   const cursor = view.state.selection.main.head
   const decos = buildBlockDecorations(doc, specs, cursor)
   // 空段的 active 是零长度 mark，根本构造不出来；先把区间记下来交给 BlankWidget 自己画
@@ -105,7 +115,13 @@ function decorationsFor(specs: readonly FieldSpec[], view: EditorView): Decorati
             side: 1,
           }).range(d.from)
         case 'active':
-          return Decoration.mark({ class: 'blk-active' }).range(d.from, d.to)
+          // 与 block 分支一致带上 --h：.blk-active 自己没有这个变量，此前全靠
+          // 嵌套在 .blk-run 里继承内联样式，只因装饰 push 顺序稳定才成立，
+          // 顺序一变高亮就静默消失（见 index.css 的 .blk-active）。
+          return Decoration.mark({
+            class: 'blk-active',
+            attributes: { style: `--h:${d.hue}` },
+          }).range(d.from, d.to)
         case 'comma':
           return Decoration.mark({ class: 'blk-comma' }).range(d.from, d.to)
       }
@@ -119,11 +135,21 @@ function decorationsFor(specs: readonly FieldSpec[], view: EditorView): Decorati
  * 两条规则，处理方式**故意不同**：
  *
  * - 改动范围**跨越分隔符** → 整笔拒绝。裁剪的语义（保留哪一段？）没有
- *   唯一正确答案，猜错就是静默改坏用户的内容。
+ *   唯一正确答案，猜错就是静默改坏用户的内容。「起点为 0」的改动并入这一条：
+ *   见 blockDoc.ts 的「位置的几何」，0 不属于任何段，任何从 0 开始的插入
+ *   都会把 parts[0] 弄成非空。
  * - 插入的**文本里含分隔符**（从别处粘来的） → 剥掉再插入。这里语义唯一，
  *   拒绝反而是「粘贴毫无反应」这种莫名其妙的表现。
+ *
+ * 最后无论走哪条路径都要对**最终会写进文档的内容**验一遍 isWellFormed
+ * 再放行，当总闸：前两条规则是已知漏洞的针对性修补，未必穷尽了所有能
+ * 构造出非法文档的路径（例如 CodeMirror 的 dropText 用 posAtCoords 的
+ * 结果直接插入、不做夹逼）。宁可在这里多验一遍，也不要指望「规则列全了」。
+ *
+ * undo/redo 带 `filter: false` 会绕过这道闸（已核实），但 undo 只会
+ * 还原到曾经合法过的文档，不构成缺口。
  */
-function guardFilter(): Extension {
+function guardFilter(specs: readonly FieldSpec[]): Extension {
   return EditorState.transactionFilter.of((tr: Transaction) => {
     if (!tr.docChanged) return tr
     // 程序化回灌显式放行，理由见 externalSync 的说明
@@ -133,12 +159,20 @@ function guardFilter(): Extension {
     let crossesBlock = false
     let insertsSep = false
     tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+      // 见 blockDoc.ts 的「位置的几何」：0 在第 0 段徽章之前、不属于任何段，
+      // 任何起点为 0 的改动都会把 parts[0] 弄成非空，一律按跨段拒绝。
+      // 拖放是唯一能构造出它的路径（dropText 用 posAtCoords 的结果直接插入、不夹逼）。
+      if (fromA === 0) crossesBlock = true
       if (changeTouchesSeparator(doc, fromA, toA)) crossesBlock = true
       if (inserted.toString().includes(BLOCK_SEP)) insertsSep = true
     })
 
     if (crossesBlock) return []
-    if (!insertsSep) return tr
+
+    if (!insertsSep) {
+      if (!isWellFormed(tr.newDoc.toString(), specs)) return []
+      return tr
+    }
 
     // 重建这笔改动，插入文本剥掉分隔符。不带 selection——长度变了，
     // 原来的选区位置已经对不上，交给 CodeMirror 按新内容自行落点
@@ -146,6 +180,10 @@ function guardFilter(): Extension {
     tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
       rebuilt.push({ from: fromA, to: toA, insert: stripSeparators(inserted.toString()) })
     })
+    // 总闸验的必须是剥离之后的结果——tr.newDoc 是未剥离的版本，验它对不上
+    // 真正会写进去的内容。
+    const finalDoc = tr.startState.changes(rebuilt).apply(tr.startState.doc).toString()
+    if (!isWellFormed(finalDoc, specs)) return []
     return { changes: rebuilt, scrollIntoView: true }
   })
 }
@@ -160,11 +198,15 @@ function selectionGuard(specs: readonly FieldSpec[]): Extension {
   return EditorState.transactionFilter.of((tr: Transaction) => {
     if (tr.docChanged || tr.selection === undefined) return tr
     const doc = tr.startState.doc.toString()
-    const head = tr.selection.main.head
-    const clamped = clampToBlock(doc, specs, head)
-    if (clamped === head) return tr
-    // 这笔事务只改选区（上面已排除 docChanged），整笔换成落点修正后的版本
-    return { selection: { anchor: clamped }, scrollIntoView: true }
+    const sel = tr.selection.main
+    const anchor = clampToBlock(doc, specs, sel.anchor)
+    const head = clampToBlock(doc, specs, sel.head)
+    if (anchor === sel.anchor && head === sel.head) return tr
+    // 返回 [tr, 修正] 而不是只返回 { selection }：后者会丢掉原事务的
+    // effects、annotations 与 userEvent。Plan 2 接上补全之后，被吞掉的
+    // 正是补全的 effect，表现是「补全面板莫名其妙不开」。
+    // anchor 与 head 分别夹、不塌成单点，否则 Shift 选区会在 clamp 点消失。
+    return [tr, { selection: { anchor, head } }]
   })
 }
 
@@ -236,7 +278,7 @@ export function blockExtensions(specs: readonly FieldSpec[]): Extension[] {
   )
 
   return [
-    guardFilter(),
+    guardFilter(specs),
     selectionGuard(specs),
     // 放在 defaultKeymap 之前才能截住 Backspace/Delete；
     // PromptEditor 里的展开顺序保证了这一点

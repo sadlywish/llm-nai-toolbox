@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MAIN_FIELDS } from '@shared/fields'
-import { BLOCK_SEP, serializeFields } from '@shared/blockDoc'
+import { BLOCK_SEP, blockRanges, emptyValues, serializeFields } from '@shared/blockDoc'
 import {
   changeTouchesSeparator,
   clampToBlock,
@@ -87,12 +87,34 @@ describe('changeTouchesSeparator', () => {
 })
 
 describe('clampToBlock', () => {
-  it('落在分隔符上的位置被推到该段内容起点', () => {
-    expect(clampToBlock(DOC, TRIO, 6)).toBe(7)
+  it('段末尾原样保留，不推进下一段', () => {
+    expect(clampToBlock(DOC, TRIO, 6)).toBe(6)
+  })
+
+  it('文档起点推进第 0 段 —— 这是唯一需要 clamp 的位置', () => {
     expect(clampToBlock(DOC, TRIO, 0)).toBe(1)
   })
 
   it('已经在段内的位置原样返回', () => {
     expect(clampToBlock(DOC, TRIO, 3)).toBe(3)
+  })
+})
+
+describe('clampToBlock × fieldIndexAt 的契约', () => {
+  it('空文档下逐段验：clamp 不动合法落点，且 clamp 后归属不变', () => {
+    const doc = serializeFields(emptyValues(MAIN_FIELDS), MAIN_FIELDS)
+    for (const r of blockRanges(doc, MAIN_FIELDS)) {
+      expect(clampToBlock(doc, MAIN_FIELDS, r.from)).toBe(r.from)
+      expect(clampToBlock(doc, MAIN_FIELDS, r.to)).toBe(r.to)
+      expect(fieldIndexAt(doc, clampToBlock(doc, MAIN_FIELDS, r.from))).toBe(r.index)
+    }
+  })
+
+  it('有非空段时同样成立 —— 覆盖 to_0 与 sepAt_1 重合那个点', () => {
+    for (const r of blockRanges(DOC, TRIO)) {
+      expect(clampToBlock(DOC, TRIO, r.from)).toBe(r.from)
+      expect(clampToBlock(DOC, TRIO, r.to)).toBe(r.to)
+      expect(fieldIndexAt(DOC, clampToBlock(DOC, TRIO, r.from))).toBe(r.index)
+    }
   })
 })
