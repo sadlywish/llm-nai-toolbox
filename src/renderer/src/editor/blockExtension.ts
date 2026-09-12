@@ -26,6 +26,7 @@ import {
 } from '@shared/blockNav'
 import { adjustWeightInBlock } from '@shared/blockWeight'
 import type { FieldSpec } from '@shared/fields'
+import { localTagCompletion } from './completion'
 
 /**
  * 标记「这一笔是程序化的整篇回灌」，例如 LLM 把字段写回编辑器。
@@ -149,9 +150,22 @@ function decorationsFor(specs: readonly FieldSpec[], view: EditorView): Decorati
 }
 
 /**
+ * 剥掉分隔符与换行。块文档必须是单行——每段内容里的字符位置都要能直接
+ * 换算成 blockRanges 的段内坐标，一旦某段内容里混进 `\n`，`.cm-line` 数量
+ * 就会变多，凡是按「整篇是一行」假设写的逻辑都会跟着错位。
+ *
+ * 不改 `stripSeparators`（blockDoc.ts）本身的契约——`serializeFields` 也
+ * 用它，扩大它的语义会把换行处理的影响面带到序列化那条路径上，而那里
+ * 从未出过这个问题。这里单开一个函数，只服务 guardFilter 这一个调用点。
+ */
+function stripSeparatorsAndNewlines(text: string): string {
+  return stripSeparators(text).replace(/[\r\n]/g, '')
+}
+
+/**
  * 段结构守卫。
  *
- * 两条规则，处理方式**故意不同**：
+ * 三条规则，处理方式**故意不同**：
  *
  * - 改动范围**跨越分隔符** → 整笔拒绝。裁剪的语义（保留哪一段？）没有
  *   唯一正确答案，猜错就是静默改坏用户的内容。「起点为 0」的改动并入这一条：
@@ -159,9 +173,14 @@ function decorationsFor(specs: readonly FieldSpec[], view: EditorView): Decorati
  *   都会把 parts[0] 弄成非空。
  * - 插入的**文本里含分隔符**（从别处粘来的） → 剥掉再插入。这里语义唯一，
  *   拒绝反而是「粘贴毫无反应」这种莫名其妙的表现。
+ * - 插入的**文本里含换行**（Enter、多行粘贴/拖放/程序化插入） → 同上一条
+ *   一起走剥离分支。Enter 走 defaultKeymap 的 insertNewlineAndIndent，
+ *   产生的仍是一笔普通事务，会照样经过这里；多行粘贴此前会落进「不含分
+ *   隔符」分支里被直接放行——`\n` 不影响 isWellFormed（分段计数不看换行），
+ *   于是换行被无声吞进段内容，这是本函数曾经的一个漏洞。
  *
  * 最后无论走哪条路径都要对**最终会写进文档的内容**验一遍 isWellFormed
- * 再放行，当总闸：前两条规则是已知漏洞的针对性修补，未必穷尽了所有能
+ * 再放行，当总闸：前面的规则是已知漏洞的针对性修补，未必穷尽了所有能
  * 构造出非法文档的路径（例如 CodeMirror 的 dropText 用 posAtCoords 的
  * 结果直接插入、不做夹逼）。宁可在这里多验一遍，也不要指望「规则列全了」。
  *
@@ -176,28 +195,29 @@ function guardFilter(specs: readonly FieldSpec[]): Extension {
 
     const doc = tr.startState.doc.toString()
     let crossesBlock = false
-    let insertsSep = false
+    let needsStrip = false
     tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
       // 见 blockDoc.ts 的「位置的几何」：0 在第 0 段徽章之前、不属于任何段，
       // 任何起点为 0 的改动都会把 parts[0] 弄成非空，一律按跨段拒绝。
       // 拖放是唯一能构造出它的路径（dropText 用 posAtCoords 的结果直接插入、不夹逼）。
       if (fromA === 0) crossesBlock = true
       if (changeTouchesSeparator(doc, fromA, toA)) crossesBlock = true
-      if (inserted.toString().includes(BLOCK_SEP)) insertsSep = true
+      const text = inserted.toString()
+      if (text.includes(BLOCK_SEP) || /[\r\n]/.test(text)) needsStrip = true
     })
 
     if (crossesBlock) return []
 
-    if (!insertsSep) {
+    if (!needsStrip) {
       if (!isWellFormed(tr.newDoc.toString(), specs)) return []
       return tr
     }
 
-    // 重建这笔改动，插入文本剥掉分隔符。不带 selection——长度变了，
+    // 重建这笔改动，插入文本剥掉分隔符与换行。不带 selection——长度变了，
     // 原来的选区位置已经对不上，交给 CodeMirror 按新内容自行落点
     const rebuilt: { from: number; to: number; insert: string }[] = []
     tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
-      rebuilt.push({ from: fromA, to: toA, insert: stripSeparators(inserted.toString()) })
+      rebuilt.push({ from: fromA, to: toA, insert: stripSeparatorsAndNewlines(inserted.toString()) })
     })
     // 总闸验的必须是剥离之后的结果——tr.newDoc 是未剥离的版本，验它对不上
     // 真正会写进去的内容。
@@ -314,6 +334,10 @@ export function blockExtensions(specs: readonly FieldSpec[]): Extension[] {
     // PromptEditor 里的展开顺序保证了这一点
     blockKeymap(specs),
     decoPlugin,
+    // 补全要排在 defaultKeymap 之前才能接住方向键/回车（PromptEditor 里的顺序保证了这一点）。
+    // 它的 ArrowUp/ArrowDown 绑定不带修饰键，只在补全面板打开时才生效，
+    // 不会跟上面 blockKeymap 的 Ctrl/Mod-ArrowUp/Down（调权重）冲突。
+    localTagCompletion(specs),
     EditorView.lineWrapping,
   ]
 }
