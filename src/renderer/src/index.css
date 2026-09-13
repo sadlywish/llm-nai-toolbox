@@ -340,7 +340,9 @@ body {
 .state-bad { color: var(--danger); }
 .state-stop { color: var(--warn); }
 .ask2 { padding: 8px 12px 10px; display: flex; flex-direction: column; gap: 8px; }
-.ask2 textarea { resize: none; height: 54px; background: #15181c; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); font: inherit; font-size: 14px; line-height: 1.6; padding: 6px 9px; }
+/* 没有光标时固定 4 行（6.4em = 4 × 行高 1.6，14px = 上下内边距 + 边框）；光标进入后 LlmConsole 按内容撑高，
+   下限就是这 4 行。最多长到窗口里还放得下顶栏与指令区其余部分，再多就在框内滚动，免得把「发送」挤出窗口 */
+.ask2 textarea { resize: none; height: calc(6.4em + 14px); max-height: calc(100vh - 160px); background: #15181c; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); font: inherit; font-size: 14px; line-height: 1.6; padding: 6px 9px; }
 .ask2 textarea:focus { outline: none; border-color: var(--accent); }
 .opts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: 13px; color: var(--ink-dim); }
 .opts label { display: flex; align-items: center; gap: 5px; }

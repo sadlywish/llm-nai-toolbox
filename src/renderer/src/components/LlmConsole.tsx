@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { applyFill } from '@shared/applyFill'
 import type { ApiType, AppConfig } from '@shared/config'
 import { buildRunInput, presetSelectionStale, selectStyleMode } from '@shared/consoleRun'
@@ -58,6 +58,25 @@ export default function LlmConsole({ workspace, config, presets, update, onOpenS
     }
   }, [presets, opts, update])
 
+  /**
+   * 指令框：光标在里面时按内容撑高，好看全整段指令；不在时回到 CSS 的固定 4 行。
+   * 是否展开以 document.activeElement 为准：发送后框被禁用，Chromium 不一定补发 blur，
+   * 光靠 focused 状态会让它在运行中一直撑着。focused 只用来触发重算。
+   */
+  const askRef = useRef<HTMLTextAreaElement>(null)
+  const [focused, setFocused] = useState(false)
+  useLayoutEffect(() => {
+    const el = askRef.current
+    if (el === null) return
+    el.style.height = ''
+    if (running || document.activeElement !== el) return
+    const min = el.offsetHeight
+    // 先压到 0 再量 scrollHeight，量到的才是内容本身的高度；再加回上下边框
+    el.style.height = '0px'
+    const needed = el.scrollHeight + (el.offsetHeight - el.clientHeight)
+    el.style.height = `${Math.max(min, needed)}px`
+  }, [focused, running, opts.instruction])
+
   function setOption<K extends keyof ConsoleOptions>(key: K, value: ConsoleOptions[K]): void {
     update((ws) => {
       ws.console[key] = value
@@ -98,8 +117,11 @@ export default function LlmConsole({ workspace, config, presets, update, onOpenS
 
       <div className="ask2">
         <textarea
+          ref={askRef}
           value={opts.instruction}
           disabled={running}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           onChange={(e) => setOption('instruction', e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
