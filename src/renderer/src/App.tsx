@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CHARACTER_FIELDS, MAIN_FIELDS, orderSpecs } from '@shared/fields'
+import LlmConsole from './components/LlmConsole'
 import PromptPane from './components/PromptPane'
 import SettingsDrawer from './components/SettingsDrawer'
 import StyleManager from './components/StyleManager'
 import { useConfig } from './state/config'
+import { initLlmEvents } from './state/llm'
 import { initStylesPersistence, useStyles } from './state/styles'
 import { useTagdb } from './state/tagdb'
 import { initWorkspacePersistence, useWorkspace } from './state/workspace'
@@ -25,6 +27,7 @@ export default function App(): JSX.Element {
   const tagdbStatus = useTagdb((s) => s.status)
   const initTagdb = useTagdb((s) => s.init)
   const loadStyles = useStyles((s) => s.load)
+  const presets = useStyles((s) => s.presets)
   // 顶栏的视图切换。不持久化：每次启动回到工作台
   const [view, setView] = useState<'workbench' | 'styles'>('workbench')
 
@@ -44,6 +47,8 @@ export default function App(): JSX.Element {
 
   useEffect(() => initWorkspacePersistence(), [])
   useEffect(() => initStylesPersistence(), [])
+  // 日志与一轮的结束都经 llm:event 推来；订阅挂在 App 上，切到画风维护视图时照样收
+  useEffect(() => initLlmEvents(), [])
 
   /**
    * 从没保存过设置时，启动后自动弹设置抽屉（规格 §14.3）。
@@ -120,13 +125,22 @@ export default function App(): JSX.Element {
         ) : /* 配置读不回来时照样放出界面（按默认配置，顶部已写明）；
             工作区读不回来时停在载入中，顶部同样写明原因 */
         workspace !== null && (configLoaded || configLoadError !== null) ? (
-          <PromptPane
-            workspace={workspace}
-            mainSpecs={mainSpecs}
-            charSpecs={charSpecs}
-            maxCharacters={config.naiMaxCharacters}
-            update={updateWorkspace}
-          />
+          <>
+            <LlmConsole
+              workspace={workspace}
+              config={config}
+              presets={presets}
+              update={updateWorkspace}
+              onOpenStyles={() => setView('styles')}
+            />
+            <PromptPane
+              workspace={workspace}
+              mainSpecs={mainSpecs}
+              charSpecs={charSpecs}
+              maxCharacters={config.naiMaxCharacters}
+              update={updateWorkspace}
+            />
+          </>
         ) : (
           <div className="placeholder">载入中…</div>
         )}

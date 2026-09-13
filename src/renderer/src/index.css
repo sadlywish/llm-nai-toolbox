@@ -315,3 +315,43 @@ body {
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 .dialog-actions button { background: none; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); padding: 3px 14px; font: inherit; font-size: 13px; cursor: pointer; }
 .dialog-actions button.danger { border-color: hsl(4 70% 45%); color: #ffb3ae; }
+
+/* 工作台里的面板不许被压扁：.pane 是 overflow:hidden 的 flex 子项，最小高度会算成 0，
+   窗口矮时会被裁掉而不是让 .workarea 滚动 */
+.workarea > .pane { flex-shrink: 0; }
+
+/* ── 按钮（两份界面稿共用） ───────────────────────────────── */
+.btn { background: none; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); padding: 3px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #0b1b2b; font-weight: 600; }
+.btn-danger { border-color: hsl(4 70% 45%); color: #ffb3ae; }
+.btn:disabled { opacity: .45; cursor: default; }
+
+/* ── LLM 指令区（界面稿 2026-09-13-llm-console-mockup.html 第 3 版） ── */
+.ask2 { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.ask2 textarea { resize: none; height: 54px; background: #15181c; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); font: inherit; font-size: 14px; line-height: 1.6; padding: 6px 9px; }
+.ask2 textarea:focus { outline: none; border-color: var(--accent); }
+.opts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: 13px; color: var(--ink-dim); }
+.opts label { display: flex; align-items: center; gap: 5px; }
+.opts select { background: #15181c; border: 1px solid var(--line); border-radius: 3px; color: var(--ink); font: inherit; font-size: 13px; padding: 2px 4px; }
+.opts .grow { flex: 1; }
+.opts .hint { font-size: 12px; color: var(--ink-faint); }
+
+/* ── LLM 日志区 ───────────────────────────────────────────── */
+.console { border-top: 1px solid var(--line); }
+.con-head { display: flex; align-items: center; gap: 10px; padding: 6px 12px; font-size: 13px; color: var(--ink-dim); background: #1a1d22; border-bottom: 1px solid var(--line); }
+.con-head .grow { flex: 1; }
+.con-head .state-running { color: var(--accent); }
+.con-head .state-ok { color: var(--ok); }
+.con-head .state-bad { color: var(--danger); }
+.con-head .state-stop { color: var(--warn); }
+.spin { display: inline-block; width: 10px; height: 10px; border: 2px solid var(--accent); border-right-color: transparent; border-radius: 50%; margin-right: 6px; vertical-align: -1px; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.log { max-height: 290px; overflow: auto; padding: 6px 12px; background: #121418; font-family: var(--mono); font-size: 13px; line-height: 1.65; }
+/* 悬挂缩进：折行后的续行对齐到正文，不钻到时间戳下面。13.2ch ≈ "12:30:09 [I] " */
+.ln { white-space: pre-wrap; word-break: break-all; padding-left: 13.2ch; text-indent: -13.2ch; color: var(--ink); }
+.ln .t { color: var(--ink-faint); }
+.ln .lv { color: var(--ink-dim); }
+.ln.w, .ln.w .lv { color: var(--warn); }
+.ln.e, .ln.e .lv { color: var(--danger); }
+.ln.ok { color: var(--ok); }
