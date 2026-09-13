@@ -424,7 +424,6 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
                 {numberField('naiMaxCharacters', '角色数上限')}
                 {numberField('naiMaxPixels', '像素上限', { hint: '宽高比换算宽高时的总像素上限' })}
               </div>
-              {textField('naiCharDefaultNegative', '角色默认负面词', { hint: '每个角色追加的负面词' })}
             </Group>
 
             <Group title="工具循环">

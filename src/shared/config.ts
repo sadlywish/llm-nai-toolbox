@@ -79,8 +79,6 @@ export interface AppConfig {
 
   // ── 多角色与分辨率 ──
   naiMaxCharacters: number
-  /** 每个角色追加的负面词 */
-  naiCharDefaultNegative: string
   /** 宽高比换算宽高时的总像素上限 */
   naiMaxPixels: number
 
@@ -140,7 +138,6 @@ export function defaultAppConfig(): AppConfig {
     tailInjection: DEFAULT_TEXTS.tailInjection,
 
     naiMaxCharacters: 6,
-    naiCharDefaultNegative: '',
     naiMaxPixels: 1024 * 1024,
 
     maxToolRounds: 10,

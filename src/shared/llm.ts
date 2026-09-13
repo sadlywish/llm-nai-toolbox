@@ -48,7 +48,7 @@ export type LlmEvent =
 export interface FillCharacter {
   /** CHARACTER_FIELDS 五项 */
   fields: FieldValues
-  /** 已追加过设置里的角色默认负面词 */
+  /** 模型给这个角色的负面词，独立于整图负面词 */
   negative: string
   /** 模型给的原样：自由坐标 "x,y" 或网格 "B3"，可能为空 */
   position: string

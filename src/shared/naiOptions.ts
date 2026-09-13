@@ -26,13 +26,6 @@ export const SAMPLER_OPTIONS: readonly string[] = [
 
 export const NOISE_SCHEDULE_OPTIONS: readonly string[] = ['karras', 'native', 'exponential', 'polyexponential']
 
-export const UC_PRESET_OPTIONS: ReadonlyArray<{ value: number; label: string }> = [
-  { value: 0, label: 'Heavy' },
-  { value: 1, label: 'Light' },
-  { value: 2, label: 'Human Focus' },
-  { value: 3, label: 'None' },
-]
-
 /**
  * 对齐到 64 的倍数，下限 64。
  *

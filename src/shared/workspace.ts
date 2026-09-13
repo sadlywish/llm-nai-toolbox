@@ -2,11 +2,15 @@ import { emptyValues, sanitizeFieldText, type FieldValues } from './blockDoc'
 import { CHARACTER_FIELDS, MAIN_FIELDS, type FieldSpec } from './fields'
 import { newId } from './ids'
 import type { MultiCharacterMode } from './llm'
-import { NOISE_SCHEDULE_OPTIONS, SAMPLER_OPTIONS, UC_PRESET_OPTIONS } from './naiOptions'
+import { NOISE_SCHEDULE_OPTIONS, SAMPLER_OPTIONS } from './naiOptions'
 
 /** seed 分配策略：每张随机，或固定用参数区里的 seed */
 export type SeedMode = 'fixed' | 'perImage'
 
+/**
+ * 生成参数。没有负面预设、质量词开关与 Variety Boost：工具主要面向 V5，V5 不支持 Variety Boost；
+ * 官网的默认正面/负面词不悄悄加进请求，将来要用也是在设置里选「用官网配置覆盖」。
+ */
 export interface GenParams {
   model: string
   width: number
@@ -17,9 +21,6 @@ export interface GenParams {
   sampler: string
   noiseSchedule: string
   cfgRescale: number
-  ucPreset: number
-  qualityToggle: boolean
-  varietyBoost: boolean
   /** perImage 模式下该值不参与计算，仅用于展示与回填 */
   seed: number
   seedMode: SeedMode
@@ -85,9 +86,6 @@ export function defaultGenParams(): GenParams {
     sampler: 'k_euler_ancestral',
     noiseSchedule: 'karras',
     cfgRescale: 0,
-    ucPreset: 0,
-    qualityToggle: true,
-    varietyBoost: false,
     seed: -1,
     seedMode: 'perImage',
     transparentBackground: false,
@@ -149,13 +147,12 @@ function normalizeParams(raw: unknown): GenParams {
   }
   const params = out as GenParams
   if (params.seedMode !== 'fixed' && params.seedMode !== 'perImage') params.seedMode = base.seedMode
-  // sampler / noiseSchedule / ucPreset 是接口认的固定字面量（见 naiOptions.ts）：
+  // sampler / noiseSchedule 是接口认的固定字面量（见 naiOptions.ts）：
   // 类型对但值不在选项表里（如手改文件、旧版本遗留值）一样要回默认值，
   // 否则下拉框会显示成空白，真正发起生成时又会被 NovelAI 报 400。
   // model 不做这层校验——V5 系列模型名未公布，允许用户填自定义名（见 ParamsPanel 的「自定义」入口）。
   if (!SAMPLER_OPTIONS.includes(params.sampler)) params.sampler = base.sampler
   if (!NOISE_SCHEDULE_OPTIONS.includes(params.noiseSchedule)) params.noiseSchedule = base.noiseSchedule
-  if (!UC_PRESET_OPTIONS.some((o) => o.value === params.ucPreset)) params.ucPreset = base.ucPreset
   return params
 }
 

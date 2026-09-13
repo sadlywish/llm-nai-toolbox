@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { defaultAppConfig, type AppConfig } from '../../src/shared/config'
 import type { LlmLogLine, MultiCharacterMode } from '../../src/shared/llm'
-import { joinCharacterNegative, postProcess } from '../../src/main/llm/fill'
+import { postProcess } from '../../src/main/llm/fill'
 import { RunLog } from '../../src/main/llm/log'
 import type { JsonObject } from '../../src/main/llm/types'
 
@@ -11,7 +11,7 @@ function run(
 ) {
   const lines: LlmLogLine[] = []
   const fill = postProcess(args, {
-    config: { ...defaultAppConfig(), negativePrompt: 'NEG', naiCharDefaultNegative: '', ...over.config },
+    config: { ...defaultAppConfig(), negativePrompt: 'NEG', ...over.config },
     lockedStyle: over.lockedStyle ?? null,
     multi: over.multi ?? 'off',
     transparent: over.transparent ?? false,
@@ -20,15 +20,6 @@ function run(
   })
   return { fill, lines: lines.map((l) => `[${l.level}] ${l.text}`) }
 }
-
-describe('joinCharacterNegative', () => {
-  it('两边都有就用逗号接；已经带着默认负面词时不重复追加', () => {
-    expect(joinCharacterNegative('bad hands', 'lowres')).toBe('bad hands, lowres')
-    expect(joinCharacterNegative('', 'lowres')).toBe('lowres')
-    expect(joinCharacterNegative('bad hands', '')).toBe('bad hands')
-    expect(joinCharacterNegative('bad hands, LowRes', 'lowres')).toBe('bad hands, LowRes')
-  })
-})
 
 describe('postProcess', () => {
   it('画风锁定在规范化之前覆盖 artist，所以锁定的画风同样经过前缀归一；原 args 被就地改', () => {
@@ -83,28 +74,25 @@ describe('postProcess', () => {
     expect(run({ artist: 'a', text: ' "天使"\n降临 ' }).fill.text).toBe('"天使" 降临')
   })
 
-  it('角色：只在多角色工具时取；非对象跳过；追加默认负面词；坐标去空白；超上限的已被截断', () => {
+  it('角色：只在多角色工具时取；非对象跳过；负面词只取模型给该角色的；坐标去空白；超上限的已被截断', () => {
     const args: JsonObject = {
       artist: 'a',
       characters: [
-        { count: 'girl', character: 'miku', negative_prompt: 'bad hands', position: ' 0.3,0.5 ' },
+        { count: 'girl', character: 'miku', negative_prompt: ' bad hands ', position: ' 0.3,0.5 ' },
         'junk',
         { count: 'boy', nltags: '一句\n话' },
         { count: 'other' },
       ],
     }
-    const { fill, lines } = run(args, {
-      withCharacters: true,
-      multi: 'coords',
-      config: { naiMaxCharacters: 3, naiCharDefaultNegative: 'lowres' },
-    })
+    const { fill, lines } = run(args, { withCharacters: true, multi: 'coords', config: { naiMaxCharacters: 3 } })
     expect(fill.characters).toHaveLength(2)
     expect(fill.characters[0]).toEqual({
       fields: { count: 'girl', character: 'miku', appearance: '', tags: '', nltags: '' },
-      negative: 'bad hands, lowres',
+      negative: 'bad hands',
       position: '0.3,0.5',
     })
-    expect(fill.characters[1].negative).toBe('lowres')
+    // 角色负面词独立存在：模型没给就是空，不拿整图负面词（这里是 NEG）或任何默认值去补
+    expect(fill.characters[1].negative).toBe('')
     expect(lines).toContain('[I] [回填] 角色 3 的 nltags 里的换行已换成空格（编辑器每个块只有一行）')
     expect(run({ artist: 'a', characters: [{ count: 'girl' }] }).fill.characters).toEqual([])
   })

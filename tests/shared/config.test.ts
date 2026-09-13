@@ -94,6 +94,8 @@ describe('mergeConfig', () => {
 
   it('不认识的键丢弃', () => {
     expect('enableNltags' in mergeConfig({ enableNltags: true })).toBe(false)
+    // 已废弃的角色默认负面词：旧配置里存着的值读进来就丢掉
+    expect('naiCharDefaultNegative' in mergeConfig({ naiCharDefaultNegative: 'lowres' })).toBe(false)
   })
 
   it('枚举值不在范围内回到默认值', () => {

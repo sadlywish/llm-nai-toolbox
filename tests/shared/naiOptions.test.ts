@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  MODEL_OPTIONS,
-  NOISE_SCHEDULE_OPTIONS,
-  SAMPLER_OPTIONS,
-  UC_PRESET_OPTIONS,
-  alignTo64,
-} from '@shared/naiOptions'
+import { MODEL_OPTIONS, NOISE_SCHEDULE_OPTIONS, SAMPLER_OPTIONS, alignTo64 } from '@shared/naiOptions'
 import { defaultGenParams } from '@shared/workspace'
 
 describe('alignTo64', () => {
@@ -28,6 +22,5 @@ describe('选项表', () => {
     expect(MODEL_OPTIONS.map((m) => m.value)).toContain(p.model)
     expect(SAMPLER_OPTIONS).toContain(p.sampler)
     expect(NOISE_SCHEDULE_OPTIONS).toContain(p.noiseSchedule)
-    expect(UC_PRESET_OPTIONS.map((o) => o.value)).toContain(p.ucPreset)
   })
 })

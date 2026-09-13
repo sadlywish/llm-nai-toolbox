@@ -1,10 +1,4 @@
-import {
-  MODEL_OPTIONS,
-  NOISE_SCHEDULE_OPTIONS,
-  SAMPLER_OPTIONS,
-  UC_PRESET_OPTIONS,
-  alignTo64,
-} from '@shared/naiOptions'
+import { MODEL_OPTIONS, NOISE_SCHEDULE_OPTIONS, SAMPLER_OPTIONS, alignTo64 } from '@shared/naiOptions'
 import type { GenParams } from '@shared/workspace'
 
 const CUSTOM_MODEL = '__custom__'
@@ -231,53 +225,9 @@ export default function ParamsPanel({ params, onChange }: Props): JSX.Element {
           })
         }
       />
-      <label className="field">
-        <span>负面预设</span>
-        <select
-          value={params.ucPreset}
-          onChange={(e) => {
-            const v = Number(e.target.value)
-            onChange((p) => {
-              p.ucPreset = v
-            })
-          }}
-        >
-          {UC_PRESET_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
 
-      <label className="field-check">
-        <input
-          type="checkbox"
-          checked={params.qualityToggle}
-          onChange={(e) => {
-            const checked = e.target.checked
-            onChange((p) => {
-              p.qualityToggle = checked
-            })
-          }}
-        />
-        质量词（Quality Toggle）
-      </label>
-      <label className="field-check">
-        <input
-          type="checkbox"
-          checked={params.varietyBoost}
-          onChange={(e) => {
-            const checked = e.target.checked
-            onChange((p) => {
-              p.varietyBoost = checked
-            })
-          }}
-        />
-        Variety Boost
-      </label>
-
-      <label className="field">
+      {/* 另起一行：CFG Rescale 右边空着，Seed 模式与 Seed 仍在同一行 */}
+      <label className="field row-start">
         <span>Seed 模式</span>
         <select
           value={params.seedMode}

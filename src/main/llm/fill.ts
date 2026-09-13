@@ -44,19 +44,6 @@ function fieldsFrom(src: JsonObject, specs: readonly FieldSpec[], prefix: string
   return out
 }
 
-/**
- * 角色负面词 + 设置里的角色默认负面词（插件 buildPayload 第 203–204 行）。
- * 已经带着默认负面词时不再追加：修改模式会把上次回填的结果原样喂回来，不判重就会一轮叠一层。
- */
-export function joinCharacterNegative(own: string, defaults: string): string {
-  const a = own.trim()
-  const b = defaults.trim()
-  if (!b) return a
-  if (!a) return b
-  if (a.toLowerCase().includes(b.toLowerCase())) return a
-  return `${a}, ${b}`
-}
-
 export function postProcess(args: JsonObject, ctx: PostProcessContext): FillResult {
   const { config, log } = ctx
 
@@ -88,7 +75,9 @@ export function postProcess(args: JsonObject, ctx: PostProcessContext): FillResu
       if (!isJsonObject(c)) return
       characters.push({
         fields: fieldsFrom(c, CHARACTER_FIELDS, `角色 ${i + 1} 的 `, log),
-        negative: joinCharacterNegative(String(c.negative_prompt || ''), config.naiCharDefaultNegative),
+        // 角色负面词独立存在，只取模型给这个角色的：不接默认值，也不拿整图负面词去补。
+        // 与插件不同（插件会追加 naiCharDefaultNegative）：实测 NovelAI 的角色负面词单独给就够了
+        negative: String(c.negative_prompt || '').trim(),
         position: String(c.position || '').trim(),
       })
     })

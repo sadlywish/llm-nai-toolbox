@@ -206,6 +206,7 @@ body {
 .token-bar { color: var(--ink-dim); font-size: 12px; }
 .token-bar.is-over { color: var(--danger); }
 .params { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-content: start; min-width: 0; }
+.params .row-start { grid-column: 1; }
 .placeholder { color: var(--ink-faint); padding: 12px; }
 
 .banner-error {
