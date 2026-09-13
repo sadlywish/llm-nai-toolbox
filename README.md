@@ -97,7 +97,7 @@ npm test           # vitest
 
 Electron 31 + electron-vite + React 18 + TypeScript(strict) + zustand + CodeMirror 6。
 
-主进程包办全部 IO 与外部请求；渲染进程 `contextIsolation` 打开、不发任何外部 HTTP。所有网络走 Electron 的 `net.fetch`，因此 NovelAI 接口、Danbooru 接口与例图共用同一处代理设置。
+主进程包办全部 IO 与外部请求；渲染进程 `contextIsolation` 打开、不发任何外部 HTTP。所有网络走 Electron 的 `net.fetch`，因此 LLM 接口、NovelAI 接口、Danbooru 接口与例图共用同一处代理设置。
 
 ### 构建前要自己放的文件
 
@@ -112,7 +112,7 @@ Electron 31 + electron-vite + React 18 + TypeScript(strict) + zustand + CodeMirr
 | `tag_deprecated.json` | 2KB | 废弃标签提醒 |
 | `character_features_v2.csv` | 5.5MB | 角色官方外观 |
 
-缺哪个，对应的 LLM 工具就**不注册**并在界面写明是哪个文件——不静默降级成一个会失败的工具。
+缺哪个，对应的 LLM 工具就**不注册**并在界面写明是哪个文件——不静默降级成一个会失败的工具。`tags_detail_v2.json` 只在设置里打开了任一类「返回 wiki」时才会被读。
 
 **默认提示词**（`resources/prompts/`）。仓库里是空文件，需要自己填：
 
@@ -123,9 +123,10 @@ Electron 31 + electron-vite + React 18 + TypeScript(strict) + zustand + CodeMirr
 | `tail.md` | 尾部注入（可以为空） |
 | `quality.txt` | 质量词 |
 | `negative.txt` | 默认负面提示词 |
-| `tag-skill-core.md` | 常驻追加到系统提示词末尾，不进配置 |
 
 这些是**初始化默认值，不是空白回退**：只在首次启动（`config.json` 不存在）时写进配置一次。之后配置里留空就是留空，不会被默认值悄悄顶回来。每个提示词框旁边有「恢复默认」按钮——升级不覆盖已有配置，那个按钮是拿到新版文案的唯一路径。
+
+**随包文档**（`resources/prompts/tag-skill-core.md`、`resources/tag-manuals/`）。取自 koishi-plugin-reforge 现有版本，已在仓库里：前者常驻追加到系统提示词末尾，后者是 `load_tag_manual` 工具可调取的主题手册（设置里开启）。不进配置，构建时打进应用。
 
 ---
 

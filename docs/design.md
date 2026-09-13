@@ -27,8 +27,8 @@ llm-nai-toolbox 的架构与关键取舍。使用方法见 [README](../README.md
 | `renderer/components/` | 提示词面板、参数区、角色面板、设置抽屉——布局与交互照画师串工具箱 |
 | `main/nai/` | 出图、PNG 元数据、zip 解包、落盘记账 |
 | `main/danbooru/` | 只服务右侧 WIKI 区 |
-| `main/tagdb/` | 本地标签库：检索、分类浏览、释义、角色特征、补全 |
-| `main/llm/` | Claude 与 OpenAI 兼容双端点、工具定义、多轮 tool_use 循环 |
+| `main/tagdb/` | 本地标签库：索引加载与补全、LLM 工具数据的惰性加载、分类浏览、释义与废弃表、角色特征、搜索结果格式化 |
+| `main/llm/` | 一轮 LLM 交互：两个端点、工具 schema、参数兜底与 NovelAI 规范化、上下文组装、收口后处理、多轮循环 |
 | `main/gen/` | 顺序发 N 张，无队列无并发控制 |
 | `shared/` | 字段定义、分块文档、配置与工作区的类型/默认值/校验/自愈、token 计算——纯函数，两端共用 |
 | `renderer/editor/` | CodeMirror 接线：装饰、守卫、快捷键 |
@@ -40,30 +40,35 @@ llm-nai-toolbox 的架构与关键取舍。使用方法见 [README](../README.md
 ## 一次 LLM 轮次
 
 ```
-渲染进程  llm:run({ instruction, editMode, fields, characters, styleLock })
+渲染进程  llm:run({ instruction, multiCharacter, editExisting, transparent, style, workspace })
    ↓
-主进程 runner
-  1. system = 系统提示词 + 多角色附加 + SKILL 文档 + 分类目录 + 尾部注入
-  2. user   = 指令 + [质量词] + [负面词] + [画风已锁定]
-            + 修改模式开启时追加 <现有参数> 快照
+主进程 runner（main/llm/runner.ts，循环只有这一份）
+  0. 备齐标签数据：缺哪个文件就摘掉对应工具，日志写明
+  1. system = 系统提示词 + 多角色说明 + tag-skill-core + 手册目录 + 分类目录 + 修改模式规则
+  2. user   = [标签释义] + 指令 + [质量词] + [画风已锁定] + [负面词]
+            修改模式：<现有参数>（取自工作区）+ [用户的修改要求]
   3. 循环 ≤ maxToolRounds：
-       工具集 = generate_image(或 _characters) + search_tags
-              + browse_tags + search_character_features + load_tag_manual
-       调 LLM，逐事件推给渲染进程
-       搜索类本地执行；命中生成工具即收口
-       置信度 ≥ 0.85 → 下一轮撤掉搜索工具
-       倒数第一轮只给生成工具，强制收口
+       工具集 = 生成工具 + search_tags + search_character_features + load_tag_manual + browse_tags
+       调端点；日志行逐条推 llm:event
+       检索类本地执行、结果喂回；没有检索调用就收口
+       搜索全部 ≥0.85 且开着 autoSkipSearch → 之后撤掉 search_tags
+       最后一轮只给生成工具
+  4. 收口后处理：画风覆盖 → NovelAI 规范化 → 透明背景 → 负面词兜底 → 宽高换算 → 角色默认负面词
    ↓
-{ fields, characters, aspectRatio, seed, notices[], transcriptId }
-   ↓
-渲染进程写入分块编辑器与参数区
-   ↓
-「自动生成」开着 → 立即 gen:start
+LlmRunResult：filled（带 FillResult）/ noParams / failed / aborted
 ```
 
-**每次发送都是全新一轮**，不累积对话历史。想在现有内容上改，用「修改模式」开关把编辑器当前内容一并送出。
+**每次发送都是全新一轮**，不累积对话历史。想在现有内容上改，打开「在现有内容上修改」，编辑器、负面词、参数、角色的当前内容会作为 `<现有参数>` 一并送出。
 
-工具名与 schema 与插件完全一致——那几份成品系统提示词（共 35KB）通篇引用这些名字，改名等于全部作废。差别只在 `generate_image` 的处理函数：它把参数交回渲染进程，而不是调 NovelAI。
+**回填内容就是本来要发给 NovelAI 的最终参数。** 插件在出图前做的处理全部在收口后做完，回填本身不再加工，所以不存在「没回填」的值。唯一例外是 `text`：插件在拼接完提示词之后才处理它（补 `no text`、改写中途的 `text:`、追加 `text: 内容`），提示词排序里没有它的位置，所以原样带出，出图时再按插件规则处理。角色默认负面词在回填时已经接进每个角色的负面词里，出图时不要再接一次。
+
+工具名与 schema 与插件完全一致——成品系统提示词通篇引用这些名字，改名等于全部作废。唯一动态的部分是 `generate_image` 描述里那句拼接顺序：按设置里的字段顺序生成。
+
+**日志照 koishi LOG。** 每行 `时间 [I/W/E] 文本`，文案沿用插件原句：本轮工具集、Token 累计、每条搜索的最高匹配、NovelAI 规范化说明、宽高换算……三种没有回填的结束各有固定的末行：模型没给参数时原样打出它说了什么；请求失败时一行接口原文、一行下一步；中止时写停在第几轮。
+
+**端点。** Claude 与 OpenAI 兼容两种。思维链关闭时**不发送**任何参数（显式 disabled 会让 Opus 5 偶尔把工具调用写进正文）。OpenAI 兼容端点各家的思维链写法不同，设置里选「参数写法」：`reasoning_effort`（OpenAI / Gemini / xAI / vLLM）、`reasoning` 对象（OpenRouter）、`thinking` 对象（DeepSeek / 智谱 / Kimi）、`enable_thinking`（通义千问）；力度原样发送，不在应用里降档；其余差异用「附加请求参数（JSON）」补，同名字段以它为准。工具往返里带回续接推理所需的字段（`reasoning_content`、`reasoning_details`、`tool_calls[].extra_content`），缺了 DeepSeek、OpenRouter、Gemini 会报 400。端点以 400 拒绝时按报错点名的参数自动退让，每种一轮最多一次：不认思维链参数就不再发、要求 `max_completion_tokens` 就改发它（OpenAI 官方的推理模型不收 `max_tokens`）、不收带回的推理字段就从历史里剥掉。网络错误与 5xx 重试 3 次；超时不重试——超时多半是代理问题，重试只会让用户多等几分钟。中止不依赖 `net.fetch` 是否支持 `AbortSignal`，请求被包在一个中止即 reject 的 promise 里。
+
+**同一时刻只有一轮。** 两轮并发往同一份工作区回填，谁先谁后说不清。
 
 ---
 
@@ -145,7 +150,9 @@ API Key 在 `secrets.json`，渲染进程只知道「有没有存过」，明文
 
 ## 本地标签库
 
-随安装包分发。计划 2 只加载 `tags_index_v2`(29MB)，启动后异步读盘；`tags_detail_v2`(41MB)、`tag_browse`、`tag_gloss`、`character_features` 留给计划 3，各自首次用到才加载。
+随安装包分发。`tags_index_v2`(29MB) 启动后异步读盘，服务补全与 `search_tags`；其余五个文件是 LLM 工具的数据，第一次跑 LLM 时由 `main/tagdb/extras.ts` 按需读入并常驻。`tags_detail_v2`(41MB) 只在打开了任一类「返回 wiki」开关时才读。读失败不缓存——用户按日志提示把文件放进去，下一轮就能用，不必重启。
+
+`tag-skill-core.md` 与 `tag-manuals/` 一共一百多 KB，构建期打进主进程包（`?raw` 与 `import.meta.glob`），不存在运行时找不到的问题。
 
 插件用的是同步 `readFileSync`，搬到 Electron 主进程会卡住启动，所以改成 `fs/promises`。但 `JSON.parse` 与建索引仍是同步的：**实测整个加载 3949ms**（读盘 85ms + parse 210ms + 建两份索引约 3.6s），常驻 heap 554MB。这段时间主进程被占住，界面照常（渲染是独立进程），只是发往主进程的补全请求会排队——所以 `loading` 状态必须在同步段开始**之前**播出去，`load()` 里那个 `await readFile` 提供的让出点保证了这一点。
 
@@ -220,9 +227,10 @@ Danbooru 失败是唯一的静默降级——它只是辅助查询，断网不�
 这些是提示词压不住、只能靠代码处理的结构性缺陷：
 
 - `sanitizeLlmArgs` — 递归解 HTML 实体
-- `toArray` — 类数组对象 `{"0":…,"1":…}` 还原成数组
-- `buildAssistantContent` — assistant 轮次**原样回传 API 原始 content 块**。`thinking` 块带 signature，从 text + tool_use 重建会丢掉它，下一轮请求直接 400
-- 参数规范化**就地修改**而不返回副本——参数会被三处消费（发送、落盘、展示），只在发送路径处理会让落盘与展示是未处理版本
+- `repairLlmArgs` — 后续参数漏进某个字符串值的尾部时还原成真参数；本该是数组/对象却收到 JSON 文本时解析回来，坏掉一个对象不连累其余
+- `toQueryList` / `toCharacterList` — 查询词的任意形状（类数组对象 `{"0":…}`、包装对象、嵌套数组）归一成列表，不丢内容
+- `buildAssistantContent` — assistant 轮次**原样回传 API 原始 content 块**。`thinking` 块带 signature，从 text + tool_use 重建会丢掉它，下一轮请求直接 400。OpenAI 兼容端点同理带回 `reasoning_content`
+- `finalizeArgs` **就地修改**参数而不返回副本——参数会被三处消费（回填、落盘、展示），只在一条路径上处理会让另外两处是未处理版本
 
 ---
 
