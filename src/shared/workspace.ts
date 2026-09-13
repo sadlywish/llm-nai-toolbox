@@ -1,6 +1,7 @@
 import { emptyValues, sanitizeFieldText, type FieldValues } from './blockDoc'
 import { CHARACTER_FIELDS, MAIN_FIELDS, type FieldSpec } from './fields'
 import { newId } from './ids'
+import { NOISE_SCHEDULE_OPTIONS, SAMPLER_OPTIONS, UC_PRESET_OPTIONS } from './naiOptions'
 
 /** seed 分配策略：每张随机，或固定用参数区里的 seed */
 export type SeedMode = 'fixed' | 'perImage'
@@ -124,6 +125,13 @@ function normalizeParams(raw: unknown): GenParams {
   }
   const params = out as GenParams
   if (params.seedMode !== 'fixed' && params.seedMode !== 'perImage') params.seedMode = base.seedMode
+  // sampler / noiseSchedule / ucPreset 是接口认的固定字面量（见 naiOptions.ts）：
+  // 类型对但值不在选项表里（如手改文件、旧版本遗留值）一样要回默认值，
+  // 否则下拉框会显示成空白，真正发起生成时又会被 NovelAI 报 400。
+  // model 不做这层校验——V5 系列模型名未公布，允许用户填自定义名（见 ParamsPanel 的「自定义」入口）。
+  if (!SAMPLER_OPTIONS.includes(params.sampler)) params.sampler = base.sampler
+  if (!NOISE_SCHEDULE_OPTIONS.includes(params.noiseSchedule)) params.noiseSchedule = base.noiseSchedule
+  if (!UC_PRESET_OPTIONS.some((o) => o.value === params.ucPreset)) params.ucPreset = base.ucPreset
   return params
 }
 

@@ -114,4 +114,22 @@ describe('normalizeWorkspace', () => {
     expect(ws.params.seedMode).toBe('perImage')
     expect(ws.params.width).toBe(896)
   })
+
+  it('参数：采样器、噪声调度、负面预设不在选项表里时回默认值；模型允许自定义名', () => {
+    const ws = normalizeWorkspace({
+      params: {
+        sampler: 'k_bogus',
+        noiseSchedule: 'linear',
+        ucPreset: 99,
+        model: 'my-custom-model',
+      },
+    })
+    expect(ws.params.sampler).toBe('k_euler_ancestral')
+    expect(ws.params.noiseSchedule).toBe('karras')
+    expect(ws.params.ucPreset).toBe(0)
+    // 合法但非默认的采样器要保留，不能被误判成非法
+    expect(normalizeWorkspace({ params: { sampler: 'k_dpmpp_2m' } }).params.sampler).toBe('k_dpmpp_2m')
+    // 模型名不校验：V5 系列名未公布，允许用户手填自定义名
+    expect(ws.params.model).toBe('my-custom-model')
+  })
 })
