@@ -365,4 +365,5 @@ body {
 .ln .lv { color: var(--ink-dim); }
 .ln.w, .ln.w .lv { color: var(--warn); }
 .ln.e, .ln.e .lv { color: var(--danger); }
+.settings-drawer .field-row input { flex: 1; min-width: 0; }
 .ln.ok { color: var(--ok); }

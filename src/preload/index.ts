@@ -30,6 +30,9 @@ const api = {
 
   saveConfig: (input: ConfigSaveInput): Promise<void> => ipcRenderer.invoke(IPC.configSave, input),
 
+  /** 系统的选择文件夹对话框；取消返回空串 */
+  pickDirectory: (): Promise<string> => ipcRenderer.invoke(IPC.pickDirectory),
+
   loadWorkspace: (): Promise<Workspace> => ipcRenderer.invoke(IPC.workspaceLoad),
 
   saveWorkspace: (ws: Workspace): Promise<void> => ipcRenderer.invoke(IPC.workspaceSave, ws),

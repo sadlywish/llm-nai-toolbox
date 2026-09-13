@@ -10,6 +10,7 @@ export const IPC = {
   tagdbStatusGet: 'tagdb:status:get',
   configLoad: 'config:load',
   configSave: 'config:save',
+  pickDirectory: 'dialog:pick-directory',
   workspaceLoad: 'workspace:load',
   workspaceSave: 'workspace:save',
   /** 关窗前的同步冲刷（sendSync），防抖窗口内还没落盘的那一次 */

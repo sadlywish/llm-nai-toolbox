@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
   API_TYPES,
+  IMAGE_FORMATS,
   NUMBER_RULES,
   OPENAI_REASONING_DIALECTS,
   OPENAI_REASONING_EFFORTS,
@@ -78,6 +79,7 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
   const config = useConfig((s) => s.config)
   const loaded = useConfig((s) => s.loaded)
   const hasLlmApiKey = useConfig((s) => s.hasLlmApiKey)
+  const hasNaiToken = useConfig((s) => s.hasNaiToken)
   const configExists = useConfig((s) => s.configExists)
   const saveError = useConfig((s) => s.saveError)
   const save = useConfig((s) => s.save)
@@ -85,6 +87,7 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
 
   const [draft, setDraft] = useState<AppConfig>(config)
   const [apiKeyInput, setApiKeyInput] = useState('')
+  const [naiTokenInput, setNaiTokenInput] = useState('')
   const [numericText, setNumericText] = useState<Record<NumericKey, string>>(() => numericTextFrom(config))
   const [saving, setSaving] = useState(false)
   // 在系统提示词框里拖选文字、松开时鼠标落在遮罩上：Chromium 把 click 事件
@@ -99,6 +102,7 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
     if (!open || !loaded) return
     setDraft(config)
     setApiKeyInput('')
+    setNaiTokenInput('')
     setNumericText(numericTextFrom(config))
     dismissSaveError()
     // 只在「打开且已载入」这一刻取快照；config 若进依赖数组，编辑期间
@@ -182,14 +186,21 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
     if (hasErrors || saving) return
     setSaving(true)
     // 留空传 undefined：主进程拿 undefined 当「不改动已存的 Key」，传 '' 会把它清空
-    await save(draft, apiKeyInput === '' ? undefined : apiKeyInput)
+    await save(draft, apiKeyInput === '' ? undefined : apiKeyInput, naiTokenInput === '' ? undefined : naiTokenInput)
     setSaving(false)
     // 只在成功时清空并关闭：失败多半是磁盘之类与输入无关的原因，
     // 用户接下来大概率要重试，把刚输入的 Key 清掉等于逼他重新输一遍
     if (useConfig.getState().saveError === null) {
       setApiKeyInput('')
+      setNaiTokenInput('')
       onClose()
     }
+  }
+
+  async function pickSaveDir(): Promise<void> {
+    const dir = await window.api.pickDirectory()
+    // 取消对话框返回空串：保留原来的目录，不清空
+    if (dir !== '') set('saveDir', dir)
   }
 
   const errorOf = (key: keyof AppConfig): ReactNode =>
@@ -323,6 +334,46 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
                   {errorOf('openaiExtraParams')}
                 </label>
               )}
+            </Group>
+
+            <Group title="NovelAI">
+              <label className="field">
+                <span>NovelAI Token</span>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={naiTokenInput}
+                  placeholder={hasNaiToken ? '已保存（留空则不修改）' : '必填'}
+                  onChange={(e) => setNaiTokenInput(e.target.value)}
+                />
+              </label>
+              {textField('naiBaseUrl', '接口地址')}
+              <label className="field">
+                <span>保存目录</span>
+                <div className="field-row">
+                  <input type="text" readOnly value={draft.saveDir} placeholder="未设置" />
+                  <button type="button" onClick={() => void pickSaveDir()}>
+                    选择…
+                  </button>
+                </div>
+                <span className="field-hint">按日期分子目录存图；同目录 _index.json 记账</span>
+              </label>
+              <div className="two-col">
+                <label className="field">
+                  <span>图片格式</span>
+                  <select value={draft.imageFormat} onChange={(e) => set('imageFormat', e.target.value as AppConfig['imageFormat'])}>
+                    {IMAGE_FORMATS.map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {numberField('naiTimeoutSec', '请求超时（秒）')}
+                {numberField('retryCount', '失败重试次数', { hint: '429 与 Token 问题不重试' })}
+                {numberField('taskIntervalMs', '任务间隔（毫秒）')}
+                {numberField('historyDays', '历史保留天数')}
+              </div>
             </Group>
 
             <Group title="思维链">

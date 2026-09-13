@@ -1,5 +1,5 @@
 import { join } from 'path'
-import { BrowserWindow, ipcMain, safeStorage } from 'electron'
+import { BrowserWindow, dialog, ipcMain, safeStorage } from 'electron'
 import { mergeConfig, validateConfig } from '@shared/config'
 import {
   IPC,
@@ -105,6 +105,13 @@ export function registerIpc(
         if (!r.ok) console.warn('[proxy]', r.message)
       })
       .catch((e: unknown) => console.warn('[proxy] 应用代理失败：', e))
+  })
+
+  ipcMain.handle(IPC.pickDirectory, async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const options: Electron.OpenDialogOptions = { properties: ['openDirectory', 'createDirectory'] }
+    const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
+    return result.canceled ? '' : (result.filePaths[0] ?? '')
   })
 
   ipcMain.handle(IPC.workspaceLoad, () => normalizeWorkspace(workspaceStore.read()))
