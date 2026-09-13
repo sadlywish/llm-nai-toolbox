@@ -1,20 +1,17 @@
 import { useEffect, useState } from 'react'
-import { CHARACTER_FIELDS, MAIN_FIELDS } from '@shared/fields'
+import { MAIN_FIELDS } from '@shared/fields'
 import { checkTokenLimit, totalTokens } from '@shared/blockMetrics'
+import type { FieldValues } from '@shared/blockDoc'
 import { tokenLimitFor } from '@renderer/prompt/t5'
 import PromptEditor from './editor/PromptEditor'
 import { useTagdb } from './state/tagdb'
-import { useWorkspace } from './state/workspace'
-
-// 模型选择要到后续计划才有，先钉死在 V5 上把上限跑通
-const MODEL = 'nai-diffusion-5-full'
+import { initWorkspacePersistence, useWorkspace } from './state/workspace'
 
 export default function App(): JSX.Element {
   const [version, setVersion] = useState('')
-  const main = useWorkspace((s) => s.main)
-  const setMain = useWorkspace((s) => s.setMain)
-  const character = useWorkspace((s) => s.character)
-  const setCharacter = useWorkspace((s) => s.setCharacter)
+  const workspace = useWorkspace((s) => s.workspace)
+  const loadWorkspace = useWorkspace((s) => s.load)
+  const updateWorkspace = useWorkspace((s) => s.update)
   const tagdbStatus = useTagdb((s) => s.status)
   const initTagdb = useTagdb((s) => s.init)
 
@@ -26,10 +23,19 @@ export default function App(): JSX.Element {
   // 挂载之前就发出去了，只订阅会错过那第一条（见 useTagdb 的 JSDoc）
   useEffect(() => initTagdb(), [initTagdb])
 
-  // TODO(后续计划): 1471 是「base + 全部角色提示词」的合计上限，这里只喂了 main，
-  // 角色完全不进预算；且 totalTokens 是分段求和、低估约 9 token（见其 JSDoc）。
-  const total = totalTokens(main, MAIN_FIELDS)
-  const over = checkTokenLimit(main, MAIN_FIELDS, MODEL)
+  useEffect(() => {
+    void loadWorkspace()
+  }, [loadWorkspace])
+
+  useEffect(() => initWorkspacePersistence(), [])
+
+  if (workspace === null) return <div className="app">载入中…</div>
+
+  const model = workspace.params.model
+  const onMainChange = (values: FieldValues): void =>
+    updateWorkspace((ws) => {
+      ws.main = values
+    })
 
   return (
     <div className="app">
@@ -52,26 +58,19 @@ export default function App(): JSX.Element {
           <div className="pane-bar">
             <span className="pane-title">提示词</span>
             <span className="pane-budget">
-              合计 <b>{total}</b> / {tokenLimitFor(MODEL)} token
+              合计 <b>{totalTokens(workspace.main, MAIN_FIELDS)}</b> / {tokenLimitFor(model)} token
             </span>
           </div>
-          <PromptEditor specs={MAIN_FIELDS} values={main} onChange={setMain} />
-          {over !== null && (
-            <p className="pane-warn" role="alert">
-              提示词 {over.total} token 超过上限 {over.limit}，最长的是「{over.longest.name}」
-              （{over.longest.tokens} token）。
-            </p>
-          )}
-        </section>
-
-        <section className="pane">
-          <div className="pane-bar">
-            <span className="pane-title">角色 1</span>
-            <span className="pane-budget">
-              合计 <b>{totalTokens(character, CHARACTER_FIELDS)}</b> token
-            </span>
-          </div>
-          <PromptEditor specs={CHARACTER_FIELDS} values={character} onChange={setCharacter} />
+          <PromptEditor specs={MAIN_FIELDS} values={workspace.main} onChange={onMainChange} />
+          {(() => {
+            const over = checkTokenLimit(workspace.main, MAIN_FIELDS, model)
+            return over === null ? null : (
+              <p className="pane-warn" role="alert">
+                提示词 {over.total} token 超过上限 {over.limit}，最长的是「{over.longest.name}」
+                （{over.longest.tokens} token）。
+              </p>
+            )
+          })()}
         </section>
       </main>
     </div>
