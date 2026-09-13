@@ -214,3 +214,28 @@ body {
   background: none; border: 1px solid currentColor; border-radius: 3px; color: inherit;
   cursor: pointer; padding: 1px 8px; font: inherit; font-size: 12px;
 }
+
+/* ── 角色面板（照工具箱 CharacterRows：页签 + 坐标 + 正负面左右 3:2） ── */
+.character-panel { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 8px; }
+.character-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.tabs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.tab {
+  display: flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 13px;
+  border: 1px solid var(--line); border-radius: 3px; cursor: pointer; user-select: none;
+}
+.tab.is-active { border-color: var(--accent); background: rgba(74, 158, 255, .12); }
+.tab-close, .tab-add {
+  background: none; border: none; color: var(--ink-faint); cursor: pointer;
+  font-size: 14px; line-height: 1; padding: 2px 4px;
+}
+.tab-close:hover, .tab-add:hover:not(:disabled) { color: var(--ink); }
+.tab-add:disabled { cursor: not-allowed; opacity: .4; }
+.character-empty { color: var(--ink-faint); padding: 12px; font-size: 13px; }
+/* 坐标输入单独一行，label 在左的横排 */
+.character-toolbar .field { flex-direction: row; align-items: center; gap: 6px; }
+.character-toolbar .field input { width: 12em; }
+/* 角色负面通常很短，左右并排、宽度 3:2（工具箱用户反馈改出来的布局）。
+   min-width: 0 是横排 flex 子项的必需项，否则会被 CodeMirror 最长不可换行片段撑开 */
+.character-prompts { display: flex; gap: 6px; }
+.character-prompts > .prompt-editor { flex: 3 1 0; min-width: 0; }
+.character-prompts > .prompt-editor + .prompt-editor { flex: 2 1 0; }

@@ -4,6 +4,7 @@ import type { Workspace } from '@shared/workspace'
 import { tokenLimitFor } from '@renderer/prompt/t5'
 import PromptEditor from '../editor/PromptEditor'
 import TagTextEditor from '../editor/TagTextEditor'
+import CharacterPanel from './CharacterPanel'
 import ParamsPanel from './ParamsPanel'
 
 interface Props {
@@ -12,6 +13,8 @@ interface Props {
   mainSpecs: readonly FieldSpec[]
   /** 按 naiCharPromptOrder 排好的角色字段集。同样要求引用稳定 */
   charSpecs: readonly FieldSpec[]
+  /** 角色数上限（设置 naiMaxCharacters） */
+  maxCharacters: number
   update: (fn: (draft: Workspace) => void) => void
 }
 
@@ -43,7 +46,13 @@ function longestAcross(
  * token 合计口径与工具箱一致：正向 + 全部启用角色（NAI 的上限就是这两者合计）。
  * 仍是分段估算之和，低估约每段一个 token，见 blockMetrics.totalTokens 的说明。
  */
-export default function PromptPane({ workspace, mainSpecs, charSpecs, update }: Props): JSX.Element {
+export default function PromptPane({
+  workspace,
+  mainSpecs,
+  charSpecs,
+  maxCharacters,
+  update,
+}: Props): JSX.Element {
   const total =
     totalTokens(workspace.main, mainSpecs) +
     workspace.characters
@@ -116,6 +125,14 @@ export default function PromptPane({ workspace, mainSpecs, charSpecs, update }: 
 
           <ParamsPanel params={workspace.params} onChange={(mutate) => update((ws) => mutate(ws.params))} />
         </div>
+
+        <CharacterPanel
+          characters={workspace.characters}
+          useCoords={workspace.useCoords}
+          charSpecs={charSpecs}
+          maxCharacters={maxCharacters}
+          update={update}
+        />
       </div>
     </section>
   )

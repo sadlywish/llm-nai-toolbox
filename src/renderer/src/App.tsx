@@ -86,6 +86,7 @@ export default function App(): JSX.Element {
             workspace={workspace}
             mainSpecs={mainSpecs}
             charSpecs={charSpecs}
+            maxCharacters={config.naiMaxCharacters}
             update={updateWorkspace}
           />
         ) : (
