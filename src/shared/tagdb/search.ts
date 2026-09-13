@@ -515,3 +515,187 @@ export function searchCategory(
 ): SearchResult {
   return searchOne(entries, query, type, index, wikiMap)
 }
+
+// ─── 按类别检索（LLM 的 search_tags 工具用） ───────────────────
+
+/** 角色查询项 */
+export interface CharacterQuery {
+  name: string
+  series?: string
+}
+
+/** 一个类别的条目与它的 trigram 索引。main/tagdb/loader.ts 的 Category 结构上满足它 */
+export interface SearchCategory {
+  entries: TagEntry[]
+  index: TagIndex
+}
+
+export interface SearchCategories {
+  artists: SearchCategory
+  characters: SearchCategory
+  series: SearchCategory
+  general: SearchCategory
+}
+
+/**
+ * search_tags 的检索本体。从插件 tag-db.ts 第 462–536 行搬运。
+ *
+ * 入参类型是 `readonly unknown[]` 而不是 `string[]`：调用方是 LLM 工具入参，形状什么都可能来。
+ * 上游 toQueryList 已经归一过一次，这里自己再兜一道——插件曾因 concepts 里混进对象
+ * 炸成 `q.trim is not a function`。
+ */
+export function searchTags(
+  cats: SearchCategories,
+  wikiMap: Map<string, string> | undefined,
+  artists: readonly unknown[],
+  characters: readonly unknown[] = [],
+  concepts: readonly unknown[] = [],
+  series: readonly unknown[] = [],
+): SearchResult[] {
+  const results: SearchResult[] = []
+  const str = (v: unknown): string =>
+    (typeof v === 'string' ? v : v === null || v === undefined ? '' : String(v)).trim()
+
+  for (const q of artists) {
+    const t = str(q)
+    if (t) results.push(searchOne(cats.artists.entries, t, '画师', cats.artists.index, wikiMap))
+  }
+  for (const cq of characters) {
+    const rec = typeof cq === 'object' && cq !== null ? (cq as Record<string, unknown>) : null
+    const name = str(typeof cq === 'string' ? cq : rec?.name)
+    if (!name) continue
+    results.push(
+      searchOneCharacter(
+        cats.characters.entries,
+        cats.series.entries,
+        name,
+        str(rec?.series),
+        '角色',
+        cats.characters.index,
+        wikiMap,
+      ),
+    )
+  }
+  for (const q of concepts) {
+    const t = str(q)
+    if (t) results.push(searchOne(cats.general.entries, t, '概念', cats.general.index, wikiMap))
+  }
+  for (const q of series) {
+    const t = str(q)
+    if (t) results.push(searchOne(cats.series.entries, t, '作品', cats.series.index, wikiMap))
+  }
+
+  // 跨类别精确 tag 名回退：当分类内无高置信匹配时，检查所有类别
+  const crossCategories: Array<{ entries: TagEntry[]; type: SearchType }> = [
+    { entries: cats.artists.entries, type: '画师' },
+    { entries: cats.characters.entries, type: '角色' },
+    { entries: cats.series.entries, type: '作品' },
+    { entries: cats.general.entries, type: '概念' },
+  ]
+  for (const r of results) {
+    if (r.matches.length > 0 && r.matches[0].score >= 0.85) continue
+    // 将查询转为 tag 格式（小写、空格转下划线）
+    const queryAsTag = r.query.trim().toLowerCase().replace(/\s+/g, '_')
+    for (const cat of crossCategories) {
+      const entry = cat.entries.find((x) => x.tag === queryAsTag)
+      if (entry) {
+        r.matches = [toMatch(entry, 1.0, wikiMap)]
+        r.type = cat.type
+        break
+      }
+    }
+  }
+  return results
+}
+
+/** 角色搜索：支持作品名辅助匹配 */
+function searchOneCharacter(
+  entries: TagEntry[], seriesDb: TagEntry[],
+  query: string, seriesHint: string, type: '画师' | '角色',
+  index?: TagIndex, wikiMap?: Map<string, string>,
+): SearchResult {
+  // 无作品提示时退化为普通搜索
+  if (!seriesHint) return searchOne(entries, query, type, index, wikiMap)
+
+  // 先将作品提示解析为可能的 series tag
+  const seriesMatches = new Set<string>()
+  const ns = normalize(seriesHint)
+  for (const se of seriesDb) {
+    // 匹配 series tag 名、中文名、英文名
+    if (normalize(se.tag).includes(ns) || ns.includes(normalize(se.tag))) {
+      seriesMatches.add(se.tag)
+      continue
+    }
+    for (const name of [...se.zh, ...se.en]) {
+      if (normalize(name).includes(ns) || ns.includes(normalize(name))) {
+        seriesMatches.add(se.tag)
+        break
+      }
+    }
+  }
+
+  const scored: Array<{ entry: TagEntry; score: number }> = []
+
+  const processEntry = (entry: TagEntry) => {
+    const { score } = matchEntry(query, entry)
+    if (score < 0.5) return
+
+    let adjusted = score
+    // 作品匹配加分：entry.series 中包含匹配到的作品 tag
+    if (seriesMatches.size > 0 && entry.series.length > 0) {
+      const hasSeriesMatch = entry.series.some(s => seriesMatches.has(s))
+      if (hasSeriesMatch) {
+        adjusted = Math.min(adjusted + 0.05, 1.0) // 作品匹配加 0.05
+      } else {
+        adjusted = Math.max(adjusted - 0.03, 0) // 作品不匹配扣 0.03
+      }
+    }
+    // tag 名中包含作品括号（如 saber_(fate)）也做匹配
+    if (seriesMatches.size > 0) {
+      const bracket = entry.tag.match(/\(([^)]+)\)/)
+      if (bracket) {
+        const inBracket = bracket[1].toLowerCase()
+        const matched = [...seriesMatches].some(s => inBracket.includes(s.replace(/_/g, ' ').toLowerCase())
+          || s.toLowerCase().includes(inBracket))
+        if (matched) {
+          adjusted = Math.min(adjusted + 0.05, 1.0)
+        }
+      }
+    }
+
+    scored.push({ entry, score: Math.round(adjusted * 100) / 100 })
+  }
+
+  const candidates = index ? getCandidates(index, query) : null
+  if (candidates !== null) {
+    for (const idx of candidates) processEntry(entries[idx])
+  } else {
+    for (const entry of entries) processEntry(entry)
+  }
+
+  // 排序逻辑同 searchOne
+  const nqLen = normalize(query).length
+  const countWeight = nqLen <= 2 ? 0.05 : 0.03
+  const scoreThreshold = 0.10 + Math.max(0, 3 - nqLen) * 0.03
+
+  scored.sort((a, b) => {
+    const diff = b.score - a.score
+    if (Math.abs(diff) >= scoreThreshold) return diff
+    const wa = b.score + Math.log10(b.entry.count + 1) * countWeight
+    const wb = a.score + Math.log10(a.entry.count + 1) * countWeight
+    return wa - wb
+  })
+
+  let matches: SearchMatch[]
+  const highScoreItems = scored.filter(s => s.score >= 0.85)
+
+  if (highScoreItems.length > 0) {
+    matches = highScoreItems.map(s => toMatch(s.entry, s.score, wikiMap))
+  } else if (scored.length > 0) {
+    matches = [toMatch(scored[0].entry, scored[0].score, wikiMap)]
+  } else {
+    matches = []
+  }
+
+  return { query, type, matches }
+}
