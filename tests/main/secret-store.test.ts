@@ -52,4 +52,16 @@ describe('SecretStore', () => {
     writeFileSync(join(dir, 'secrets.json'), JSON.stringify(['llmApiKey']))
     expect(new SecretStore(dir, fakeCrypto).read('llmApiKey')).toBe('')
   })
+
+  it('两把钥匙各管各的：LLM Key 与 NovelAI Token 互不影响', () => {
+    const store = new SecretStore(dir, fakeCrypto)
+    store.write('llmApiKey', 'a')
+    store.write('naiToken', 'b')
+    expect(store.read('llmApiKey')).toBe('a')
+    expect(store.read('naiToken')).toBe('b')
+
+    store.write('naiToken', '')
+    expect(store.read('naiToken')).toBe('')
+    expect(store.read('llmApiKey')).toBe('a')
+  })
 })

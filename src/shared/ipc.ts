@@ -63,6 +63,8 @@ export interface ConfigLoadResult {
   config: AppConfig
   /** 只回传「有没有存过」，明文永远不进渲染进程 */
   hasLlmApiKey: boolean
+  /** 同上：NovelAI Token 有没有存过 */
+  hasNaiToken: boolean
   /** config.json 在不在；false 时启动自动弹设置抽屉（规格 §14.3） */
   configExists: boolean
 }
@@ -71,4 +73,6 @@ export interface ConfigSaveInput {
   config: AppConfig
   /** undefined = 不改动已存的 Key。设置抽屉不回显明文，没填就不能把已存的覆盖掉 */
   llmApiKey?: string
+  /** 同 llmApiKey：undefined = 不改动已存的 Token */
+  naiToken?: string
 }

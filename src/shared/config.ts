@@ -16,6 +16,9 @@ export const API_TYPES: readonly ApiType[] = ['claude', 'openai']
 export const THINKING_FORMATS: readonly ThinkingFormat[] = ['adaptive', 'budget']
 export const THINKING_EFFORTS: readonly ThinkingEffort[] = ['low', 'medium', 'high', 'xhigh', 'max']
 
+export type ImageFormat = 'png' | 'webp'
+export const IMAGE_FORMATS: readonly ImageFormat[] = ['png', 'webp']
+
 /**
  * OpenAI 兼容接口的思维链参数写法。各家各不相同（2026-09 核对各家文档）：
  * - reasoning_effort：OpenAI 官方、Gemini、xAI、vLLM 等，顶层 `reasoning_effort`
@@ -65,6 +68,21 @@ export interface AppConfig {
   openaiReasoningEffort: OpenAIReasoningEffort
   /** 0 = 不发预算。只有 reasoning_object 与 enable_thinking 两种写法使用 */
   openaiReasoningBudget: number
+
+  // ── NovelAI ──
+  /** 出图接口地址，路径固定 /ai/generate-image */
+  naiBaseUrl: string
+  /** 图片保存根目录，按日期分子目录。空串 = 未设置，点「生成」时提示去设置 */
+  saveDir: string
+  imageFormat: ImageFormat
+  /** NovelAI 单次请求超时（秒） */
+  naiTimeoutSec: number
+  /** 网络错误、超时、其他 HTTP 错误的按张重试次数；429 与 Token 问题不重试 */
+  retryCount: number
+  /** 相邻两张之间的间隔（毫秒） */
+  taskIntervalMs: number
+  /** 历史竖栏读最近几天的记录 */
+  historyDays: number
 
   // ── 提示词 ──
   systemPrompt: string
@@ -127,6 +145,14 @@ export function defaultAppConfig(): AppConfig {
     openaiReasoningDialect: 'reasoning_effort',
     openaiReasoningEffort: 'high',
     openaiReasoningBudget: 0,
+
+    naiBaseUrl: 'https://image.novelai.net',
+    saveDir: '',
+    imageFormat: 'png',
+    naiTimeoutSec: 120,
+    retryCount: 2,
+    taskIntervalMs: 1000,
+    historyDays: 7,
 
     systemPrompt: DEFAULT_TEXTS.systemPrompt,
     naiCharSystemPrompt: DEFAULT_TEXTS.naiCharSystemPrompt,
@@ -199,6 +225,10 @@ export const NUMBER_RULES: Record<NumericKey, NumberRule> = {
   openaiReasoningBudget: { min: 0, integer: true },
   naiMaxCharacters: { min: 1, integer: true },
   naiMaxPixels: { min: 64 * 64, integer: true },
+  naiTimeoutSec: { min: 1, integer: true },
+  retryCount: { min: 0, integer: true },
+  taskIntervalMs: { min: 0, integer: true },
+  historyDays: { min: 1, integer: true },
   maxToolRounds: { min: 1, integer: true },
   // 插件的 Schema 就是 2000~40000
   tagBrowsePageChars: { min: 2000, max: 40000, integer: true },
@@ -252,6 +282,9 @@ export function validateConfig(cfg: AppConfig): ConfigErrors {
   if (!/^https?:\/\/\S+$/i.test(cfg.apiBaseUrl.trim())) {
     errors.apiBaseUrl = '要写成 http:// 或 https:// 开头的地址'
   }
+  if (!/^https?:\/\/\S+$/i.test(cfg.naiBaseUrl.trim())) {
+    errors.naiBaseUrl = '要写成 http:// 或 https:// 开头的地址'
+  }
   if (cfg.model.trim() === '') errors.model = '模型名不能为空'
   const mainOrder = fieldOrderError(MAIN_FIELDS, cfg.promptOrder)
   if (mainOrder !== null) errors.promptOrder = mainOrder
@@ -290,6 +323,7 @@ export function mergeConfig(stored: unknown): AppConfig {
   if (!THINKING_EFFORTS.includes(cfg.thinkingEffort)) cfg.thinkingEffort = base.thinkingEffort
   if (!OPENAI_REASONING_DIALECTS.includes(cfg.openaiReasoningDialect)) cfg.openaiReasoningDialect = base.openaiReasoningDialect
   if (!OPENAI_REASONING_EFFORTS.includes(cfg.openaiReasoningEffort)) cfg.openaiReasoningEffort = base.openaiReasoningEffort
+  if (!IMAGE_FORMATS.includes(cfg.imageFormat)) cfg.imageFormat = base.imageFormat
   if (extraParamsError(cfg.openaiExtraParams) !== null) cfg.openaiExtraParams = base.openaiExtraParams
   for (const key of Object.keys(NUMBER_RULES) as NumericKey[]) {
     if (numberRuleError(NUMBER_RULES[key], cfg[key]) !== null) cfg[key] = base[key]

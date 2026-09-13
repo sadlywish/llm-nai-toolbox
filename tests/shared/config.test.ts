@@ -173,6 +173,40 @@ describe('RESTORABLE_KEYS', () => {
   })
 })
 
+describe('NovelAI 设置项', () => {
+  it('默认值照画师串工具箱', () => {
+    const c = defaultAppConfig()
+    expect([c.naiBaseUrl, c.saveDir, c.imageFormat, c.naiTimeoutSec, c.retryCount, c.taskIntervalMs, c.historyDays]).toEqual([
+      'https://image.novelai.net',
+      '',
+      'png',
+      120,
+      2,
+      1000,
+      7,
+    ])
+  })
+
+  it('图片格式不在范围内回到 png', () => {
+    expect(mergeConfig({ imageFormat: 'jpg' }).imageFormat).toBe('png')
+    expect(mergeConfig({ imageFormat: 'webp' }).imageFormat).toBe('webp')
+  })
+
+  it('接口地址必须是 http(s)', () => {
+    expect(validateConfig({ ...defaultAppConfig(), naiBaseUrl: 'image.novelai.net' }).naiBaseUrl).toBe('要写成 http:// 或 https:// 开头的地址')
+    expect(validateConfig(defaultAppConfig()).naiBaseUrl).toBeUndefined()
+  })
+
+  it('数值规则：重试次数与任务间隔可为 0，超时与历史天数至少 1', () => {
+    const errs = validateConfig({ ...defaultAppConfig(), retryCount: 0, taskIntervalMs: 0, naiTimeoutSec: 0, historyDays: 0 })
+    expect(errs.retryCount).toBeUndefined()
+    expect(errs.taskIntervalMs).toBeUndefined()
+    expect(errs.naiTimeoutSec).toBe('不能小于 1')
+    expect(errs.historyDays).toBe('不能小于 1')
+    expect(validateConfig({ ...defaultAppConfig(), retryCount: -1 }).retryCount).toBe('不能小于 0')
+  })
+})
+
 describe('OpenAI 兼容接口的思维链与附加参数', () => {
   it('默认值：reasoning_effort 写法、high、不发预算、没有附加参数', () => {
     const cfg = defaultAppConfig()

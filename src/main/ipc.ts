@@ -84,6 +84,7 @@ export function registerIpc(
     (): ConfigLoadResult => ({
       config: configStore.read(),
       hasLlmApiKey: secrets.read('llmApiKey') !== '',
+      hasNaiToken: secrets.read('naiToken') !== '',
       configExists: configStore.exists(),
     }),
   )
@@ -97,6 +98,7 @@ export function registerIpc(
     configStore.write(config)
     // 去掉首尾空白：复制粘贴的 Key 常带一个换行，带着它请求会被判 401
     if (typeof input.llmApiKey === 'string') secrets.write('llmApiKey', input.llmApiKey.trim())
+    if (typeof input.naiToken === 'string') secrets.write('naiToken', input.naiToken.trim())
     // 代理是 session 级设置，改了立刻重新应用，否则就是「填了要重启才生效」
     void applyProxy(config.proxy)
       .then((r) => {
