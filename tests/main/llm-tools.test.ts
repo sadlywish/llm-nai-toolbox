@@ -21,13 +21,12 @@ describe('generateTool', () => {
     expect(t.inputSchema.required).toEqual(['tags'])
   })
 
-  it('generate_image 的属性 = 全部整图字段 + 五个尾部参数（与 fields.ts 不许漂移）', () => {
+  it('generate_image 的属性 = 全部整图字段 + 四个尾部参数（与 fields.ts 不许漂移）', () => {
     const keys = Object.keys(props(generateTool(false, ORDER).inputSchema)).sort()
     const expected = [
       ...MAIN_FIELDS.map((f) => f.name),
       'negative_prompt',
       'aspect_ratio',
-      'seed',
       'text',
       'transparent_background',
     ].sort()

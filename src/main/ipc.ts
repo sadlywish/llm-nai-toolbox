@@ -7,7 +7,7 @@ import {
   type ConfigSaveInput,
   type TagdbCompleteInput,
 } from '@shared/ipc'
-import { parseLlmRunInput, type LlmRunResult } from '@shared/llm'
+import { parseLlmRunInput, type LlmEvent, type LlmRunResult } from '@shared/llm'
 import { normalizeWorkspace } from '@shared/workspace'
 import { ConfigStore } from './config-store'
 import { createClaudeChat } from './llm/claude'
@@ -162,7 +162,7 @@ export function registerIpc(
     currentRun = controller
     const sender = event.sender
     try {
-      return await runLlm(input, {
+      const result = await runLlm(input, {
         config,
         // 明文 Key 只在主进程里用，不进入参、返回值与日志
         apiKey: secrets.read('llmApiKey').trim(),
@@ -172,11 +172,14 @@ export function registerIpc(
         manualToc: TAG_MANUAL_TOC,
         skillCore: TAG_SKILL_CORE,
         signal: controller.signal,
-        // 只推给发起这一轮的窗口；窗口关了就不推，结果照样作为 invoke 的返回值
+        // 只推给发起这一轮的窗口；窗口关了就不推
         emit: (e) => {
           if (!sender.isDestroyed()) sender.send(IPC.llmEvent, e)
         },
       })
+      // 收尾经事件送达：与日志同一条通道，保证排在最后一行日志之后
+      if (!sender.isDestroyed()) sender.send(IPC.llmEvent, { kind: 'finished', result } satisfies LlmEvent)
+      return result
     } finally {
       currentRun = null
     }

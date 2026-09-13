@@ -130,7 +130,7 @@ export function aspectRatioOf(width: number, height: number): string {
 
 /**
  * 工作区 → 修改模式的 <现有参数>。形状与生成工具的参数一致，LLM 看到的就是它该输出的样子。
- * 空值不带（省 token）；seed 只在固定模式下带；只带启用的角色——没启用的不参与生成。
+ * 空值不带（省 token）；seed 由参数区决定，不带；只带启用的角色——没启用的不参与生成。
  */
 export function workspaceToEditArgs(ws: Workspace, withCharacters: boolean): JsonObject {
   const args: JsonObject = {}
@@ -139,7 +139,6 @@ export function workspaceToEditArgs(ws: Workspace, withCharacters: boolean): Jso
   }
   if (ws.negative.trim()) args.negative_prompt = ws.negative.trim()
   args.aspect_ratio = aspectRatioOf(ws.params.width, ws.params.height)
-  if (ws.params.seedMode === 'fixed') args.seed = ws.params.seed
   if (ws.text.trim()) args.text = ws.text.trim()
   if (ws.params.transparentBackground) args.transparent_background = true
   if (withCharacters) {

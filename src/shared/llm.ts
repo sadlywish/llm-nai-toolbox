@@ -39,6 +39,11 @@ export type LlmEvent =
   | { kind: 'log'; line: LlmLogLine }
   /** 进入第 round 轮（从 1 数）。状态条「运行中 · 第 2 / 10 轮」用 */
   | { kind: 'round'; round: number; maxRounds: number }
+  /**
+   * 一轮结束。与日志行走同一条通道，先后有保证——invoke 的返回值走另一条通道，
+   * 实测会早于最后几行日志到达。渲染进程以这条事件为准收尾。
+   */
+  | { kind: 'finished'; result: LlmRunResult }
 
 export interface FillCharacter {
   /** CHARACTER_FIELDS 五项 */
@@ -62,8 +67,6 @@ export interface FillResult {
   aspectRatio: string
   width: number
   height: number
-  /** null = 模型给的是 -1（随机），不动参数区的 seed */
-  seed: number | null
   transparentBackground: boolean
   /** 单角色工具时为空数组 */
   characters: FillCharacter[]

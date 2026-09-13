@@ -57,6 +57,7 @@ const SHARED_FIELDS: Record<string, JsonObject> = {
   },
 }
 
+// 插件这里还有 seed 字段。本应用不让模型管 seed（2026-09-13 用户决定），seed 完全由参数区决定
 const TAIL_FIELDS: Record<string, JsonObject> = {
   negative_prompt: {
     type: 'string',
@@ -67,7 +68,6 @@ const TAIL_FIELDS: Record<string, JsonObject> = {
     description: '宽高比，如 1:1, 2:3, 3:2, 16:9, 9:16。实际分辨率按总像素上限反推并对齐到 64 的倍数。',
     default: '1:1',
   },
-  seed: { type: 'integer', description: '随机种子，-1 为随机', default: -1 },
   text: {
     type: 'string',
     description:

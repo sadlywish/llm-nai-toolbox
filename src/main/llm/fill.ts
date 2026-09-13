@@ -81,9 +81,6 @@ export function postProcess(args: JsonObject, ctx: PostProcessContext): FillResu
   const [width, height] = calcNaiDimensions(aspectRatio, config.naiMaxPixels)
   log.info(`宽高比 ${aspectRatio} → ${width}×${height}（像素上限 ${config.naiMaxPixels}）`)
 
-  const rawSeed = Number(args.seed ?? -1)
-  const seed = Number.isFinite(rawSeed) && rawSeed >= 0 ? Math.floor(rawSeed) : null
-
   const characters: FillCharacter[] = []
   if (ctx.withCharacters && Array.isArray(args.characters)) {
     const list = args.characters as unknown[]
@@ -105,7 +102,6 @@ export function postProcess(args: JsonObject, ctx: PostProcessContext): FillResu
     aspectRatio,
     width,
     height,
-    seed,
     transparentBackground: tb === true || tb === 'true',
     characters,
     useCoords: ctx.multi === 'coords',

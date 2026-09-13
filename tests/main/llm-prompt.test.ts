@@ -125,7 +125,7 @@ describe('aspectRatioOf / workspaceToEditArgs', () => {
     expect(aspectRatioOf(1344, 768)).toBe('7:4')
   })
 
-  it('只带非空字段；seed 只在固定模式带；透明背景只在打开时带；只带启用的角色', () => {
+  it('只带非空字段；从不带 seed；透明背景只在打开时带；只带启用的角色', () => {
     const ws = emptyWorkspace()
     ws.main.tags = ' smile '
     ws.negative = 'lowres'
@@ -152,7 +152,7 @@ describe('aspectRatioOf / workspaceToEditArgs', () => {
     ws.params.seedMode = 'fixed'
     ws.params.transparentBackground = true
     const args = workspaceToEditArgs(ws, false)
-    expect(args.seed).toBe(42)
+    expect('seed' in args).toBe(false)
     expect(args.transparent_background).toBe(true)
     expect(args.characters).toBeUndefined()
   })

@@ -67,13 +67,8 @@ describe('postProcess', () => {
     expect(run({ artist: 'a' }).fill.aspectRatio).toBe('1:1')
   })
 
-  it('seed：≥0 取整数，-1 与认不出的给 null', () => {
-    expect(run({ artist: 'a', seed: 42 }).fill.seed).toBe(42)
-    expect(run({ artist: 'a', seed: '7' }).fill.seed).toBe(7)
-    expect(run({ artist: 'a', seed: 3.7 }).fill.seed).toBe(3)
-    expect(run({ artist: 'a', seed: -1 }).fill.seed).toBeNull()
-    expect(run({ artist: 'a', seed: 'abc' }).fill.seed).toBeNull()
-    expect(run({ artist: 'a' }).fill.seed).toBeNull()
+  it('模型给了 seed 也不回填：seed 由参数区决定', () => {
+    expect('seed' in run({ artist: 'a', seed: 42 }).fill).toBe(false)
   })
 
   it('透明背景：强制开关优先；否则看模型给的值', () => {
