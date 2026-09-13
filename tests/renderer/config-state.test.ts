@@ -58,15 +58,25 @@ describe('useConfig', () => {
   })
 
   it('save 成功：configExists 变 true；Key 不传不改 hasLlmApiKey，传非空变 true，传空串变 false', async () => {
+    // 先 load：mock 的 hasLlmApiKey 是 true。初值本来就是 false，用它做
+    // 「不传 Key」的起点区分不出「保留原值」与「一律置 false」——两者结果相同。
+    await mod.useConfig.getState().load()
     const cfg = { ...defaultAppConfig(), maxToolRounds: 3 }
+
     await mod.useConfig.getState().save(cfg)
     expect(mod.useConfig.getState().configExists).toBe(true)
     expect(mod.useConfig.getState().config.maxToolRounds).toBe(3)
-    expect(mod.useConfig.getState().hasLlmApiKey).toBe(false)
-    await mod.useConfig.getState().save(cfg, 'k')
     expect(mod.useConfig.getState().hasLlmApiKey).toBe(true)
+
     await mod.useConfig.getState().save(cfg, '')
     expect(mod.useConfig.getState().hasLlmApiKey).toBe(false)
+
+    // 再次不传 Key：应保持上一步置为的 false，而不是回弹
+    await mod.useConfig.getState().save(cfg)
+    expect(mod.useConfig.getState().hasLlmApiKey).toBe(false)
+
+    await mod.useConfig.getState().save(cfg, 'k')
+    expect(mod.useConfig.getState().hasLlmApiKey).toBe(true)
   })
 
   it('save 失败：saveError 写明原因，配置不变', async () => {

@@ -1,9 +1,21 @@
 import { mkdtempSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConfigStore } from '../../src/main/config-store'
 import { defaultAppConfig, type AppConfig } from '../../src/shared/config'
+
+// 见 tests/shared/config.test.ts 顶部同名注释：随包资源文件目前全是 0 字节，
+// 不 mock 成非空值的话「默认文案不回退」测不出区分力。
+vi.mock('../../src/shared/defaultTexts', () => ({
+  DEFAULT_TEXTS: {
+    systemPrompt: 'SYS',
+    naiCharSystemPrompt: 'CHR',
+    tailInjection: 'TAIL',
+    quality: 'Q',
+    negativePrompt: 'NEG',
+  },
+}))
 
 let dir: string
 

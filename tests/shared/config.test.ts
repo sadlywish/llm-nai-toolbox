@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   NUMBER_RULES,
   RESTORABLE_KEYS,
@@ -9,6 +9,20 @@ import {
 } from '@shared/config'
 import { DEFAULT_TEXTS } from '@shared/defaultTexts'
 import { DEFAULT_CHAR_PROMPT_ORDER, DEFAULT_PROMPT_ORDER } from '@shared/fields'
+
+// 随包资源文件（resources/prompts/*）目前全是 0 字节，DEFAULT_TEXTS 各项
+// 都是 ''，导致「默认文案不回退」类断言与「取自默认值」的路径写出同一个
+// 空串，测不出区分力：mergeConfig 就算被改成「空串就跳过取默认值」也照样
+// 全绿。这里 mock 成非空值，让上述两类断言真的能落在不同的字符串上。
+vi.mock('../../src/shared/defaultTexts', () => ({
+  DEFAULT_TEXTS: {
+    systemPrompt: 'SYS',
+    naiCharSystemPrompt: 'CHR',
+    tailInjection: 'TAIL',
+    quality: 'Q',
+    negativePrompt: 'NEG',
+  },
+}))
 
 describe('defaultAppConfig', () => {
   it('每次返回新对象 —— 配置会被就地修改，共享一个对象会连带改掉别处', () => {
