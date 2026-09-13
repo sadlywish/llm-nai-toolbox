@@ -14,7 +14,7 @@ llm-nai-toolbox 的架构与关键取舍。使用方法见 [README](../README.md
 
 ## 进程模型
 
-主进程包办全部 IO 与外部请求；渲染进程 `contextIsolation` 打开、不发任何外部 HTTP 请求。所有网络走 Electron 的 `net.fetch`，因此 NovelAI 接口、Danbooru 接口与例图共用同一处代理设置。
+主进程包办全部 IO 与外部请求；渲染进程 `contextIsolation` 打开、不发任何外部 HTTP 请求。所有网络走 Electron 的 `net.fetch`，因此 LLM 接口、NovelAI 接口、Danbooru 接口与例图共用同一处代理设置。
 
 渲染进程里唯一的例外是 `<img src>` 加载 Danbooru 图片——它走 Electron session 的代理，与 `net.fetch` 是同一处配置，不必另开一条 IPC 通道。
 
@@ -22,12 +22,15 @@ llm-nai-toolbox 的架构与关键取舍。使用方法见 [README](../README.md
 
 | 目录 | 职责 |
 |---|---|
+| `main/net.ts` | `appFetch`（`net.fetch`）与代理应用；主进程所有外部请求都走它 |
+| `main/store.ts` · `config-store.ts` · `secret-store.ts` | `workspace.json` / `config.json` / `secrets.json` 的原子读写；密钥用 `safeStorage` 加密 |
+| `renderer/components/` | 提示词面板、参数区、角色面板、设置抽屉——布局与交互照画师串工具箱 |
 | `main/nai/` | 出图、PNG 元数据、zip 解包、落盘记账 |
 | `main/danbooru/` | 只服务右侧 WIKI 区 |
 | `main/tagdb/` | 本地标签库：检索、分类浏览、释义、角色特征、补全 |
 | `main/llm/` | Claude 与 OpenAI 兼容双端点、工具定义、多轮 tool_use 循环 |
 | `main/gen/` | 顺序发 N 张，无队列无并发控制 |
-| `shared/` | 字段定义、分块文档的序列化与判定、token 计算——纯函数，两端共用 |
+| `shared/` | 字段定义、分块文档、配置与工作区的类型/默认值/校验/自愈、token 计算——纯函数，两端共用 |
 | `renderer/editor/` | CodeMirror 接线：装饰、守卫、快捷键 |
 
 `shared/fields.ts` 是字段的唯一事实来源。分块装饰、提示词拼接、LLM 工具 schema 全部从这里取——各写一份必然漂移，漂移的表现是「界面上有这个块，拼接时被漏掉」。
@@ -109,12 +112,24 @@ llm-nai-toolbox 的架构与关键取舍。使用方法见 [README](../README.md
 | | 整图（10 项） | 角色（5 项） |
 |---|---|---|
 | 字段 | `count style character artist appearance tags environment series nltags quality` | `count character appearance tags nltags` |
-| `count` | 总人数、构图、镜头，自由标签 | 该角色的性别标记，`girl`/`boy`/`other` 三选一，渲染成选择器 |
+| `count` | 总人数、构图、镜头，自由标签 | 该角色的性别标记，`girl`/`boy`/`other` 三选一；规格要求渲染成选择器，目前尚未实现，仍是分块编辑器里的普通文本块 |
 | `character` | 多角色模式下必须留空 | 该角色的角色名 |
 
 `negative_prompt` 与 `position` 是角色的**参数不是字段**，有各自的独立输入，绝不进分块流。
 
 编辑器组件**接受字段集作为参数**，不引用任何模块级字段常量。
+
+### 工作区与设置
+
+一份工作区（`workspace.json`）：整图字段、画面文字、负面词、生成参数、角色列表、坐标定位开关。编辑防抖 500ms 落盘，关窗前同步冲刷一次。读回来的任何形状都先过 `normalizeWorkspace`：缺的补默认、类型不对的回默认、字段值里的换行剥掉、重复的角色 id 重新生成——重复 id 会让两个角色共用一个编辑器实例与撤销栈。
+
+**画面文字不是字段**：它在提示词拼接完之后才接到末尾，提示词排序里没有它的位置，所以单独一个输入框。
+
+设置（`config.json`）读写都过 `mergeConfig`：逐项按默认值的类型取用，只补缺不回退——存的是空串就是空串，随包默认文案只在文件不存在时出现一次（设置抽屉的「恢复默认」除外）。枚举、数值规则、字段顺序不合法的项回到默认值。
+
+**字段顺序串必须恰好包含全部字段。** 它同时决定拼接顺序与编辑器里块的先后；插件允许漏写字段（漏掉的不拼接），这里不允许，否则会有一个看得见却发不出去的块。
+
+API Key 在 `secrets.json`，渲染进程只知道「有没有存过」，明文不进渲染进程。
 
 ---
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { FieldSpec } from '@shared/fields'
 import { CHARACTER_FIELDS, MAIN_FIELDS, fieldByName } from '@shared/fields'
 import { blockRanges, serializeFields } from '@shared/blockDoc'
-import { completionTargetAt } from '@shared/blockCompletion'
+import { completionTargetAt, completionTargetInText } from '@shared/blockCompletion'
 
 const rangeOf = (doc: string, specs: readonly FieldSpec[], name: string) => {
   const hit = blockRanges(doc, specs).find((r) => r.name === name)
@@ -97,5 +97,48 @@ describe('completionTargetAt', () => {
     // 第 0 段必须有内容：段为空时去掉边界检查也返回 null，这条测试就空过了
     const doc = serializeFields({ count: '1girl', tags: 'solo' }, MAIN_FIELDS)
     expect(completionTargetAt(doc, MAIN_FIELDS, 0)).toBeNull()
+  })
+})
+
+describe('completionTargetInText', () => {
+  it('按逗号分隔的单元取词，区间是文本内坐标，偏好原样带回', () => {
+    const text = 'lowres, bad ha'
+    const t = completionTargetInText(text, text.length, 'general')!
+    expect(t.query.trim()).toBe('bad ha')
+    expect(text.slice(t.from, t.to)).toBe(t.query)
+    expect(t.prefer).toBe('general')
+  })
+
+  it('画师前缀词优先：只取前缀之后的名字，偏好改成画师', () => {
+    const text = 'lowres, artist:wl'
+    const t = completionTargetInText(text, text.length, 'general')!
+    expect(t.query).toBe('wl')
+    expect(text.slice(t.from, t.to)).toBe('wl')
+    expect(t.prefer).toBe('artist')
+  })
+
+  it('光标处没有词时返回 null', () => {
+    expect(completionTargetInText('lowres, ', 8, 'general')).toBeNull()
+    expect(completionTargetInText('', 0, 'general')).toBeNull()
+  })
+
+  it('位置越界返回 null', () => {
+    expect(completionTargetInText('lowres', -1, 'general')).toBeNull()
+    expect(completionTargetInText('lowres', 7, 'general')).toBeNull()
+  })
+
+  it('分块版本 = 段内调用 + 区间加回段起点（逐位置对照）', () => {
+    const tags = 'looking at viewer, artist:greem b, upper body'
+    const doc = serializeFields({ tags }, MAIN_FIELDS)
+    const r = rangeOf(doc, MAIN_FIELDS, 'tags')
+    for (let local = 0; local <= tags.length; local++) {
+      const inText = completionTargetInText(tags, local, 'general')
+      const inDoc = completionTargetAt(doc, MAIN_FIELDS, r.from + local)
+      if (inText === null) {
+        expect(inDoc).toBeNull()
+      } else {
+        expect(inDoc).toEqual({ ...inText, from: r.from + inText.from, to: r.from + inText.to })
+      }
+    }
   })
 })

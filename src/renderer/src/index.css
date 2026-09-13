@@ -165,3 +165,121 @@ body {
   color: var(--ink-faint);
   font-style: normal;
 }
+
+/* ── 表单（照画师串工具箱的 .field 皮肤，换成本应用的配色） ───────── */
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--ink-dim); min-width: 0; }
+.field input, .field select, .field textarea {
+  background: #15181c; border: 1px solid var(--line); border-radius: 3px;
+  color: var(--ink); padding: 4px 7px; font: inherit; font-size: 13px; min-width: 0;
+}
+.field textarea { resize: vertical; font-family: var(--mono); font-size: 12.5px; line-height: 1.55; }
+.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
+.field input:disabled, .field select:disabled, .field textarea:disabled { color: var(--ink-faint); cursor: not-allowed; }
+.field.is-disabled { opacity: .6; }
+.field.span2, .field-check.span2 { grid-column: span 2; }
+.field-label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.field-hint { color: var(--ink-faint); font-size: 12px; line-height: 1.5; }
+.field-error { color: var(--danger); font-size: 12px; }
+.field-row { display: flex; align-items: center; gap: 6px; }
+.field-row button, .field-label button {
+  background: none; border: 1px solid var(--line); border-radius: 3px; color: var(--ink);
+  cursor: pointer; padding: 0 8px; font: inherit; font-size: 12px; white-space: nowrap;
+}
+.field-check { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-dim); }
+
+/* ── 提示词面板：左 2 份提示词、右 1 份参数（照工具箱例图面板） ──── */
+.prompt-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+.prompt-columns { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+.prompt-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.prompt-left .pane-warn { border-top: none; padding: 0; }
+.prompt-editor { border: 1px solid var(--line); border-radius: 4px; background: #15181c; }
+.prompt-editor:focus-within { border-color: var(--accent); }
+/* 纯文本标签编辑器不沿用分块编辑器那套为徽章对齐调出来的行高与内边距 */
+.prompt-editor.tag-text-editor { min-height: 46px; }
+.prompt-editor.tag-text-editor .cm-content { padding: 8px 12px; line-height: 1.7; }
+.prompt-editor.tag-text-editor .cm-placeholder { color: var(--ink-faint); font-family: "Microsoft YaHei", system-ui, sans-serif; font-size: 13px; }
+.text-row { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.text-row input { width: 26em; max-width: 100%; }
+.text-row .field-hint { flex-basis: 100%; }
+.token-bar { color: var(--ink-dim); font-size: 12px; }
+.token-bar.is-over { color: var(--danger); }
+.params { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-content: start; min-width: 0; }
+.placeholder { color: var(--ink-faint); padding: 12px; }
+
+.banner-error {
+  display: flex; gap: 10px; align-items: center; padding: 7px 12px; font-size: 13px;
+  color: var(--danger); background: hsl(4 60% 40% / .12); border-bottom: 1px solid var(--line);
+}
+.banner-error button {
+  background: none; border: 1px solid currentColor; border-radius: 3px; color: inherit;
+  cursor: pointer; padding: 1px 8px; font: inherit; font-size: 12px;
+}
+
+/* ── 角色面板（照工具箱 CharacterRows：页签 + 坐标 + 正负面左右 3:2） ── */
+.character-panel { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 8px; }
+.character-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.tabs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.tab {
+  display: flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 13px;
+  border: 1px solid var(--line); border-radius: 3px; cursor: pointer; user-select: none;
+}
+.tab.is-active { border-color: var(--accent); background: rgba(74, 158, 255, .12); }
+.tab-close, .tab-add {
+  background: none; border: none; color: var(--ink-faint); cursor: pointer;
+  font-size: 14px; line-height: 1; padding: 2px 4px;
+}
+.tab-close:hover, .tab-add:hover:not(:disabled) { color: var(--ink); }
+.tab-add:disabled { cursor: not-allowed; opacity: .4; }
+.character-empty { color: var(--ink-faint); padding: 12px; font-size: 13px; }
+/* 坐标输入单独一行，label 在左的横排 */
+.character-toolbar .field { flex-direction: row; align-items: center; gap: 6px; }
+.character-toolbar .field input { width: 12em; }
+/* 角色负面通常很短，左右并排、宽度 3:2（工具箱用户反馈改出来的布局）。
+   min-width: 0 是横排 flex 子项的必需项，否则会被 CodeMirror 最长不可换行片段撑开 */
+.character-prompts { display: flex; gap: 6px; }
+.character-prompts > .prompt-editor { flex: 3 1 0; min-width: 0; }
+.character-prompts > .prompt-editor + .prompt-editor { flex: 2 1 0; }
+
+/* ── 顶栏按钮 ─────────────────────────────────────────────── */
+.header-spacer { flex: 1; }
+.header-button {
+  background: none; border: 1px solid var(--line); border-radius: 4px; color: var(--ink);
+  padding: 2px 12px; font: inherit; font-size: 13px; cursor: pointer; align-self: center;
+}
+.header-button:hover { border-color: var(--accent); }
+
+/* ── 设置抽屉（照工具箱，宽度放到 520px 容纳长提示词） ─────────────── */
+.drawer-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); display: flex; justify-content: flex-end; z-index: 10; }
+.settings-drawer {
+  width: 520px; max-width: 100%; height: 100%; overflow-y: auto;
+  background: var(--panel); border-left: 1px solid var(--line);
+  padding: 12px 14px 0; display: flex; flex-direction: column; gap: 10px; font-size: 13px;
+}
+.drawer-header { display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+.drawer-close { background: none; border: none; color: var(--ink-dim); cursor: pointer; font-size: 18px; line-height: 1; }
+.drawer-close:hover { color: var(--ink); }
+/* 首次启动的说明条。用 accent 而不是错误红：这不是出错，是一次正常的引导 */
+.drawer-firstrun { border: 1px solid var(--accent); border-radius: 4px; padding: 7px 9px; font-size: 12.5px; line-height: 1.7; background: #15181c; }
+.drawer-error { background: #5a1d1d; color: #ffd7d7; border: 1px solid #7a2a2a; border-radius: 3px; padding: 6px 8px; font-size: 12.5px; }
+.drawer-group { border: 1px solid var(--line); border-radius: 5px; flex-shrink: 0; }
+.drawer-group-head {
+  display: flex; justify-content: space-between; width: 100%; padding: 6px 10px;
+  background: var(--panel-2); color: var(--ink); border: none; border-bottom: 1px solid var(--line);
+  border-radius: 5px 5px 0 0; font: inherit; font-size: 13px; cursor: pointer; text-align: left;
+}
+.drawer-group.is-closed .drawer-group-head { border-bottom: none; border-radius: 5px; }
+.drawer-group-summary { color: var(--ink-faint); font-size: 12px; }
+.drawer-group-body { padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+.drawer-subtitle { color: var(--ink); font-size: 12.5px; margin-top: 4px; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+/* 保存栏钉在抽屉底部：分组很长，滚到中间也要能直接保存 */
+.drawer-actions {
+  position: sticky; bottom: 0; margin-top: auto; display: flex; justify-content: flex-end; gap: 8px;
+  padding: 8px 0 12px; border-top: 1px solid var(--line); background: var(--panel);
+}
+.drawer-actions button {
+  background: none; border: 1px solid var(--line); border-radius: 4px; color: var(--ink);
+  padding: 4px 16px; font: inherit; font-size: 13px; cursor: pointer;
+}
+.drawer-actions button.primary { background: var(--accent); border-color: var(--accent); color: #0b1b2b; font-weight: 600; }
+.drawer-actions button:disabled { opacity: .45; cursor: not-allowed; }
