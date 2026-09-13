@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { CHARACTER_FIELDS, MAIN_FIELDS, orderSpecs } from '@shared/fields'
 import PromptPane from './components/PromptPane'
 import SettingsDrawer from './components/SettingsDrawer'
+import StyleManager from './components/StyleManager'
 import { useConfig } from './state/config'
+import { initStylesPersistence, useStyles } from './state/styles'
 import { useTagdb } from './state/tagdb'
 import { initWorkspacePersistence, useWorkspace } from './state/workspace'
 
@@ -22,6 +24,9 @@ export default function App(): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const tagdbStatus = useTagdb((s) => s.status)
   const initTagdb = useTagdb((s) => s.init)
+  const loadStyles = useStyles((s) => s.load)
+  // 顶栏的视图切换。不持久化：每次启动回到工作台
+  const [view, setView] = useState<'workbench' | 'styles'>('workbench')
 
   useEffect(() => {
     void window.api.appVersion().then(setVersion)
@@ -34,9 +39,11 @@ export default function App(): JSX.Element {
   useEffect(() => {
     void loadConfig()
     void loadWorkspace()
-  }, [loadConfig, loadWorkspace])
+    void loadStyles()
+  }, [loadConfig, loadWorkspace, loadStyles])
 
   useEffect(() => initWorkspacePersistence(), [])
+  useEffect(() => initStylesPersistence(), [])
 
   /**
    * 从没保存过设置时，启动后自动弹设置抽屉（规格 §14.3）。
@@ -65,6 +72,14 @@ export default function App(): JSX.Element {
       <header className="app-header">
         <span className="app-title">llm-nai-toolbox</span>
         {version !== '' && <span className="app-version">v{version}</span>}
+        <div className="view-switch" role="tablist">
+          <button type="button" role="tab" className={view === 'workbench' ? 'is-on' : ''} onClick={() => setView('workbench')}>
+            工作台
+          </button>
+          <button type="button" role="tab" className={view === 'styles' ? 'is-on' : ''} onClick={() => setView('styles')}>
+            画风维护
+          </button>
+        </div>
         <span className="header-spacer" />
         <button type="button" className="header-button" onClick={() => setSettingsOpen(true)}>
           设置
@@ -100,9 +115,11 @@ export default function App(): JSX.Element {
       )}
 
       <main className="workarea">
-        {/* 配置读不回来时照样放出界面（按默认配置，顶部已写明）；
-            工作区读不回来时停在载入中，顶部同样写明原因 */}
-        {workspace !== null && (configLoaded || configLoadError !== null) ? (
+        {view === 'styles' ? (
+          <StyleManager />
+        ) : /* 配置读不回来时照样放出界面（按默认配置，顶部已写明）；
+            工作区读不回来时停在载入中，顶部同样写明原因 */
+        workspace !== null && (configLoaded || configLoadError !== null) ? (
           <PromptPane
             workspace={workspace}
             mainSpecs={mainSpecs}

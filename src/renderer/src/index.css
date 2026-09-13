@@ -8,6 +8,8 @@
   --ink-faint: #6b737f;
   --accent: #4a9eff;
   --danger: #ff6b63;
+  --warn: #e5c07b;
+  --ok: #98c379;
   --mono: "Cascadia Mono", Consolas, "Microsoft YaHei", ui-monospace, monospace;
 }
 
@@ -283,3 +285,33 @@ body {
 }
 .drawer-actions button.primary { background: var(--accent); border-color: var(--accent); color: #0b1b2b; font-weight: 600; }
 .drawer-actions button:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ── 顶栏视图切换（工作台 / 画风维护） ─────────────────────── */
+.view-switch { display: flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; margin-left: 14px; align-self: center; }
+.view-switch button { background: none; border: none; color: var(--ink-dim); padding: 2px 14px; font: inherit; font-size: 13px; cursor: pointer; }
+.view-switch button.is-on { background: var(--panel); color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+
+/* ── 画风维护（照画师串工具箱的画师串编辑器） ──────────────── */
+.style-manager .style-tabs { padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel-2); }
+.tab-rename-input { background: #15181c; border: 1px solid var(--accent); color: var(--ink); font: inherit; font-size: 13px; padding: 0 4px; width: 9em; border-radius: 3px; }
+.tab-rename-input.is-invalid { border-color: var(--danger); }
+.tab-empty-mark { color: var(--warn); font-size: 12px; }
+.style-empty { padding: 50px 0; text-align: center; color: var(--ink-faint); font-size: 13px; }
+.prompt-toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.prompt-toolbar button { background: none; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); padding: 2px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+.prompt-toolbar button:hover { border-color: var(--accent); }
+.prompt-toolbar-hint { color: var(--ink-faint); }
+.prompt-toolbar-notice { color: var(--ok); }
+.style-editor { padding: 10px 12px 6px; }
+.style-editor .prompt-editor { min-height: 120px; }
+.style-foot { display: flex; justify-content: space-between; gap: 12px; padding: 0 12px 10px; font-size: 12.5px; color: var(--ink-faint); }
+.link-button { background: none; border: none; color: var(--accent); cursor: pointer; font: inherit; padding: 0; }
+
+/* ── 确认弹框 ─────────────────────────────────────────────── */
+.dialog-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); display: flex; align-items: center; justify-content: center; z-index: 20; }
+.dialog { width: 420px; max-width: calc(100% - 32px); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; font-size: 13px; line-height: 1.8; }
+.dialog-title { font-weight: 600; }
+.dialog-body p { margin: 4px 0; color: var(--ink-dim); }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.dialog-actions button { background: none; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); padding: 3px 14px; font: inherit; font-size: 13px; cursor: pointer; }
+.dialog-actions button.danger { border-color: hsl(4 70% 45%); color: #ffb3ae; }
