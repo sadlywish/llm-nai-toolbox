@@ -8,7 +8,7 @@ import {
 import { escapeNaiTag, escapeNaiTagList } from '../../src/main/tagdb/escape'
 
 const CSV = [
-  '﻿character,copyright,appearance,clothing',
+  '\uFEFFcharacter,copyright,appearance,clothing',
   'hatsune_miku,vocaloid,"long_hair, twintails, aqua_hair","necktie, detached_sleeves"',
   '',
   'saber_(fate),fate_(series),"blonde_hair, green_eyes",armor',
@@ -48,8 +48,11 @@ describe('parseCharacterCsv', () => {
 describe('findCharacterFeature', () => {
   const db = parseCharacterCsv(CSV)
 
-  it('大小写不敏感、空格当下划线，精确命中优先', () => {
+  it('大小写不敏感、空格当下划线，精确命中优先于排在前面的包含匹配', () => {
     expect(findCharacterFeature(db, 'Hatsune Miku')?.character).toBe('hatsune_miku')
+    // saber_(fate) 排在前面且包含 saber：去掉精确分支的话会返回它
+    const shadowed = parseCharacterCsv('character,copyright,appearance,clothing\nsaber_(fate),fate,a,b\nsaber,other,c,d\n')
+    expect(findCharacterFeature(shadowed, 'Saber')?.character).toBe('saber')
   })
 
   it('精确没有时取第一个包含查询词的键', () => {
@@ -69,6 +72,9 @@ describe('角色特征文本', () => {
   it('search_tags 富化：按三个开关逐行拼，全关时为空串', () => {
     expect(characterFeatureText(feat, { series: true, appearance: true, clothing: false })).toBe(
       '  作品: vocaloid\n  外貌: long hair, twintails, aqua hair',
+    )
+    expect(characterFeatureText(feat, { series: false, appearance: false, clothing: true })).toBe(
+      '  服装: necktie, detached sleeves',
     )
     expect(characterFeatureText(feat, { series: false, appearance: false, clothing: false })).toBe('')
   })
