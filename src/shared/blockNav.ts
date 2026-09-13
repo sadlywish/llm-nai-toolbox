@@ -1,4 +1,4 @@
-import { BLOCK_SEP, blockRanges } from './blockDoc'
+import { BLOCK_SEP } from './blockDoc'
 import type { FieldSpec } from './fields'
 
 /**
@@ -77,30 +77,3 @@ export function clampToBlock(
   return pos === 0 ? 1 : pos
 }
 
-/**
- * 光标停在 `pos` 时，应不应该把它关联到**前一个**字符（assoc = -1）。
- *
- * 段的几何（见 blockDoc.ts 的「位置的几何」）决定了 `to_i === sepAt_{i+1}`：
- * 同一个位置既是第 i 段内容的末尾，也是第 i+1 段的分隔符位。但第 i+1 段的
- * **内容起点**是 `sepAt_{i+1} + 1`，是另一个位置 —— 所以这个位置不存在
- * 「下一段开头」这层含义，它只能是「第 i 段的末尾」。
- *
- * 不显式关联到前一个字符的话，CodeMirror 会向后解析（分隔符被 replace 藏掉，
- * 零宽度），把光标画在后一段框的左边缘，表现为「光标从后一个标签往前移，
- * 却显示在后一个标签的头部」。
- *
- * 空段除外：空段 `from === to`，同一位置还兼着「本段内容起点」，
- * 关联到前一个字符会把光标画到上一段去。
- */
-export function prefersBackwardAssoc(
-  doc: string,
-  specs: readonly FieldSpec[],
-  pos: number,
-): boolean {
-  for (const range of blockRanges(doc, specs)) {
-    // 空段：同一位置有多重含义，不能一律往前靠
-    if (range.from === range.to) continue
-    if (pos === range.to) return true
-  }
-  return false
-}

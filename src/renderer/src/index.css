@@ -50,72 +50,56 @@ body {
 /* 15px 是姊妹项目「画师串工具箱」在实屏上试出来的值，它的注释写着
    「13px 偏小；15px 之后每屏少约两行」。行高从 2.35 收到 2.05 补偿字号变大，
    免得每行占地翻上去。 */
-/* padding-left 只留 2px：每个框自带 14px 左外边距（见 .blk-run 的说明），
-   两者相加才是视觉上的左边距 */
-.prompt-editor .cm-content { padding: 14px 16px 14px 2px; line-height: 2.05; }
+.prompt-editor .cm-content { padding: 14px 16px; line-height: 2.05; }
 .prompt-editor .cm-focused { outline: none; }
 
-/* ── 一个段 = 一个框，徽章是框内的 ::before 伪元素 ──────────────
-   徽章只能是伪元素：**widget 在 CodeMirror 里进不了 mark 内部**，
-   replace widget 与 side:1 的普通 widget 都实测过，都渲染成 mark 的兄弟节点
-   （详见 blockExtension.ts 的 decorationsFor）。
+/* ── 分块编辑器 ────────────────────────────────────────────────
+   折行规则照静态演示稿 docs/block-editor-preview.html，DOM 结构与分层理由见
+   editor/blockExtension.ts 开头的「版面」与 Layers。这里的每条规则都在
+   480~1586px 每 9px 一档的窗口宽度下实测过，改之前先想清楚它在防什么。
 
-   代价是伪元素没有 DOM 节点、量不到矩形，所以垂直对齐**不能靠调参，
-   必须靠构造保证**。构造是这样闭合的：
-     .blk-run 的 line-height 写死 15px  → 内框的行盒 = 15px
-     ::before 的 height / line-height 也是 15px → 芯片 = 行盒，不多不少
-     .blk-run 上下内边距各 3px          → 框总高 21px，芯片上下各留 3px
-   三个数字互相锁死，任何一处改成相对单位（em / 继承）都会崩：徽章 12px、
-   内容 15px，同一个相对值在两者上算出的像素不同 —— 这是前几轮反复错位的根因。
-   实测过的失败形态：只写死 ::before 的 line-height 而不写 .blk-run 的，
-   框的行盒仍是继承来的 30.75px，15px 芯片坐在高行盒的基线上，
-   被压到框下方并溢出 6px（实测 gapTop 12 / gapBottom -6）。
+   一个段 = 一个框（.blk-run），徽章是框的 ::before。徽章只能是伪元素：
+   **widget 在 CodeMirror 里进不了 mark 内部**（replace widget 与 side:1 的普通
+   widget 都实测过，都渲染成 mark 的兄弟节点）。
 
-   非空段与空段走两条渲染路径（block mark / EmptyPillWidget），共用这一套规则。
-   组间间距一律加在**框**的右侧：加在徽章上会让框紧贴下一个徽章、
-   被视觉上归进下一组（它属于前一个）。 */
+   框**不能有外边距**：块间距由一个空格提供（.blk-grp::after），行首的块才能
+   贴着左缘。先前用 margin-left: 14px 时，折行后续行的文字跑到了框缩进的左边。 */
 .blk-run {
   background: hsl(var(--h) 48% 56% / .14);
   box-shadow: inset 0 0 0 1px hsl(var(--h) 45% 52% / .42);
   border-radius: 4px;
   padding: 3px 8px 3px 4px;
-  /* 间距用**左**外边距，不用右外边距。藏掉分隔符的那个零宽 replace 元素排在
-     本框的右外边距**之后**，用 margin-right 时光标会被画到那 14px 间隙的远端、
-     紧贴下一个框（实测 caret x=513.2，而本框右缘 499.8、下一框左缘 513.8），
-     表现为「光标从后一个标签往前移，却显示在后一个标签的头部」。
-     改成 margin-left 后间隙归下一个框，光标落点回到本框边缘。
-     首个框的多余缩进由 .cm-content 的 padding-left 抵掉。 */
-  margin-left: 14px;
   line-height: 15px;
 }
 
-/* 12px 是实屏上能看清的下限。原先 9.5px 抄的是网页稿的数值，
-   而那份稿子是在浏览器里按 2 倍放大看的 —— 1 倍实屏下根本读不出字。 */
+/* 徽章必须是 display: inline，不能是 inline-block。inline-block 是原子行内元素，
+   它后面天然有折行机会，窗口一窄徽章就孤零零留在上一行行尾、首词去了下一行。
+   inline 的伪元素与首词之间没有折行机会，两者一起换行。
+
+   12px 是实屏上能看清的下限。原先 9.5px 抄的是网页稿的数值，
+   而那份稿子是在浏览器里按 2 倍放大看的 —— 1 倍实屏下根本读不出字。
+
+   inline 元素的 height 不生效，底色高度 = 字体内容区（12px 下实测 14px），
+   padding-bottom 补 1px 到 15px；vertical-align: 2px 让它在 21px 的框里上下各留 3px。
+   两个值都是像素扫描截图实测出来的（伪元素没有 DOM 节点、量不到矩形），
+   改 font-size、line-height 或框的内边距后要重新量。 */
 .blk-run::before {
   content: attr(data-field);
-  display: inline-block;
+  display: inline;
   font-family: var(--mono);
   font-size: 12px; font-weight: 600; letter-spacing: .02em;
   background: hsl(var(--h) 48% 58%); color: #0f1115;
   border-radius: 3px;
-  height: 15px; line-height: 15px; padding: 0 6px;
+  padding: 0 6px 1px;
   margin-right: 7px;
   white-space: nowrap; user-select: none;
-  /* 上抬 2px。基线对齐会把芯片压低：15px 正文的基线在内容区顶部下约 11.7px
-     （ascent≈0.78em），而 12px 芯片自身的基线在它顶部下约 9.8px，
-     差值约 1.9px —— 芯片因此下坠、吃掉下边的 3px 内边距。
-     伪元素没有 DOM 节点、量不到矩形，这个值是按字体度量算的，并由实机确认。
-     改动 font-size 或 line-height 时必须重新算这一项。 */
   vertical-align: 2px;
 }
 
 /* 空段的框：**必须和非空段处在同一种布局环境**，即同样是 display: inline。
-   先前写成 inline-block + height + vertical-align 是这轮反复对不齐的根因：
-   inline-block 自带一套内部行盒，徽章在里面按 15px 字号的基线排；而非空段的
-   框是行内元素、在 .cm-line 的行盒里排。两种环境下同一组数值必然一个对一个错，
-   而那个 vertical-align 的偏移量是猜的（实机表现为空框与有内容的框整体错位）。
-   现在空框只在 .blk-run 之上加一条右内边距撑出空地，其余一切继承同一套规则 ——
-   两条渲染路径，一种布局。 */
+   写成 inline-block 时它自带一套内部行盒，徽章在里面按另一条基线排，
+   实机表现为空框与有内容的框整体错位。inline 的空框里只有一个 nowrap 的徽章，
+   没有折行机会，本来就不会被拆开，不需要 inline-block 来保证。 */
 .blk-run-empty {
   /* 1.2em ≈ 18px。取这个值是为了让「空 → 打第一个字」宽度几乎不跳：
      空框宽 = 4(左内边距) + 徽章 + 7(徽章右边距) + 18 = 徽章 + 29；
@@ -125,12 +109,24 @@ body {
   padding-right: 1.2em;
 }
 
-/* 光标所在段。active 是加在 block mark 的 class 上，与 .blk-run 同元素，
-   所以这条必须排在它之后才能盖住背景。 */
+/* 光标所在段。active 与 .blk-run 在同一个元素上，这条必须排在它之后才能盖住背景。 */
 .blk-active {
   background: hsl(var(--h) 62% 60% / .28);
   box-shadow: inset 0 0 0 1px hsl(var(--h) 72% 66% / .85);
 }
+
+/* 块后面的空格与拼接逗号。不可编辑、不可选中，复制时也不会带上。
+   空格要跟在块**后面**：折点在空格之后，空格悬挂在行尾，下一行的块贴着左缘。
+   逗号前用不换行空格（\a0），把逗号粘在块尾，不会独自落到行首。
+   两者都不能放进 widget，理由见 blockExtension.ts 的 SeparatorWidget。 */
+.blk-grp::after { content: " "; user-select: none; }
+.blk-grp-joined::after { content: "\a0, "; color: var(--ink-dim); }
+.blk-sep { user-select: none; }
+
+/* 标签级折行：一个标签连同它的逗号不拆开；逗号后紧跟字符时补一个零宽折行点。
+   伪元素要设回 pre-wrap，否则继承 nowrap，折行点不生效。 */
+.blk-tag { white-space: nowrap; }
+.blk-brk::after { content: "\200b"; white-space: pre-wrap; }
 
 .blk-comma {
   color: var(--danger); background: hsl(4 80% 60% / .16);

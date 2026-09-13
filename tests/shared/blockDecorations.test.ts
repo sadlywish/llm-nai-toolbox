@@ -1,62 +1,84 @@
 import { describe, expect, it } from 'vitest'
 import { MAIN_FIELDS } from '@shared/fields'
-import { serializeFields } from '@shared/blockDoc'
-import { buildBlockDecorations } from '@shared/blockDecorations'
-import type { DecoKind } from '@shared/blockDecorations'
+import { emptyValues, parseDocument, serializeFields } from '@shared/blockDoc'
+import { buildBlockLayout } from '@shared/blockDecorations'
+import { buildPrompt } from '@shared/prompt'
 
 const TRIO = MAIN_FIELDS.slice(0, 3)
-// ␟1girl␟␟skadi
+// ␟1girl␟␟skadi   下标： 0 1..5 6 7 8..12
 const DOC = serializeFields({ count: '1girl', style: '', character: 'skadi' }, TRIO)
 
-const kinds = (doc: string, cursor: number, kind: DecoKind) =>
-  buildBlockDecorations(doc, TRIO, cursor).filter((d) => d.kind === kind)
-
-describe('buildBlockDecorations', () => {
-  it('每段一个徽章，落在该段的分隔符上', () => {
-    const badges = kinds(DOC, 1, 'badge')
-    expect(badges).toHaveLength(3)
-    expect(badges.map((b) => b.from)).toEqual([0, 6, 7])
-    expect(badges.every((b) => b.to === b.from + 1)).toBe(true)
-    expect(badges.map((b) => b.label)).toEqual(['count', 'style', 'character'])
+describe('buildBlockLayout', () => {
+  it('每段一项，区间与分隔符位置取自段结构', () => {
+    const { fields } = buildBlockLayout(DOC, TRIO, 1)
+    expect(fields.map((f) => [f.sepAt, f.from, f.to])).toEqual([
+      [0, 1, 6],
+      [6, 7, 7],
+      [7, 8, 13],
+    ])
+    expect(fields.map((f) => f.field)).toEqual(['count', 'style', 'character'])
+    expect(fields.map((f) => f.empty)).toEqual([false, true, false])
   })
 
-  it('每段一个块装饰，区间等于该段内容范围', () => {
-    const blocks = kinds(DOC, 1, 'block')
-    expect(blocks).toHaveLength(3)
-    expect(blocks[0]).toMatchObject({ from: 1, to: 6, field: 'count' })
-    expect(blocks[2]).toMatchObject({ from: 8, to: 13, field: 'character' })
+  it('色相与徽章文字取自字段', () => {
+    const { fields } = buildBlockLayout(DOC, TRIO, 1)
+    expect(fields.map((f) => f.hue)).toEqual(TRIO.map((s) => s.hue))
+    expect(fields.map((f) => f.label)).toEqual(TRIO.map((s) => s.label))
   })
 
-  it('空段额外带一个 blank 标记，非空段没有', () => {
-    const blanks = kinds(DOC, 1, 'blank')
-    expect(blanks.map((b) => b.field)).toEqual(['style'])
+  it('光标所在段 active，且只有一个；光标在空段时落在空段上', () => {
+    const active = (cursor: number) =>
+      buildBlockLayout(DOC, TRIO, cursor).fields.filter((f) => f.active).map((f) => f.field)
+    expect(active(3)).toEqual(['count'])
+    expect(active(6)).toEqual(['count'])
+    expect(active(7)).toEqual(['style'])
+    expect(active(10)).toEqual(['character'])
   })
 
-  it('光标所在段带 active 标记，且只有一个', () => {
-    expect(kinds(DOC, 3, 'active').map((d) => d.field)).toEqual(['count'])
-    expect(kinds(DOC, 10, 'active').map((d) => d.field)).toEqual(['character'])
+  it('只含空白的段不是空段（有框），但不进拼接结果（后面没有逗号）', () => {
+    const doc = serializeFields({ count: '  ', style: '', character: 'a' }, TRIO)
+    const [count, style, character] = buildBlockLayout(doc, TRIO, 1).fields
+    expect(count).toMatchObject({ empty: false, joined: false })
+    expect(style).toMatchObject({ empty: true, joined: false })
+    expect(character).toMatchObject({ empty: false, joined: true })
   })
 
-  it('光标在空段时 active 落在空段上', () => {
-    expect(kinds(DOC, 7, 'active').map((d) => d.field)).toEqual(['style'])
+  it('标签单位是文档坐标', () => {
+    const doc = serializeFields({ count: '', style: 'long hair, silver hair', character: '' }, TRIO)
+    const style = buildBlockLayout(doc, TRIO, 1).fields[1]
+    expect(style.tags.map((t) => doc.slice(t.from, t.to))).toEqual(['long hair,', 'silver hair'])
   })
 
-  it('色相取自字段，同名字段同色', () => {
-    const badges = kinds(DOC, 1, 'badge')
-    expect(badges[0].hue).toBe(MAIN_FIELDS[0].hue)
-    expect(badges[2].hue).toBe(MAIN_FIELDS[2].hue)
+  it('只有 tags 形态的字段切标签单位，nltags 是自然语言、照常在空格处折', () => {
+    const doc = serializeFields({ ...emptyValues(MAIN_FIELDS), nltags: 'a b, c', tags: 'a b, c' }, MAIN_FIELDS)
+    const { fields } = buildBlockLayout(doc, MAIN_FIELDS, 1)
+    expect(fields.find((f) => f.field === 'nltags')!.tags).toEqual([])
+    expect(fields.find((f) => f.field === 'tags')!.tags).toHaveLength(2)
   })
 
-  it('全角逗号命中被带出来，坐标是文档坐标', () => {
+  it('全角逗号命中带出来，坐标是文档坐标', () => {
     const doc = serializeFields({ count: 'a，b', style: '', character: '' }, TRIO)
-    const hits = buildBlockDecorations(doc, TRIO, 1).filter((d) => d.kind === 'comma')
-    expect(hits).toHaveLength(1)
-    expect(doc.slice(hits[0].from, hits[0].to)).toBe('，')
+    const { commaHits } = buildBlockLayout(doc, TRIO, 1)
+    expect(commaHits).toHaveLength(1)
+    expect(doc.slice(commaHits[0].from, commaHits[0].to)).toBe('，')
   })
 
-  it('区间按 from 升序排好，CodeMirror 要求装饰有序', () => {
-    const decos = buildBlockDecorations(DOC, TRIO, 3)
-    const froms = decos.map((d) => d.from)
-    expect([...froms].sort((a, b) => a - b)).toEqual(froms)
+  it('性质：按版面拼出编辑器里看得见的文字，与 buildPrompt 的结果一致', () => {
+    // 编辑器里看得见的：非空段的内容；joined 的段后面一个 ` ,`；块与块之间的空格。
+    // 徽章与空框没有文字。比较时把空白压成一个，因为块间空格与 trim 掉的空白在屏幕上
+    // 与拼接结果里的数量不同，那不是「看到的与发出去的不一致」。
+    const pool = ['', '', '  ', '1girl', 'solo,', ' a, b ', '多 吗', 'x,,', ',']
+    let seed = 3
+    const rand = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648
+    const squash = (s: string) => s.replace(/\s+/g, ' ').trim()
+    for (let round = 0; round < 500; round++) {
+      const values = emptyValues(MAIN_FIELDS)
+      for (const spec of MAIN_FIELDS) values[spec.name] = pool[Math.floor(rand() * pool.length)]
+      const doc = serializeFields(values, MAIN_FIELDS)
+      const shown = buildBlockLayout(doc, MAIN_FIELDS, 1)
+        .fields.map((f) => (f.empty ? ' ' : doc.slice(f.from, f.to) + (f.joined ? ' , ' : ' ')))
+        .join('')
+      expect(squash(shown)).toBe(squash(buildPrompt(parseDocument(doc, MAIN_FIELDS), MAIN_FIELDS)))
+    }
   })
 })
