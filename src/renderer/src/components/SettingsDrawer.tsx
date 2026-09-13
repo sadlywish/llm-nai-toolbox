@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import {
   API_TYPES,
   NUMBER_RULES,
+  RESTORABLE_KEYS,
   THINKING_EFFORTS,
   THINKING_FORMATS,
   defaultAppConfig,
@@ -13,6 +14,11 @@ import { useConfig } from '../state/config'
 
 type BooleanKey = { [K in keyof AppConfig]: AppConfig[K] extends boolean ? K : never }[keyof AppConfig]
 type StringKey = { [K in keyof AppConfig]: AppConfig[K] extends string ? K : never }[keyof AppConfig]
+
+/** 「恢复默认」按钮该不该出现，唯一依据是 RESTORABLE_KEYS——不要在各字段调用处各判一遍 */
+function isRestorable(key: keyof AppConfig): key is StringKey {
+  return (RESTORABLE_KEYS as readonly string[]).includes(key)
+}
 
 const API_TYPE_LABELS: Record<AppConfig['apiType'], string> = { claude: 'Claude', openai: 'OpenAI 兼容' }
 const THINKING_FORMAT_LABELS: Record<AppConfig['thinkingFormat'], string> = {
@@ -111,6 +117,17 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
   }
   const hasErrors = Object.keys(errors).length > 0
 
+  function setThinkingFormat(value: AppConfig['thinkingFormat']): void {
+    // 预算 token 框在非 budget 格式下会置灰（见下面 numberField 的 disabled）。
+    // 一个置灰、用户碰不到的框不能继续攥着一个非法值挡住保存，所以切走 budget
+    // 时把草稿和原文本都退回上次保存的值——那个值必然是校验通过的
+    if (value !== 'budget' && errors.thinkingBudgetTokens !== undefined) {
+      setNumericText((t) => ({ ...t, thinkingBudgetTokens: String(config.thinkingBudgetTokens) }))
+      set('thinkingBudgetTokens', config.thinkingBudgetTokens)
+    }
+    set('thinkingFormat', value)
+  }
+
   async function handleSubmit(e: FormEvent): Promise<void> {
     e.preventDefault()
     if (hasErrors || saving) return
@@ -135,11 +152,11 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
     </button>
   )
 
-  const textField = (key: StringKey, label: string, opts: { hint?: string; placeholder?: string; restorable?: boolean } = {}): ReactNode => (
+  const textField = (key: StringKey, label: string, opts: { hint?: string; placeholder?: string } = {}): ReactNode => (
     <label className="field">
       <span className="field-label">
         {label}
-        {opts.restorable === true && restoreButton(key)}
+        {isRestorable(key) && restoreButton(key)}
       </span>
       <input type="text" value={draft[key]} placeholder={opts.placeholder} onChange={(e) => set(key, e.target.value)} />
       {opts.hint !== undefined && <span className="field-hint">{opts.hint}</span>}
@@ -151,7 +168,7 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
     <label className="field">
       <span className="field-label">
         {label}
-        {restoreButton(key)}
+        {isRestorable(key) && restoreButton(key)}
       </span>
       <textarea rows={rows} value={draft[key]} onChange={(e) => set(key, e.target.value)} />
       {errorOf(key)}
@@ -244,7 +261,7 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
                   <span>格式</span>
                   <select
                     value={draft.thinkingFormat}
-                    onChange={(e) => set('thinkingFormat', e.target.value as AppConfig['thinkingFormat'])}
+                    onChange={(e) => setThinkingFormat(e.target.value as AppConfig['thinkingFormat'])}
                   >
                     {THINKING_FORMATS.map((f) => (
                       <option key={f} value={f}>
@@ -277,14 +294,11 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
               {areaField('systemPrompt', '系统提示词', 6)}
               {areaField('naiCharSystemPrompt', '多角色附加', 3)}
               <div className="two-col">
-                {textField('quality', '质量词', { restorable: true })}
-                {textField('negativePrompt', '负面词', { restorable: true })}
+                {textField('quality', '质量词')}
+                {textField('negativePrompt', '负面词')}
               </div>
-              {textField('promptOrder', '字段顺序', { restorable: true, hint: '同时决定编辑器里块的先后' })}
-              {textField('naiCharPromptOrder', '角色字段顺序', {
-                restorable: true,
-                hint: '同时决定角色编辑器里块的先后',
-              })}
+              {textField('promptOrder', '字段顺序', { hint: '同时决定编辑器里块的先后' })}
+              {textField('naiCharPromptOrder', '角色字段顺序', { hint: '同时决定角色编辑器里块的先后' })}
               {checkField('tailInjectionEnabled', '尾部注入')}
               {draft.tailInjectionEnabled && areaField('tailInjection', '尾部注入内容', 3)}
             </Group>
