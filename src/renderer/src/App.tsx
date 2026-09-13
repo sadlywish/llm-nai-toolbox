@@ -1,17 +1,22 @@
-import { useEffect, useState } from 'react'
-import { MAIN_FIELDS } from '@shared/fields'
-import { checkTokenLimit, totalTokens } from '@shared/blockMetrics'
-import type { FieldValues } from '@shared/blockDoc'
-import { tokenLimitFor } from '@renderer/prompt/t5'
-import PromptEditor from './editor/PromptEditor'
+import { useEffect, useMemo, useState } from 'react'
+import { CHARACTER_FIELDS, MAIN_FIELDS, orderSpecs } from '@shared/fields'
+import PromptPane from './components/PromptPane'
+import { useConfig } from './state/config'
 import { useTagdb } from './state/tagdb'
 import { initWorkspacePersistence, useWorkspace } from './state/workspace'
 
 export default function App(): JSX.Element {
   const [version, setVersion] = useState('')
   const workspace = useWorkspace((s) => s.workspace)
+  const workspaceLoadError = useWorkspace((s) => s.loadError)
+  const workspaceSaveError = useWorkspace((s) => s.saveError)
+  const dismissWorkspaceSaveError = useWorkspace((s) => s.dismissSaveError)
   const loadWorkspace = useWorkspace((s) => s.load)
   const updateWorkspace = useWorkspace((s) => s.update)
+  const config = useConfig((s) => s.config)
+  const configLoaded = useConfig((s) => s.loaded)
+  const configLoadError = useConfig((s) => s.loadError)
+  const loadConfig = useConfig((s) => s.load)
   const tagdbStatus = useTagdb((s) => s.status)
   const initTagdb = useTagdb((s) => s.init)
 
@@ -24,18 +29,19 @@ export default function App(): JSX.Element {
   useEffect(() => initTagdb(), [initTagdb])
 
   useEffect(() => {
+    void loadConfig()
     void loadWorkspace()
-  }, [loadWorkspace])
+  }, [loadConfig, loadWorkspace])
 
   useEffect(() => initWorkspacePersistence(), [])
 
-  if (workspace === null) return <div className="app">载入中…</div>
-
-  const model = workspace.params.model
-  const onMainChange = (values: FieldValues): void =>
-    updateWorkspace((ws) => {
-      ws.main = values
-    })
+  // 必须 memo：PromptEditor 以字段集引用作为重建依据，每次渲染换新数组会让
+  // 编辑器不停重建、光标跳回开头。顺序串变了才换引用。
+  const mainSpecs = useMemo(() => orderSpecs(MAIN_FIELDS, config.promptOrder), [config.promptOrder])
+  const charSpecs = useMemo(
+    () => orderSpecs(CHARACTER_FIELDS, config.naiCharPromptOrder),
+    [config.naiCharPromptOrder],
+  )
 
   return (
     <div className="app">
@@ -53,25 +59,38 @@ export default function App(): JSX.Element {
         </div>
       )}
 
+      {configLoadError !== null && (
+        <div className="banner-error" role="alert">
+          {configLoadError}（已按默认配置运行）
+        </div>
+      )}
+      {workspaceLoadError !== null && (
+        <div className="banner-error" role="alert">
+          {workspaceLoadError}
+        </div>
+      )}
+      {workspaceSaveError !== null && (
+        <div className="banner-error" role="alert">
+          {workspaceSaveError}
+          <button type="button" onClick={dismissWorkspaceSaveError}>
+            知道了
+          </button>
+        </div>
+      )}
+
       <main className="workarea">
-        <section className="pane">
-          <div className="pane-bar">
-            <span className="pane-title">提示词</span>
-            <span className="pane-budget">
-              合计 <b>{totalTokens(workspace.main, MAIN_FIELDS)}</b> / {tokenLimitFor(model)} token
-            </span>
-          </div>
-          <PromptEditor specs={MAIN_FIELDS} values={workspace.main} onChange={onMainChange} />
-          {(() => {
-            const over = checkTokenLimit(workspace.main, MAIN_FIELDS, model)
-            return over === null ? null : (
-              <p className="pane-warn" role="alert">
-                提示词 {over.total} token 超过上限 {over.limit}，最长的是「{over.longest.name}」
-                （{over.longest.tokens} token）。
-              </p>
-            )
-          })()}
-        </section>
+        {/* 配置读不回来时照样放出界面（按默认配置，顶部已写明）；
+            工作区读不回来时停在载入中，顶部同样写明原因 */}
+        {workspace !== null && (configLoaded || configLoadError !== null) ? (
+          <PromptPane
+            workspace={workspace}
+            mainSpecs={mainSpecs}
+            charSpecs={charSpecs}
+            update={updateWorkspace}
+          />
+        ) : (
+          <div className="placeholder">载入中…</div>
+        )}
       </main>
     </div>
   )
