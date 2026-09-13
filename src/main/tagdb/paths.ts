@@ -1,14 +1,18 @@
 import { join } from 'path'
 
 /**
- * 本计划需要的数据文件。
+ * 标签库数据文件（规格 §10.1）。
  *
- * 只列真正有消费方的那一个。规格 §10.1 还列了 detail / browse / gloss /
- * deprecated / character_features / tag-manuals，但它们的消费方是 LLM 工具，
- * 属计划 3；提前声明就是没人读的死代码。
+ * index 在启动后由 loader.ts 异步加载，服务补全与 search_tags；
+ * 其余五个是 LLM 工具的数据，第一次跑 LLM 时由 extras.ts 按需加载。
  */
 export const TAGDB_FILES = {
   index: 'tags_index_v2.json',
+  detail: 'tags_detail_v2.json',
+  browse: 'tag_browse.json',
+  gloss: 'tag_gloss.json',
+  deprecated: 'tag_deprecated.json',
+  characterFeatures: 'character_features_v2.csv',
 } as const
 
 /**
