@@ -14,7 +14,7 @@ llm-nai-toolbox 的架构与关键取舍。使用方法见 [README](../README.md
 
 ## 进程模型
 
-主进程包办全部 IO 与外部请求；渲染进程 `contextIsolation` 打开、不发任何外部 HTTP 请求。所有网络走 Electron 的 `net.fetch`，因此 NovelAI 接口、Danbooru 接口与例图共用同一处代理设置。
+主进程包办全部 IO 与外部请求；渲染进程 `contextIsolation` 打开、不发任何外部 HTTP 请求。所有网络走 Electron 的 `net.fetch`，因此 LLM 接口、NovelAI 接口、Danbooru 接口与例图共用同一处代理设置。
 
 渲染进程里唯一的例外是 `<img src>` 加载 Danbooru 图片——它走 Electron session 的代理，与 `net.fetch` 是同一处配置，不必另开一条 IPC 通道。
 
@@ -112,7 +112,7 @@ llm-nai-toolbox 的架构与关键取舍。使用方法见 [README](../README.md
 | | 整图（10 项） | 角色（5 项） |
 |---|---|---|
 | 字段 | `count style character artist appearance tags environment series nltags quality` | `count character appearance tags nltags` |
-| `count` | 总人数、构图、镜头，自由标签 | 该角色的性别标记，`girl`/`boy`/`other` 三选一，渲染成选择器 |
+| `count` | 总人数、构图、镜头，自由标签 | 该角色的性别标记，`girl`/`boy`/`other` 三选一；规格要求渲染成选择器，目前尚未实现，仍是分块编辑器里的普通文本块 |
 | `character` | 多角色模式下必须留空 | 该角色的角色名 |
 
 `negative_prompt` 与 `position` 是角色的**参数不是字段**，有各自的独立输入，绝不进分块流。
