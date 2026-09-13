@@ -20,7 +20,8 @@ describe('TagExtrasLoader', () => {
     const r = await new TagExtrasLoader(dir).browse()
     expect(r.ok).toBe(false)
     if (!r.ok) {
-      expect(r.detail).toContain(TAGDB_FILES.browse)
+      // Node 的 ENOENT 原文本身就带着完整路径，所以还要钉住「找不到」这句友好提示
+      expect(r.detail.startsWith(`找不到 ${TAGDB_FILES.browse}`)).toBe(true)
       expect(r.detail).toContain(dir)
     }
   })
@@ -70,10 +71,11 @@ describe('TagExtrasLoader', () => {
   })
 
   it('wiki：只收字符串值', async () => {
-    put(TAGDB_FILES.detail, JSON.stringify({ miku: 'Vocaloid', bad: 3 }))
+    put(TAGDB_FILES.detail, JSON.stringify({ miku: 'Vocaloid', 'Hatsune Miku': 'x', bad: 3 }))
     const r = await new TagExtrasLoader(dir).wiki()
     expect(r.ok).toBe(true)
-    if (r.ok) expect([...r.value.entries()]).toEqual([['miku', 'Vocaloid']])
+    // 键原样保留、不归一：wiki 以 Danbooru 原始标签名查
+    if (r.ok) expect([...r.value.entries()]).toEqual([['miku', 'Vocaloid'], ['Hatsune Miku', 'x']])
   })
 
   it('同名目录（读不了）：说读取失败而不是找不到', async () => {
