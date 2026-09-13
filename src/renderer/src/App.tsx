@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CHARACTER_FIELDS, MAIN_FIELDS, orderSpecs } from '@shared/fields'
 import PromptPane from './components/PromptPane'
+import SettingsDrawer from './components/SettingsDrawer'
 import { useConfig } from './state/config'
 import { useTagdb } from './state/tagdb'
 import { initWorkspacePersistence, useWorkspace } from './state/workspace'
@@ -17,6 +18,8 @@ export default function App(): JSX.Element {
   const configLoaded = useConfig((s) => s.loaded)
   const configLoadError = useConfig((s) => s.loadError)
   const loadConfig = useConfig((s) => s.load)
+  const configExists = useConfig((s) => s.configExists)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const tagdbStatus = useTagdb((s) => s.status)
   const initTagdb = useTagdb((s) => s.init)
 
@@ -35,6 +38,20 @@ export default function App(): JSX.Element {
 
   useEffect(() => initWorkspacePersistence(), [])
 
+  /**
+   * 从没保存过设置时，启动后自动弹设置抽屉（规格 §14.3）。
+   *
+   * 判据是 config.json 在不在，不是「配置等于默认值」。firstPromptDone 让这件事
+   * 一辈子只发生一次：不加的话，用户手动关掉抽屉后任何一次 configExists 仍为
+   * false 的重渲染都可能把它再弹出来，变成关不掉。
+   */
+  const firstPromptDone = useRef(false)
+  useEffect(() => {
+    if (!configLoaded || configExists || firstPromptDone.current) return
+    firstPromptDone.current = true
+    setSettingsOpen(true)
+  }, [configLoaded, configExists])
+
   // 必须 memo：PromptEditor 以字段集引用作为重建依据，每次渲染换新数组会让
   // 编辑器不停重建、光标跳回开头。顺序串变了才换引用。
   const mainSpecs = useMemo(() => orderSpecs(MAIN_FIELDS, config.promptOrder), [config.promptOrder])
@@ -48,6 +65,10 @@ export default function App(): JSX.Element {
       <header className="app-header">
         <span className="app-title">llm-nai-toolbox</span>
         {version !== '' && <span className="app-version">v{version}</span>}
+        <span className="header-spacer" />
+        <button type="button" className="header-button" onClick={() => setSettingsOpen(true)}>
+          设置
+        </button>
       </header>
 
       {tagdbStatus !== null && tagdbStatus.state !== 'ready' && (
@@ -93,6 +114,8 @@ export default function App(): JSX.Element {
           <div className="placeholder">载入中…</div>
         )}
       </main>
+
+      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   )
 }

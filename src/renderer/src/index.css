@@ -239,3 +239,47 @@ body {
 .character-prompts { display: flex; gap: 6px; }
 .character-prompts > .prompt-editor { flex: 3 1 0; min-width: 0; }
 .character-prompts > .prompt-editor + .prompt-editor { flex: 2 1 0; }
+
+/* ── 顶栏按钮 ─────────────────────────────────────────────── */
+.header-spacer { flex: 1; }
+.header-button {
+  background: none; border: 1px solid var(--line); border-radius: 4px; color: var(--ink);
+  padding: 2px 12px; font: inherit; font-size: 13px; cursor: pointer; align-self: center;
+}
+.header-button:hover { border-color: var(--accent); }
+
+/* ── 设置抽屉（照工具箱，宽度放到 520px 容纳长提示词） ─────────────── */
+.drawer-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); display: flex; justify-content: flex-end; z-index: 10; }
+.settings-drawer {
+  width: 520px; max-width: 100%; height: 100%; overflow-y: auto;
+  background: var(--panel); border-left: 1px solid var(--line);
+  padding: 12px 14px 0; display: flex; flex-direction: column; gap: 10px; font-size: 13px;
+}
+.drawer-header { display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+.drawer-close { background: none; border: none; color: var(--ink-dim); cursor: pointer; font-size: 18px; line-height: 1; }
+.drawer-close:hover { color: var(--ink); }
+/* 首次启动的说明条。用 accent 而不是错误红：这不是出错，是一次正常的引导 */
+.drawer-firstrun { border: 1px solid var(--accent); border-radius: 4px; padding: 7px 9px; font-size: 12.5px; line-height: 1.7; background: #15181c; }
+.drawer-error { background: #5a1d1d; color: #ffd7d7; border: 1px solid #7a2a2a; border-radius: 3px; padding: 6px 8px; font-size: 12.5px; }
+.drawer-group { border: 1px solid var(--line); border-radius: 5px; flex-shrink: 0; }
+.drawer-group-head {
+  display: flex; justify-content: space-between; width: 100%; padding: 6px 10px;
+  background: var(--panel-2); color: var(--ink); border: none; border-bottom: 1px solid var(--line);
+  border-radius: 5px 5px 0 0; font: inherit; font-size: 13px; cursor: pointer; text-align: left;
+}
+.drawer-group.is-closed .drawer-group-head { border-bottom: none; border-radius: 5px; }
+.drawer-group-summary { color: var(--ink-faint); font-size: 12px; }
+.drawer-group-body { padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+.drawer-subtitle { color: var(--ink); font-size: 12.5px; margin-top: 4px; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+/* 保存栏钉在抽屉底部：分组很长，滚到中间也要能直接保存 */
+.drawer-actions {
+  position: sticky; bottom: 0; margin-top: auto; display: flex; justify-content: flex-end; gap: 8px;
+  padding: 8px 0 12px; border-top: 1px solid var(--line); background: var(--panel);
+}
+.drawer-actions button {
+  background: none; border: 1px solid var(--line); border-radius: 4px; color: var(--ink);
+  padding: 4px 16px; font: inherit; font-size: 13px; cursor: pointer;
+}
+.drawer-actions button.primary { background: var(--accent); border-color: var(--accent); color: #0b1b2b; font-weight: 600; }
+.drawer-actions button:disabled { opacity: .45; cursor: not-allowed; }
