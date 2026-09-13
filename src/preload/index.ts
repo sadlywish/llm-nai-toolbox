@@ -8,6 +8,7 @@ import {
   type TagdbStatus,
 } from '@shared/ipc'
 import type { LlmEvent, LlmRunInput, LlmRunResult } from '@shared/llm'
+import type { StylePreset } from '@shared/styles'
 import type { Workspace } from '@shared/workspace'
 
 const api = {
@@ -47,6 +48,13 @@ const api = {
     ipcRenderer.on(IPC.llmEvent, handler)
     return () => ipcRenderer.off(IPC.llmEvent, handler)
   },
+
+  loadStyles: (): Promise<StylePreset[]> => ipcRenderer.invoke(IPC.stylesLoad),
+
+  saveStyles: (presets: StylePreset[]): Promise<void> => ipcRenderer.invoke(IPC.stylesSave, presets),
+
+  /** 同步写盘，只给关窗前的 beforeunload 用 */
+  flushStyles: (presets: StylePreset[]): boolean => ipcRenderer.sendSync(IPC.stylesFlush, presets),
 }
 
 contextBridge.exposeInMainWorld('api', api)

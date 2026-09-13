@@ -20,6 +20,10 @@ export const IPC = {
   llmAbort: 'llm:abort',
   /** 主进程 → 渲染进程：日志行与轮次 */
   llmEvent: 'llm:event',
+  stylesLoad: 'styles:load',
+  stylesSave: 'styles:save',
+  /** 关窗前的同步冲刷（sendSync），同 workspace:flush */
+  stylesFlush: 'styles:flush',
 } as const
 
 export interface TagdbCompleteInput {

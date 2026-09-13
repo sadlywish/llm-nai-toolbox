@@ -8,6 +8,7 @@ import {
   type TagdbCompleteInput,
 } from '@shared/ipc'
 import { parseLlmRunInput, type LlmEvent, type LlmRunResult } from '@shared/llm'
+import { normalizeStyles } from '@shared/styles'
 import { normalizeWorkspace } from '@shared/workspace'
 import { ConfigStore } from './config-store'
 import { createClaudeChat } from './llm/claude'
@@ -69,6 +70,7 @@ export function registerIpc(
   const secrets = new SecretStore(appInfo.userDataDir, electronCrypto)
   // 读进来的形状不可信，一律交给 normalizeWorkspace，所以这里存 unknown
   const workspaceStore = new JsonStore<unknown>(join(appInfo.userDataDir, 'workspace.json'), () => null)
+  const stylesStore = new JsonStore<unknown>(join(appInfo.userDataDir, 'styles.json'), () => [])
 
   // 代理必须在任何请求之前生效。不 await：窗口先出来，setProxy 只影响后续请求
   void applyProxy(configStore.read().proxy)
@@ -112,6 +114,22 @@ export function registerIpc(
   ipcMain.on(IPC.workspaceFlush, (event, ws: unknown) => {
     try {
       workspaceStore.write(normalizeWorkspace(ws))
+      event.returnValue = true
+    } catch {
+      // 每条路径都必须给 returnValue 赋值，否则渲染进程会一直阻塞在 sendSync 上
+      event.returnValue = false
+    }
+  })
+
+  ipcMain.handle(IPC.stylesLoad, () => normalizeStyles(stylesStore.read()))
+
+  ipcMain.handle(IPC.stylesSave, (_e, presets: unknown) => {
+    stylesStore.write(normalizeStyles(presets))
+  })
+
+  ipcMain.on(IPC.stylesFlush, (event, presets: unknown) => {
+    try {
+      stylesStore.write(normalizeStyles(presets))
       event.returnValue = true
     } catch {
       // 每条路径都必须给 returnValue 赋值，否则渲染进程会一直阻塞在 sendSync 上
