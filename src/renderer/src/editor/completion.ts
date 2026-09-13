@@ -1,6 +1,6 @@
 import { autocompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
 import type { Extension } from '@codemirror/state'
-import { completionTargetAt } from '@shared/blockCompletion'
+import { completionTargetAt, type CompletionTarget } from '@shared/blockCompletion'
 import type { FieldSpec } from '@shared/fields'
 
 /** 规格 §10.4 给的防抖。与「跟随光标」的 400ms 不是一回事 */
@@ -44,13 +44,14 @@ function formatCount(n: number): string {
  * 查询走 IPC 到主进程的本地标签库，**不请求 Danbooru** —— 渲染进程不发外部
  * HTTP 是本工程的硬约束，而且补全是打字过程中的高频操作，走网络体验不可接受。
  *
- * 补全哪个词、偏好哪一类由 completionTargetAt 算（它负责段内坐标换算：
- * 分词函数只能吃段内文本，整篇喂进去词边界会全错）。
+ * 补全哪个词、偏好哪一类由调用方给的 resolveTarget 算：分块编辑器用
+ * completionTargetAt（负责段内坐标换算），单字段编辑器用 completionTargetInText。
  */
-export function localTagCompletion(specs: readonly FieldSpec[]): Extension {
+export function tagCompletion(
+  resolveTarget: (doc: string, pos: number) => CompletionTarget | null,
+): Extension {
   async function source(ctx: CompletionContext): Promise<CompletionResult | null> {
-    const doc = ctx.state.doc.toString()
-    const target = completionTargetAt(doc, specs, ctx.pos)
+    const target = resolveTarget(ctx.state.doc.toString(), ctx.pos)
     if (target === null) return null
     const res = await window.api.tagdbComplete({
       query: target.query,
@@ -86,4 +87,9 @@ export function localTagCompletion(specs: readonly FieldSpec[]): Extension {
     // DOM —— 结果集大小与渲染量是两件事，压力挡在这里而不是在查询层截断
     maxRenderedOptions: 50,
   })
+}
+
+/** 分块编辑器的补全：按光标所在段与字段的补全偏好取词 */
+export function localTagCompletion(specs: readonly FieldSpec[]): Extension {
+  return tagCompletion((doc, pos) => completionTargetAt(doc, specs, pos))
 }
