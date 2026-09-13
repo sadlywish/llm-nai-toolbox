@@ -14,6 +14,12 @@ export const IPC = {
   workspaceSave: 'workspace:save',
   /** 关窗前的同步冲刷（sendSync），防抖窗口内还没落盘的那一次 */
   workspaceFlush: 'workspace:flush',
+  /** 跑一轮 LLM（invoke）。同一时刻只允许一轮 */
+  llmRun: 'llm:run',
+  /** 中止正在跑的那一轮（invoke） */
+  llmAbort: 'llm:abort',
+  /** 主进程 → 渲染进程：日志行与轮次 */
+  llmEvent: 'llm:event',
 } as const
 
 export interface TagdbCompleteInput {

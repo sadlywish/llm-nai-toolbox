@@ -7,6 +7,7 @@ import {
   type TagdbCompleteResult,
   type TagdbStatus,
 } from '@shared/ipc'
+import type { LlmEvent, LlmRunInput, LlmRunResult } from '@shared/llm'
 import type { Workspace } from '@shared/workspace'
 
 const api = {
@@ -34,6 +35,18 @@ const api = {
 
   /** 同步写盘，只给关窗前的 beforeunload 用：那时异步 invoke 来不及返回 */
   flushWorkspace: (ws: Workspace): boolean => ipcRenderer.sendSync(IPC.workspaceFlush, ws),
+
+  /** 跑一轮 LLM。过程经 onLlmEvent 推送；上一轮没结束时 reject */
+  llmRun: (input: LlmRunInput): Promise<LlmRunResult> => ipcRenderer.invoke(IPC.llmRun, input),
+
+  llmAbort: (): Promise<void> => ipcRenderer.invoke(IPC.llmAbort),
+
+  /** 返回取消订阅的函数（同 onTagdbStatus） */
+  onLlmEvent: (cb: (e: LlmEvent) => void): (() => void) => {
+    const handler = (_e: unknown, ev: LlmEvent): void => cb(ev)
+    ipcRenderer.on(IPC.llmEvent, handler)
+    return () => ipcRenderer.off(IPC.llmEvent, handler)
+  },
 }
 
 contextBridge.exposeInMainWorld('api', api)

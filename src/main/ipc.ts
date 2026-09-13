@@ -7,12 +7,19 @@ import {
   type ConfigSaveInput,
   type TagdbCompleteInput,
 } from '@shared/ipc'
+import { parseLlmRunInput, type LlmRunResult } from '@shared/llm'
 import { normalizeWorkspace } from '@shared/workspace'
 import { ConfigStore } from './config-store'
-import { applyProxy } from './net'
+import { createClaudeChat } from './llm/claude'
+import { prepareTagData } from './llm/data'
+import { createOpenAIChat } from './llm/openai'
+import { TAG_MANUALS, TAG_MANUAL_TOC, TAG_SKILL_CORE } from './llm/resources'
+import { runLlm } from './llm/runner'
+import { appFetch, applyProxy } from './net'
 import { SecretStore, type SecretCrypto } from './secret-store'
 import { JsonStore } from './store'
 import { COMPLETION_PREFERS, completeFrom } from './tagdb/complete'
+import { TagExtrasLoader } from './tagdb/extras'
 import { TagdbLoader } from './tagdb/loader'
 import { resolveTagdbDir } from './tagdb/paths'
 
@@ -138,6 +145,46 @@ export function registerIpc(
 
   // 渲染进程可能在第一条 status 广播之后才挂上监听，所以它也要能主动问一次
   ipcMain.handle(IPC.tagdbStatusGet, () => loader.status)
+
+  const extras = new TagExtrasLoader(dir)
+  /** 正在跑的那一轮。同一时刻只允许一轮：两轮并发写同一份工作区，回填结果谁先谁后说不清 */
+  let currentRun: AbortController | null = null
+
+  ipcMain.handle(IPC.llmRun, async (event, raw: unknown): Promise<LlmRunResult> => {
+    // IPC 边界不能假定调用方守规矩：入参先校验，工作区快照过 normalizeWorkspace
+    const input = parseLlmRunInput(raw)
+    if (typeof input === 'string') throw new Error(input)
+    if (currentRun !== null) throw new Error('上一轮还在运行，先等它结束或中止')
+
+    // 配置在发送那一刻读一次：这一轮跑完之前改设置，不影响这一轮
+    const config = configStore.read()
+    const controller = new AbortController()
+    currentRun = controller
+    const sender = event.sender
+    try {
+      return await runLlm(input, {
+        config,
+        // 明文 Key 只在主进程里用，不进入参、返回值与日志
+        apiKey: secrets.read('llmApiKey').trim(),
+        chat: config.apiType === 'claude' ? createClaudeChat(appFetch) : createOpenAIChat(appFetch),
+        prepareData: (log) => prepareTagData(loader, extras, config, log),
+        manuals: TAG_MANUALS,
+        manualToc: TAG_MANUAL_TOC,
+        skillCore: TAG_SKILL_CORE,
+        signal: controller.signal,
+        // 只推给发起这一轮的窗口；窗口关了就不推，结果照样作为 invoke 的返回值
+        emit: (e) => {
+          if (!sender.isDestroyed()) sender.send(IPC.llmEvent, e)
+        },
+      })
+    } finally {
+      currentRun = null
+    }
+  })
+
+  ipcMain.handle(IPC.llmAbort, () => {
+    currentRun?.abort()
+  })
 
   void loader.load()
 }
