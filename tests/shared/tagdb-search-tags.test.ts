@@ -37,6 +37,31 @@ describe('searchTags', () => {
     expect(withHint[0].matches[0].score).toBe(1)
   })
 
+  it('作品提示的三种调整各自生效：角色作品对上加分、对不上扣分、标签括号里的作品名加分；作品名也能按中文别名认', () => {
+    const mk = (entries: TagEntry[]) => ({ entries, index: buildIndex(entries) })
+    // 基础分：archer_(fate_grand_order) 0.96、arche 0.88、archr 0.96，都没到 1.0，加减分看得出来
+    const hinted: SearchCategories = {
+      artists: mk([]),
+      characters: mk([
+        e('archer_(fate_grand_order)', 10),
+        e('arche', 20, { series: ['fate'] }),
+        e('archr', 30, { series: ['kantai_collection'] }),
+      ]),
+      series: mk([e('fate', 3000, { zh: ['命运'] }), e('kantai_collection', 4000)]),
+      general: mk([]),
+    }
+    const scores = (series?: string) =>
+      Object.fromEntries(
+        searchTags(hinted, undefined, [], [series ? { name: 'archer', series } : { name: 'archer' }])[0].matches.map((m) => [
+          m.tag,
+          m.score,
+        ]),
+      )
+    expect(scores()).toEqual({ 'archer_(fate_grand_order)': 0.96, arche: 0.88, archr: 0.96 })
+    expect(scores('fate')).toEqual({ 'archer_(fate_grand_order)': 1, arche: 0.93, archr: 0.93 })
+    expect(scores('命运')).toEqual({ 'archer_(fate_grand_order)': 1, arche: 0.93, archr: 0.93 })
+  })
+
   it('分类内没有高置信结果时，按标签原名在全部类别里精确回退并改正 type', () => {
     const [r] = searchTags(cats(), undefined, ['blue hair'])
     expect(r.type).toBe('概念')
