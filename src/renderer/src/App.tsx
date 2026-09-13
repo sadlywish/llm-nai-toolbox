@@ -3,6 +3,7 @@ import { CHARACTER_FIELDS, MAIN_FIELDS } from '@shared/fields'
 import { checkTokenLimit, totalTokens } from '@shared/blockMetrics'
 import { tokenLimitFor } from '@renderer/prompt/t5'
 import PromptEditor from './editor/PromptEditor'
+import { useTagdb } from './state/tagdb'
 import { useWorkspace } from './state/workspace'
 
 // 模型选择要到后续计划才有，先钉死在 V5 上把上限跑通
@@ -14,10 +15,16 @@ export default function App(): JSX.Element {
   const setMain = useWorkspace((s) => s.setMain)
   const character = useWorkspace((s) => s.character)
   const setCharacter = useWorkspace((s) => s.setCharacter)
+  const tagdbStatus = useTagdb((s) => s.status)
+  const initTagdb = useTagdb((s) => s.init)
 
   useEffect(() => {
     void window.api.appVersion().then(setVersion)
   }, [])
+
+  // init() 里既主动问一次当前状态，又订阅后续广播——广播可能在这个组件
+  // 挂载之前就发出去了，只订阅会错过那第一条（见 useTagdb 的 JSDoc）
+  useEffect(() => initTagdb(), [initTagdb])
 
   // TODO(后续计划): 1471 是「base + 全部角色提示词」的合计上限，这里只喂了 main，
   // 角色完全不进预算；且 totalTokens 是分段求和、低估约 9 token（见其 JSDoc）。
@@ -30,6 +37,15 @@ export default function App(): JSX.Element {
         <span className="app-title">llm-nai-toolbox</span>
         {version !== '' && <span className="app-version">v{version}</span>}
       </header>
+
+      {tagdbStatus !== null && tagdbStatus.state !== 'ready' && (
+        <div
+          className={tagdbStatus.state === 'loading' ? 'tagdb-bar' : 'tagdb-bar tagdb-bar-warn'}
+          role="status"
+        >
+          {tagdbStatus.detail}
+        </div>
+      )}
 
       <main className="workarea">
         <section className="pane">

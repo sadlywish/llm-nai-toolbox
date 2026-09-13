@@ -30,6 +30,13 @@ describe('serializeFields', () => {
     expect(doc.split(BLOCK_SEP)).toHaveLength(TRIO.length + 1)
     expect(parseDocument(doc, TRIO).count).toBe('ab')
   })
+
+  it('值里混进换行会被剥掉——回灌（LLM 写回）绕开 guardFilter，净化只能在这里做', () => {
+    const doc = serializeFields({ count: 'a\nb\r\nc', style: '', character: '' }, TRIO)
+    expect(doc).not.toMatch(/[\r\n]/)
+    expect(isWellFormed(doc, TRIO)).toBe(true)
+    expect(parseDocument(doc, TRIO).count).toBe('abc')
+  })
 })
 
 describe('往返一致性', () => {
@@ -70,6 +77,10 @@ describe('isWellFormed / parseDocument', () => {
 
   it('首段非空判为损坏——分隔符之前不该有内容', () => {
     expect(isWellFormed(`x${BLOCK_SEP}a${BLOCK_SEP}b${BLOCK_SEP}c`, TRIO)).toBe(false)
+  })
+
+  it('段数与首段都对、但段内混进换行也判为损坏——总闸得看见换行', () => {
+    expect(isWellFormed(`${BLOCK_SEP}a\nb${BLOCK_SEP}${BLOCK_SEP}c`, TRIO)).toBe(false)
   })
 
   it('损坏文档抛错而不是静默修补', () => {

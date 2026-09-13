@@ -1,5 +1,6 @@
 import { join } from 'path'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { registerIpc } from './ipc'
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -37,6 +38,16 @@ function createWindow(): void {
 ipcMain.handle('app:version', () => app.getVersion())
 
 void app.whenReady().then(() => {
+  // 必须在 createWindow 之前、且整个应用只调一次。放进 createWindow 会让
+  // macOS 的「窗口全关后再激活」走到第二次注册，`ipcMain.handle` 会抛
+  // 「Attempted to register a second handler」（实测），窗口建不出来。
+  registerIpc({
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    // 开发态 app.getAppPath() 就是项目根；打包后是 asar 路径，
+    // 那种形态用不到 appRoot（见 resolveTagdbDir）。
+    appRoot: app.getAppPath(),
+  })
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

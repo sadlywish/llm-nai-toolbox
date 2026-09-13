@@ -138,3 +138,34 @@ body {
   text-decoration: underline wavy var(--danger) 1px;
   text-underline-offset: 3px;
 }
+
+/* 标签库载入/缺文件提示。缺文件不静默降级 —— 界面必须说清是哪个文件 */
+.tagdb-bar {
+  padding: 7px 12px;
+  font-size: 13px;
+  color: var(--ink-dim);
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+}
+.tagdb-bar-warn {
+  color: var(--danger);
+  background: hsl(4 60% 40% / .12);
+}
+
+/* 补全下拉：跟编辑器同一套深色 */
+.cm-tooltip.cm-tooltip-autocomplete {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.cm-tooltip-autocomplete > ul > li[aria-selected] {
+  background: hsl(212 55% 45% / .45);
+  color: var(--ink);
+}
+.cm-completionDetail {
+  margin-left: 10px;
+  color: var(--ink-faint);
+  font-style: normal;
+}
