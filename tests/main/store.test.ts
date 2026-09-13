@@ -43,12 +43,14 @@ describe('JsonStore', () => {
     expect(JSON.parse(readFileSync(file, 'utf-8'))).toEqual({ n: 1 })
   })
 
-  it('JSON 解析失败回退 fallback，不动原文件', () => {
+  it('JSON 解析失败回退 fallback，不动原文件，并复制一份 .corrupt 留证', () => {
     const file = join(dir, 'a.json')
     writeFileSync(file, '{ 半截')
     const store = new JsonStore<Doc>(file, () => ({ n: 0 }), isDoc)
     expect(store.read()).toEqual({ n: 0 })
     expect(readFileSync(file, 'utf-8')).toBe('{ 半截')
+    expect(existsSync(`${file}.corrupt`)).toBe(true)
+    expect(readFileSync(`${file}.corrupt`, 'utf-8')).toBe('{ 半截')
   })
 
   it('形状不对回退 fallback，并把坏文件改名为 .corrupt 留证', () => {

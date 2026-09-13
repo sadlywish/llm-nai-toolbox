@@ -1,5 +1,6 @@
 import {
   closeSync,
+  copyFileSync,
   existsSync,
   fsyncSync,
   mkdirSync,
@@ -46,6 +47,14 @@ export class JsonStore<T> {
       }
       return parsed as T
     } catch {
+      // 原文件不动是为了不在读取时就破坏现场；但下一次 write() 会用 fallback
+      // 覆盖掉原文件，所以这里先复制一份留证——用户手写的内容不能因为一次
+      // 解析失败就没了。复制失败（例如目录不可写）吞掉，不影响回退。
+      try {
+        copyFileSync(this.filePath, `${this.filePath}.corrupt`)
+      } catch {
+        /* 留证失败不影响回退 */
+      }
       return this.fallback()
     }
   }

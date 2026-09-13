@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
   API_TYPES,
   NUMBER_RULES,
@@ -77,6 +77,11 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [numericText, setNumericText] = useState<Record<NumericKey, string>>(() => numericTextFrom(config))
   const [saving, setSaving] = useState(false)
+  // 在系统提示词框里拖选文字、松开时鼠标落在遮罩上：Chromium 把 click 事件
+  // 派给按下与松开两个目标的最近公共祖先——正是遮罩——于是 onClose 被
+  // 触发，草稿（连同刚填的 API Key）全丢。只有按下和松开都落在遮罩本身
+  // 才算真的点了遮罩要关闭。
+  const downOnBackdrop = useRef(false)
 
   useEffect(() => {
     // 必须等 loaded 才重置草稿：配置还没读回来就用默认值初始化草稿，
@@ -198,7 +203,15 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
   )
 
   return (
-    <div className="drawer-backdrop" onClick={onClose}>
+    <div
+      className="drawer-backdrop"
+      onMouseDown={(e) => {
+        downOnBackdrop.current = e.target === e.currentTarget
+      }}
+      onClick={(e) => {
+        if (downOnBackdrop.current && e.target === e.currentTarget) onClose()
+      }}
+    >
       <form className="settings-drawer" onClick={(e) => e.stopPropagation()} onSubmit={(e) => void handleSubmit(e)}>
         <div className="drawer-header">
           <span>设置</span>

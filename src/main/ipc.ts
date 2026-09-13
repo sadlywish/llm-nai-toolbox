@@ -64,9 +64,11 @@ export function registerIpc(
   const workspaceStore = new JsonStore<unknown>(join(appInfo.userDataDir, 'workspace.json'), () => null)
 
   // 代理必须在任何请求之前生效。不 await：窗口先出来，setProxy 只影响后续请求
-  void applyProxy(configStore.read().proxy).then((r) => {
-    if (!r.ok) console.warn('[proxy]', r.message)
-  })
+  void applyProxy(configStore.read().proxy)
+    .then((r) => {
+      if (!r.ok) console.warn('[proxy]', r.message)
+    })
+    .catch((e: unknown) => console.warn('[proxy] 应用代理失败：', e))
 
   ipcMain.handle(
     IPC.configLoad,
@@ -84,11 +86,14 @@ export function registerIpc(
     const errors = Object.values(validateConfig(config))
     if (errors.length > 0) throw new Error(`配置不合法：${errors.join('；')}`)
     configStore.write(config)
-    if (typeof input.llmApiKey === 'string') secrets.write('llmApiKey', input.llmApiKey)
+    // 去掉首尾空白：复制粘贴的 Key 常带一个换行，带着它请求会被判 401
+    if (typeof input.llmApiKey === 'string') secrets.write('llmApiKey', input.llmApiKey.trim())
     // 代理是 session 级设置，改了立刻重新应用，否则就是「填了要重启才生效」
-    void applyProxy(config.proxy).then((r) => {
-      if (!r.ok) console.warn('[proxy]', r.message)
-    })
+    void applyProxy(config.proxy)
+      .then((r) => {
+        if (!r.ok) console.warn('[proxy]', r.message)
+      })
+      .catch((e: unknown) => console.warn('[proxy] 应用代理失败：', e))
   })
 
   ipcMain.handle(IPC.workspaceLoad, () => normalizeWorkspace(workspaceStore.read()))
