@@ -133,3 +133,34 @@ describe('normalizeWorkspace', () => {
     expect(ws.params.model).toBe('my-custom-model')
   })
 })
+
+describe('指令区选项', () => {
+  it('空工作区带默认的指令区选项', () => {
+    expect(emptyWorkspace().console).toEqual({
+      instruction: '',
+      multiCharacter: 'off',
+      editExisting: false,
+      transparent: false,
+      styleMode: 'none',
+      presetId: '',
+    })
+  })
+
+  it('读回时逐项校验：枚举不认识回默认，类型不对回默认，合法值保留', () => {
+    const ws = normalizeWorkspace({
+      console: { instruction: '画初音', multiCharacter: 'on', editExisting: 'yes', transparent: true, styleMode: 'preset', presetId: 7 },
+    })
+    expect(ws.console).toEqual({
+      instruction: '画初音',
+      multiCharacter: 'off',
+      editExisting: false,
+      transparent: true,
+      styleMode: 'preset',
+      presetId: '',
+    })
+    expect(normalizeWorkspace({ console: { multiCharacter: 'coords', styleMode: 'x' } }).console).toMatchObject({
+      multiCharacter: 'coords',
+      styleMode: 'none',
+    })
+  })
+})

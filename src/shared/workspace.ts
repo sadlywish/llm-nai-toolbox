@@ -1,6 +1,7 @@
 import { emptyValues, sanitizeFieldText, type FieldValues } from './blockDoc'
 import { CHARACTER_FIELDS, MAIN_FIELDS, type FieldSpec } from './fields'
 import { newId } from './ids'
+import type { MultiCharacterMode } from './llm'
 import { NOISE_SCHEDULE_OPTIONS, SAMPLER_OPTIONS, UC_PRESET_OPTIONS } from './naiOptions'
 
 /** seed 分配策略：每张随机，或固定用参数区里的 seed */
@@ -36,6 +37,23 @@ export interface CharacterPrompt {
   position: string
 }
 
+export type StyleMode = 'none' | 'preset' | 'current'
+
+/** 指令区的输入与开关。随工作区保存，重开应用时还是上次的样子 */
+export interface ConsoleOptions {
+  instruction: string
+  /** 多角色：关闭 / 位置由模型安排 / 手动指定坐标 */
+  multiCharacter: MultiCharacterMode
+  /** 在现有内容上修改 */
+  editExisting: boolean
+  /** 透明背景 */
+  transparent: boolean
+  /** 画风：不覆盖 / 用选用的预设覆盖 / 用当前 artist 块覆盖 */
+  styleMode: StyleMode
+  /** 选中的画风预设 id；styleMode 不是 preset 时无意义 */
+  presetId: string
+}
+
 /**
  * 当前工作状态（workspace.json）。
  *
@@ -50,6 +68,7 @@ export interface Workspace {
   characters: CharacterPrompt[]
   /** 角色坐标是否发送给 NAI；关闭时由模型安排位置 */
   useCoords: boolean
+  console: ConsoleOptions
 }
 
 /**
@@ -75,6 +94,10 @@ export function defaultGenParams(): GenParams {
   }
 }
 
+export function defaultConsoleOptions(): ConsoleOptions {
+  return { instruction: '', multiCharacter: 'off', editExisting: false, transparent: false, styleMode: 'none', presetId: '' }
+}
+
 export function createCharacter(): CharacterPrompt {
   return {
     id: newId('ch'),
@@ -93,6 +116,7 @@ export function emptyWorkspace(): Workspace {
     params: defaultGenParams(),
     characters: [],
     useCoords: false,
+    console: defaultConsoleOptions(),
   }
 }
 
@@ -135,6 +159,22 @@ function normalizeParams(raw: unknown): GenParams {
   return params
 }
 
+const MULTI_MODES: readonly MultiCharacterMode[] = ['off', 'auto', 'coords']
+const STYLE_MODES: readonly StyleMode[] = ['none', 'preset', 'current']
+
+function normalizeConsole(raw: unknown): ConsoleOptions {
+  const base = defaultConsoleOptions()
+  if (!isRecord(raw)) return base
+  return {
+    instruction: str(raw.instruction),
+    multiCharacter: MULTI_MODES.find((m) => m === raw.multiCharacter) ?? base.multiCharacter,
+    editExisting: typeof raw.editExisting === 'boolean' ? raw.editExisting : base.editExisting,
+    transparent: typeof raw.transparent === 'boolean' ? raw.transparent : base.transparent,
+    styleMode: STYLE_MODES.find((m) => m === raw.styleMode) ?? base.styleMode,
+    presetId: str(raw.presetId),
+  }
+}
+
 /**
  * 读回的工作区补齐 + 自愈。任何来源（旧版本文件、手改、IPC 传进来的）
  * 都先过这里，界面与主进程拿到的永远是完整合法的形状。
@@ -169,5 +209,6 @@ export function normalizeWorkspace(raw: unknown): Workspace {
     params: normalizeParams(raw.params),
     characters,
     useCoords: typeof raw.useCoords === 'boolean' ? raw.useCoords : base.useCoords,
+    console: normalizeConsole(raw.console),
   }
 }
