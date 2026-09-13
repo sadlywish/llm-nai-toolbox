@@ -125,3 +125,44 @@ export function fieldByName(
 ): FieldSpec | undefined {
   return specs.find((s) => s.name === name)
 }
+
+/** 顺序串切成字段名。与插件 buildPrompt 的切法一致：逗号分隔、去空白、丢空项 */
+export function parseFieldOrder(order: string): string[] {
+  return order
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+/**
+ * 顺序串的问题；合法时返回 null。
+ *
+ * **必须恰好包含字段集的全部字段、各一次。** 插件允许漏写字段（漏掉的不拼接），
+ * 这里不允许：顺序串同时决定编辑器里块的先后，漏掉一个字段就意味着一个
+ * 在编辑器里看得见、却不会被发出去的块——框里看到的与拼接结果对不上。
+ */
+export function fieldOrderError(specs: readonly FieldSpec[], order: string): string | null {
+  const names = parseFieldOrder(order)
+  const known = new Set(specs.map((s) => s.name))
+  const unknown = names.filter((n) => !known.has(n))
+  if (unknown.length > 0) return `不认识的字段：${unknown.join('、')}`
+  const duplicated = [...new Set(names.filter((n, i) => names.indexOf(n) !== i))]
+  if (duplicated.length > 0) return `字段重复：${duplicated.join('、')}`
+  const missing = specs.map((s) => s.name).filter((n) => !names.includes(n))
+  if (missing.length > 0) return `缺少字段：${missing.join('、')}`
+  return null
+}
+
+/**
+ * 按顺序串重排字段集。
+ *
+ * 顺序串非法时原样返回字段集。这是兜底而不是降级：设置抽屉保存前
+ * 与 mergeConfig 读配置时都已经把非法顺序串拦下，正常路径走不到这里。
+ *
+ * 每次调用返回新数组，调用方必须按顺序串 memo（PromptEditor 以字段集
+ * 引用作为重建编辑器的依据，见其 Props 注释）。
+ */
+export function orderSpecs(specs: readonly FieldSpec[], order: string): readonly FieldSpec[] {
+  if (fieldOrderError(specs, order) !== null) return specs
+  return parseFieldOrder(order).map((name) => fieldByName(specs, name) as FieldSpec)
+}

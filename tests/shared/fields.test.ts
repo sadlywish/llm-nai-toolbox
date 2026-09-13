@@ -5,6 +5,9 @@ import {
   DEFAULT_PROMPT_ORDER,
   MAIN_FIELDS,
   fieldByName,
+  fieldOrderError,
+  orderSpecs,
+  parseFieldOrder,
 } from '@shared/fields'
 
 const namesOf = (specs: readonly { name: string }[]): string[] => specs.map((s) => s.name)
@@ -77,5 +80,36 @@ describe('字段属性', () => {
     for (const spec of MAIN_FIELDS) {
       expect(spec.hue >= 10 && spec.hue <= 340).toBe(true)
     }
+  })
+})
+
+describe('字段顺序', () => {
+  it('parseFieldOrder 按逗号切分、去空白、丢空项', () => {
+    expect(parseFieldOrder(' count ,style,, character ')).toEqual(['count', 'style', 'character'])
+  })
+
+  it('默认顺序串合法', () => {
+    expect(fieldOrderError(MAIN_FIELDS, DEFAULT_PROMPT_ORDER)).toBeNull()
+    expect(fieldOrderError(CHARACTER_FIELDS, DEFAULT_CHAR_PROMPT_ORDER)).toBeNull()
+  })
+
+  it('不认识的字段、重复、缺失分别报错并点名', () => {
+    const full = DEFAULT_PROMPT_ORDER
+    expect(fieldOrderError(MAIN_FIELDS, `${full}, lora`)).toContain('lora')
+    expect(fieldOrderError(MAIN_FIELDS, `${full}, count`)).toContain('count')
+    expect(fieldOrderError(MAIN_FIELDS, 'count, style')).toContain('artist')
+  })
+
+  it('角色字段集不认整图专属字段', () => {
+    expect(fieldOrderError(CHARACTER_FIELDS, `${DEFAULT_CHAR_PROMPT_ORDER}, artist`)).toContain('artist')
+  })
+
+  it('orderSpecs 按顺序串重排字段集', () => {
+    const order = 'quality, count, style, character, artist, appearance, tags, environment, series, nltags'
+    expect(namesOf(orderSpecs(MAIN_FIELDS, order))).toEqual(splitOrder(order))
+  })
+
+  it('orderSpecs 遇到非法顺序串原样返回字段集（保存与合并时已拦过，这里只是兜底）', () => {
+    expect(orderSpecs(MAIN_FIELDS, 'count')).toBe(MAIN_FIELDS)
   })
 })
