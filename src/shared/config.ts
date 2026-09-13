@@ -17,6 +17,29 @@ export const THINKING_FORMATS: readonly ThinkingFormat[] = ['adaptive', 'budget'
 export const THINKING_EFFORTS: readonly ThinkingEffort[] = ['low', 'medium', 'high', 'xhigh', 'max']
 
 /**
+ * OpenAI 兼容接口的思维链参数写法。各家各不相同（2026-09 核对各家文档）：
+ * - reasoning_effort：OpenAI 官方、Gemini、xAI、vLLM 等，顶层 `reasoning_effort`
+ * - reasoning_object：OpenRouter，`reasoning: { effort }` 或 `reasoning: { max_tokens }`
+ * - thinking_object：DeepSeek、智谱、Kimi，`thinking: { type: "enabled" }`
+ * - enable_thinking：通义千问，`enable_thinking: true`，预算另用 `thinking_budget`
+ * 具体请求体由 main/llm/thinking.ts 生成。
+ */
+export type OpenAIReasoningDialect = 'reasoning_effort' | 'reasoning_object' | 'thinking_object' | 'enable_thinking'
+export type OpenAIReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+
+export const OPENAI_REASONING_DIALECTS: readonly OpenAIReasoningDialect[] = [
+  'reasoning_effort',
+  'reasoning_object',
+  'thinking_object',
+  'enable_thinking',
+]
+/** 原样发给端点，不在应用里降档：各家各模型支持的档位不同，由端点决定收不收 */
+export const OPENAI_REASONING_EFFORTS: readonly OpenAIReasoningEffort[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
+
+/** 附加请求参数里不许出现的键：它们由应用自己组装，被覆盖掉整轮就跑不起来 */
+export const RESERVED_REQUEST_KEYS: readonly string[] = ['model', 'messages', 'tools', 'stream']
+
+/**
  * 应用配置（config.json）。**不含任何密钥**——API Key 在 secrets.json。
  *
  * 分组照规格 §14，默认值照 koishi 插件 src/config.ts。
@@ -29,12 +52,19 @@ export interface AppConfig {
   maxTokens: number
   /** LLM 单次请求超时（秒） */
   requestTimeoutSec: number
+  /** OpenAI 兼容接口的附加请求参数（JSON 对象文本），原样合并进请求体，同名字段以它为准 */
+  openaiExtraParams: string
 
   // ── 思维链 ──
   thinkingEnabled: boolean
   thinkingFormat: ThinkingFormat
   thinkingEffort: ThinkingEffort
   thinkingBudgetTokens: number
+  /** 以下三项只对 OpenAI 兼容接口生效；Claude 接口用上面四项 */
+  openaiReasoningDialect: OpenAIReasoningDialect
+  openaiReasoningEffort: OpenAIReasoningEffort
+  /** 0 = 不发预算。只有 reasoning_object 与 enable_thinking 两种写法使用 */
+  openaiReasoningBudget: number
 
   // ── 提示词 ──
   systemPrompt: string
@@ -90,11 +120,15 @@ export function defaultAppConfig(): AppConfig {
     model: 'claude-sonnet-5',
     maxTokens: 16000,
     requestTimeoutSec: 120,
+    openaiExtraParams: '',
 
     thinkingEnabled: false,
     thinkingFormat: 'adaptive',
     thinkingEffort: 'high',
     thinkingBudgetTokens: 10000,
+    openaiReasoningDialect: 'reasoning_effort',
+    openaiReasoningEffort: 'high',
+    openaiReasoningBudget: 0,
 
     systemPrompt: DEFAULT_TEXTS.systemPrompt,
     naiCharSystemPrompt: DEFAULT_TEXTS.naiCharSystemPrompt,
@@ -165,6 +199,7 @@ export const NUMBER_RULES: Record<NumericKey, NumberRule> = {
   requestTimeoutSec: { min: 1, integer: true },
   // budget 与 maxTokens 的相对关系（≥1024 且 < maxTokens）在发请求时收敛并告警（规格 §9.3），这里只管是正整数
   thinkingBudgetTokens: { min: 1, integer: true },
+  openaiReasoningBudget: { min: 0, integer: true },
   naiMaxCharacters: { min: 1, integer: true },
   naiMaxPixels: { min: 64 * 64, integer: true },
   maxToolRounds: { min: 1, integer: true },
@@ -185,6 +220,29 @@ function numberRuleError(rule: NumberRule, value: number): string | null {
   return null
 }
 
+/** 附加请求参数的问题；合法（含留空）时返回 null */
+export function extraParamsError(text: string): string | null {
+  if (text.trim() === '') return null
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return '不是合法的 JSON'
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return '要写成 JSON 对象，例如 {"top_p": 0.9}'
+  }
+  const reserved = Object.keys(parsed).filter((k) => RESERVED_REQUEST_KEYS.includes(k))
+  if (reserved.length > 0) return `不能包含 ${reserved.join('、')}：这些由应用自己填`
+  return null
+}
+
+/** 附加请求参数 → 对象。留空或不合法时给空对象（保存与读配置时都已校验过，正常路径走不到不合法） */
+export function parseExtraParams(text: string): Record<string, unknown> {
+  if (extraParamsError(text) !== null || text.trim() === '') return {}
+  return JSON.parse(text) as Record<string, unknown>
+}
+
 export type ConfigErrors = Partial<Record<keyof AppConfig, string>>
 
 /** 保存前的校验。返回空对象表示全部合法 */
@@ -202,6 +260,8 @@ export function validateConfig(cfg: AppConfig): ConfigErrors {
   if (mainOrder !== null) errors.promptOrder = mainOrder
   const charOrder = fieldOrderError(CHARACTER_FIELDS, cfg.naiCharPromptOrder)
   if (charOrder !== null) errors.naiCharPromptOrder = charOrder
+  const extra = extraParamsError(cfg.openaiExtraParams)
+  if (extra !== null) errors.openaiExtraParams = extra
   const proxy = parseProxyRules(cfg.proxy)
   if (!proxy.ok) errors.proxy = proxy.message
   return errors
@@ -231,6 +291,9 @@ export function mergeConfig(stored: unknown): AppConfig {
   if (!API_TYPES.includes(cfg.apiType)) cfg.apiType = base.apiType
   if (!THINKING_FORMATS.includes(cfg.thinkingFormat)) cfg.thinkingFormat = base.thinkingFormat
   if (!THINKING_EFFORTS.includes(cfg.thinkingEffort)) cfg.thinkingEffort = base.thinkingEffort
+  if (!OPENAI_REASONING_DIALECTS.includes(cfg.openaiReasoningDialect)) cfg.openaiReasoningDialect = base.openaiReasoningDialect
+  if (!OPENAI_REASONING_EFFORTS.includes(cfg.openaiReasoningEffort)) cfg.openaiReasoningEffort = base.openaiReasoningEffort
+  if (extraParamsError(cfg.openaiExtraParams) !== null) cfg.openaiExtraParams = base.openaiExtraParams
   for (const key of Object.keys(NUMBER_RULES) as NumericKey[]) {
     if (numberRuleError(NUMBER_RULES[key], cfg[key]) !== null) cfg[key] = base[key]
   }

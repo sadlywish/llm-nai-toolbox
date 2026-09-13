@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'rea
 import {
   API_TYPES,
   NUMBER_RULES,
+  OPENAI_REASONING_DIALECTS,
+  OPENAI_REASONING_EFFORTS,
   RESTORABLE_KEYS,
   THINKING_EFFORTS,
   THINKING_FORMATS,
@@ -9,6 +11,8 @@ import {
   validateConfig,
   type AppConfig,
   type NumericKey,
+  type OpenAIReasoningDialect,
+  type OpenAIReasoningEffort,
 } from '@shared/config'
 import { useConfig } from '../state/config'
 
@@ -24,6 +28,12 @@ const API_TYPE_LABELS: Record<AppConfig['apiType'], string> = { claude: 'Claude'
 const THINKING_FORMAT_LABELS: Record<AppConfig['thinkingFormat'], string> = {
   adaptive: 'adaptive（按力度）',
   budget: 'budget（按预算）',
+}
+const OPENAI_DIALECT_LABELS: Record<OpenAIReasoningDialect, string> = {
+  reasoning_effort: 'reasoning_effort（OpenAI / Gemini / xAI / vLLM）',
+  reasoning_object: 'reasoning 对象（OpenRouter）',
+  thinking_object: 'thinking 对象（DeepSeek / 智谱 / Kimi）',
+  enable_thinking: 'enable_thinking（通义千问）',
 }
 
 function numericTextFrom(cfg: AppConfig): Record<NumericKey, string> {
@@ -122,6 +132,14 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
   }
   const hasErrors = Object.keys(errors).length > 0
 
+  const openaiUsesBudget = draft.openaiReasoningDialect === 'reasoning_object' || draft.openaiReasoningDialect === 'enable_thinking'
+  // thinking 对象只发 {type: enabled}（智谱、Kimi 不认力度字段）；enable_thinking 是开关加预算；
+  // OpenRouter 的 effort 与 max_tokens 二选一，填了预算就不再发力度
+  const openaiEffortDisabled =
+    draft.openaiReasoningDialect === 'thinking_object' ||
+    draft.openaiReasoningDialect === 'enable_thinking' ||
+    (draft.openaiReasoningDialect === 'reasoning_object' && draft.openaiReasoningBudget > 0)
+
   function setThinkingFormat(value: AppConfig['thinkingFormat']): void {
     // 预算 token 框在非 budget 格式下会置灰（见下面 numberField 的 disabled）。
     // 一个置灰、用户碰不到的框不能继续攥着一个非法值挡住保存，所以切走 budget
@@ -131,6 +149,32 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
       set('thinkingBudgetTokens', config.thinkingBudgetTokens)
     }
     set('thinkingFormat', value)
+  }
+
+  function setApiType(value: AppConfig['apiType']): void {
+    // 切换接口类型后，另一种接口专属的输入框会被藏起来。藏起来的框不能攥着一个非法值
+    // 挡住保存（用户已经看不见它了），所以把那些有错的项退回上次保存的值——那个值必然合法
+    if (value === 'claude') {
+      if (errors.openaiExtraParams !== undefined) set('openaiExtraParams', config.openaiExtraParams)
+      if (errors.openaiReasoningBudget !== undefined) {
+        setNumericText((t) => ({ ...t, openaiReasoningBudget: String(config.openaiReasoningBudget) }))
+        set('openaiReasoningBudget', config.openaiReasoningBudget)
+      }
+    } else if (errors.thinkingBudgetTokens !== undefined) {
+      setNumericText((t) => ({ ...t, thinkingBudgetTokens: String(config.thinkingBudgetTokens) }))
+      set('thinkingBudgetTokens', config.thinkingBudgetTokens)
+    }
+    set('apiType', value)
+  }
+
+  function setOpenaiDialect(value: OpenAIReasoningDialect): void {
+    // 与 setThinkingFormat 同理：切到用不上预算的写法时，置灰的预算框不能攥着非法值
+    const usesBudget = value === 'reasoning_object' || value === 'enable_thinking'
+    if (!usesBudget && errors.openaiReasoningBudget !== undefined) {
+      setNumericText((t) => ({ ...t, openaiReasoningBudget: String(config.openaiReasoningBudget) }))
+      set('openaiReasoningBudget', config.openaiReasoningBudget)
+    }
+    set('openaiReasoningDialect', value)
   }
 
   async function handleSubmit(e: FormEvent): Promise<void> {
@@ -240,7 +284,7 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
               <div className="two-col">
                 <label className="field">
                   <span>接口类型</span>
-                  <select value={draft.apiType} onChange={(e) => set('apiType', e.target.value as AppConfig['apiType'])}>
+                  <select value={draft.apiType} onChange={(e) => setApiType(e.target.value as AppConfig['apiType'])}>
                     {API_TYPES.map((t) => (
                       <option key={t} value={t}>
                         {API_TYPE_LABELS[t]}
@@ -265,42 +309,101 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
                 {numberField('maxTokens', '最大输出 token')}
                 {numberField('requestTimeoutSec', '请求超时（秒）')}
               </div>
+              {draft.apiType === 'openai' && (
+                <label className="field">
+                  <span>附加请求参数（JSON）</span>
+                  <textarea
+                    rows={3}
+                    spellCheck={false}
+                    value={draft.openaiExtraParams}
+                    placeholder={'{"top_p": 0.9}'}
+                    onChange={(e) => set('openaiExtraParams', e.target.value)}
+                  />
+                  <span className="field-hint">原样合并进请求体，同名字段以这里为准</span>
+                  {errorOf('openaiExtraParams')}
+                </label>
+              )}
             </Group>
 
             <Group title="思维链">
               {checkField('thinkingEnabled', '开启')}
-              <div className="two-col">
-                <label className="field">
-                  <span>格式</span>
-                  <select
-                    value={draft.thinkingFormat}
-                    onChange={(e) => setThinkingFormat(e.target.value as AppConfig['thinkingFormat'])}
-                  >
-                    {THINKING_FORMATS.map((f) => (
-                      <option key={f} value={f}>
-                        {THINKING_FORMAT_LABELS[f]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span>力度</span>
-                  <select
-                    value={draft.thinkingEffort}
-                    onChange={(e) => set('thinkingEffort', e.target.value as AppConfig['thinkingEffort'])}
-                  >
-                    {THINKING_EFFORTS.map((f) => (
-                      <option key={f} value={f}>
-                        {f}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              {numberField('thinkingBudgetTokens', '预算 token', {
-                disabled: draft.thinkingFormat !== 'budget',
-                hint: '仅 budget 格式使用；须 ≥1024 且小于最大输出 token，超出会自动收敛并告警',
-              })}
+              {draft.apiType === 'claude' ? (
+                <>
+                  <div className="two-col">
+                    <label className="field">
+                      <span>格式</span>
+                      <select
+                        value={draft.thinkingFormat}
+                        onChange={(e) => setThinkingFormat(e.target.value as AppConfig['thinkingFormat'])}
+                      >
+                        {THINKING_FORMATS.map((f) => (
+                          <option key={f} value={f}>
+                            {THINKING_FORMAT_LABELS[f]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>力度</span>
+                      <select
+                        value={draft.thinkingEffort}
+                        onChange={(e) => set('thinkingEffort', e.target.value as AppConfig['thinkingEffort'])}
+                      >
+                        {THINKING_EFFORTS.map((f) => (
+                          <option key={f} value={f}>
+                            {f}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  {numberField('thinkingBudgetTokens', '预算 token', {
+                    disabled: draft.thinkingFormat !== 'budget',
+                    hint: '仅 budget 格式使用；须 ≥1024 且小于最大输出 token，超出会自动收敛并告警',
+                  })}
+                </>
+              ) : (
+                <>
+                  <label className="field">
+                    <span>参数写法</span>
+                    <select
+                      value={draft.openaiReasoningDialect}
+                      onChange={(e) => setOpenaiDialect(e.target.value as OpenAIReasoningDialect)}
+                    >
+                      {OPENAI_REASONING_DIALECTS.map((d) => (
+                        <option key={d} value={d}>
+                          {OPENAI_DIALECT_LABELS[d]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="two-col">
+                    <label className={`field ${openaiEffortDisabled ? 'is-disabled' : ''}`}>
+                      <span>力度</span>
+                      <select
+                        value={draft.openaiReasoningEffort}
+                        disabled={openaiEffortDisabled}
+                        onChange={(e) => set('openaiReasoningEffort', e.target.value as OpenAIReasoningEffort)}
+                      >
+                        {OPENAI_REASONING_EFFORTS.map((f) => (
+                          <option key={f} value={f}>
+                            {f}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {numberField('openaiReasoningBudget', '预算 token', {
+                      disabled: !openaiUsesBudget,
+                      hint: '0 = 不发预算；仅 OpenRouter、通义千问的写法使用',
+                    })}
+                  </div>
+                  {draft.openaiReasoningDialect === 'thinking_object' && (
+                    <span className="field-hint">
+                      {'DeepSeek 要调力度时，在「附加请求参数」里写 {"thinking": {"type": "enabled", "reasoning_effort": "max"}}'}
+                    </span>
+                  )}
+                </>
+              )}
             </Group>
 
             <Group title="提示词">

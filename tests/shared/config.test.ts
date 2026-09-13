@@ -3,7 +3,9 @@ import {
   NUMBER_RULES,
   RESTORABLE_KEYS,
   defaultAppConfig,
+  extraParamsError,
   mergeConfig,
+  parseExtraParams,
   validateConfig,
   type AppConfig,
 } from '@shared/config'
@@ -166,5 +168,48 @@ describe('RESTORABLE_KEYS', () => {
         'tailInjection',
       ].sort(),
     )
+  })
+})
+
+describe('OpenAI 兼容接口的思维链与附加参数', () => {
+  it('默认值：reasoning_effort 写法、high、不发预算、没有附加参数', () => {
+    const cfg = defaultAppConfig()
+    expect(cfg.openaiReasoningDialect).toBe('reasoning_effort')
+    expect(cfg.openaiReasoningEffort).toBe('high')
+    expect(cfg.openaiReasoningBudget).toBe(0)
+    expect(cfg.openaiExtraParams).toBe('')
+  })
+
+  it('extraParamsError：留空合法；要是 JSON 对象；不许覆盖应用自己组装的键', () => {
+    expect(extraParamsError('  ')).toBeNull()
+    expect(extraParamsError('{"top_p": 0.9}')).toBeNull()
+    expect(extraParamsError('{top_p: 0.9}')).toBe('不是合法的 JSON')
+    expect(extraParamsError('[1]')).toBe('要写成 JSON 对象，例如 {"top_p": 0.9}')
+    expect(extraParamsError('{"model": "x", "stream": true, "top_p": 1}')).toBe('不能包含 model、stream：这些由应用自己填')
+  })
+
+  it('parseExtraParams：合法时给对象，留空或不合法时给空对象', () => {
+    expect(parseExtraParams('{"thinking": {"type": "enabled"}}')).toEqual({ thinking: { type: 'enabled' } })
+    expect(parseExtraParams('')).toEqual({})
+    expect(parseExtraParams('{bad')).toEqual({})
+  })
+
+  it('validateConfig 报附加参数的错；预算允许 0、不许负数', () => {
+    expect(validateConfig({ ...defaultAppConfig(), openaiExtraParams: '[1]' }).openaiExtraParams).toBeDefined()
+    expect(validateConfig({ ...defaultAppConfig(), openaiReasoningBudget: 0 }).openaiReasoningBudget).toBeUndefined()
+    expect(validateConfig({ ...defaultAppConfig(), openaiReasoningBudget: -1 }).openaiReasoningBudget).toBe('不能小于 0')
+  })
+
+  it('mergeConfig：写法与力度不在枚举里、附加参数不合法时回默认值；合法值原样保留', () => {
+    const bad = mergeConfig({ openaiReasoningDialect: 'x', openaiReasoningEffort: 'ultra', openaiExtraParams: '{bad' })
+    expect(bad.openaiReasoningDialect).toBe('reasoning_effort')
+    expect(bad.openaiReasoningEffort).toBe('high')
+    expect(bad.openaiExtraParams).toBe('')
+    const good = mergeConfig({ openaiReasoningDialect: 'thinking_object', openaiReasoningEffort: 'max', openaiExtraParams: '{"top_p": 1}' })
+    expect([good.openaiReasoningDialect, good.openaiReasoningEffort, good.openaiExtraParams]).toEqual([
+      'thinking_object',
+      'max',
+      '{"top_p": 1}',
+    ])
   })
 })
