@@ -47,6 +47,8 @@ void app.whenReady().then(() => {
     // 开发态 app.getAppPath() 就是项目根；打包后是 asar 路径，
     // 那种形态用不到 appRoot（见 resolveTagdbDir）。
     appRoot: app.getAppPath(),
+    // %APPDATA%\llm-nai-toolbox（名字取自 package.json 的 name），规格 §2.1
+    userDataDir: app.getPath('userData'),
   })
   createWindow()
   app.on('activate', () => {

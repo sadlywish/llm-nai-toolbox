@@ -1,10 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import {
   IPC,
+  type ConfigLoadResult,
+  type ConfigSaveInput,
   type TagdbCompleteInput,
   type TagdbCompleteResult,
   type TagdbStatus,
 } from '@shared/ipc'
+import type { Workspace } from '@shared/workspace'
 
 const api = {
   appVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
@@ -20,6 +23,17 @@ const api = {
     ipcRenderer.on(IPC.tagdbStatus, handler)
     return () => ipcRenderer.off(IPC.tagdbStatus, handler)
   },
+
+  loadConfig: (): Promise<ConfigLoadResult> => ipcRenderer.invoke(IPC.configLoad),
+
+  saveConfig: (input: ConfigSaveInput): Promise<void> => ipcRenderer.invoke(IPC.configSave, input),
+
+  loadWorkspace: (): Promise<Workspace> => ipcRenderer.invoke(IPC.workspaceLoad),
+
+  saveWorkspace: (ws: Workspace): Promise<void> => ipcRenderer.invoke(IPC.workspaceSave, ws),
+
+  /** 同步写盘，只给关窗前的 beforeunload 用：那时异步 invoke 来不及返回 */
+  flushWorkspace: (ws: Workspace): boolean => ipcRenderer.sendSync(IPC.workspaceFlush, ws),
 }
 
 contextBridge.exposeInMainWorld('api', api)

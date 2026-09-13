@@ -1,5 +1,17 @@
-import { BrowserWindow, ipcMain } from 'electron'
-import { IPC, type TagdbCompleteInput } from '@shared/ipc'
+import { join } from 'path'
+import { BrowserWindow, ipcMain, safeStorage } from 'electron'
+import { mergeConfig, validateConfig } from '@shared/config'
+import {
+  IPC,
+  type ConfigLoadResult,
+  type ConfigSaveInput,
+  type TagdbCompleteInput,
+} from '@shared/ipc'
+import { normalizeWorkspace } from '@shared/workspace'
+import { ConfigStore } from './config-store'
+import { applyProxy } from './net'
+import { SecretStore, type SecretCrypto } from './secret-store'
+import { JsonStore } from './store'
 import { COMPLETION_PREFERS, completeFrom } from './tagdb/complete'
 import { TagdbLoader } from './tagdb/loader'
 import { resolveTagdbDir } from './tagdb/paths'
@@ -29,13 +41,71 @@ import { resolveTagdbDir } from './tagdb/paths'
 // 是哪条契约说清楚。
 let registered = false
 
+/**
+ * 生产环境的加密实现：Electron 的 safeStorage，Windows 下即 DPAPI，
+ * 加密绑定当前系统用户。换机器后旧密文解不开，SecretStore 当作未设置。
+ */
+const electronCrypto: SecretCrypto = {
+  encrypt: (plain) => safeStorage.encryptString(plain).toString('base64'),
+  decrypt: (cipher) => safeStorage.decryptString(Buffer.from(cipher, 'base64')),
+}
+
 export function registerIpc(
-  appInfo: { isPackaged: boolean; resourcesPath: string; appRoot: string },
+  appInfo: { isPackaged: boolean; resourcesPath: string; appRoot: string; userDataDir: string },
 ): void {
   if (registered) {
     throw new Error('registerIpc 只能在整个应用生命周期里调用一次，见函数注释')
   }
   registered = true
+
+  const configStore = new ConfigStore(appInfo.userDataDir)
+  const secrets = new SecretStore(appInfo.userDataDir, electronCrypto)
+  // 读进来的形状不可信，一律交给 normalizeWorkspace，所以这里存 unknown
+  const workspaceStore = new JsonStore<unknown>(join(appInfo.userDataDir, 'workspace.json'), () => null)
+
+  // 代理必须在任何请求之前生效。不 await：窗口先出来，setProxy 只影响后续请求
+  void applyProxy(configStore.read().proxy).then((r) => {
+    if (!r.ok) console.warn('[proxy]', r.message)
+  })
+
+  ipcMain.handle(
+    IPC.configLoad,
+    (): ConfigLoadResult => ({
+      config: configStore.read(),
+      hasLlmApiKey: secrets.read('llmApiKey') !== '',
+      configExists: configStore.exists(),
+    }),
+  )
+
+  ipcMain.handle(IPC.configSave, (_e, input: ConfigSaveInput) => {
+    // IPC 边界不能假定调用方守规矩：先判过再解构
+    if (typeof input !== 'object' || input === null) throw new Error('config:save 入参无效')
+    const config = mergeConfig(input.config)
+    const errors = Object.values(validateConfig(config))
+    if (errors.length > 0) throw new Error(`配置不合法：${errors.join('；')}`)
+    configStore.write(config)
+    if (typeof input.llmApiKey === 'string') secrets.write('llmApiKey', input.llmApiKey)
+    // 代理是 session 级设置，改了立刻重新应用，否则就是「填了要重启才生效」
+    void applyProxy(config.proxy).then((r) => {
+      if (!r.ok) console.warn('[proxy]', r.message)
+    })
+  })
+
+  ipcMain.handle(IPC.workspaceLoad, () => normalizeWorkspace(workspaceStore.read()))
+
+  ipcMain.handle(IPC.workspaceSave, (_e, ws: unknown) => {
+    workspaceStore.write(normalizeWorkspace(ws))
+  })
+
+  ipcMain.on(IPC.workspaceFlush, (event, ws: unknown) => {
+    try {
+      workspaceStore.write(normalizeWorkspace(ws))
+      event.returnValue = true
+    } catch {
+      // 每条路径都必须给 returnValue 赋值，否则渲染进程会一直阻塞在 sendSync 上
+      event.returnValue = false
+    }
+  })
 
   const dir = resolveTagdbDir(appInfo)
 
