@@ -24,7 +24,7 @@ llm-nai-toolbox 的架构与关键取舍。使用方法见 [README](../README.md
 |---|---|
 | `main/net.ts` | `appFetch`（`net.fetch`）与代理应用；主进程所有外部请求都走它 |
 | `main/store.ts` · `config-store.ts` · `secret-store.ts` | `workspace.json` / `styles.json` / `config.json` / `secrets.json` 的原子读写；密钥用 `safeStorage` 加密 |
-| `renderer/components/` | 指令区与日志区、提示词面板、参数区、角色面板、画风维护、设置抽屉——布局与交互照画师串工具箱与已确认的界面稿 |
+| `renderer/components/` | 指令区（固定在窗口底部）与日志抽屉（从指令区向上展开）、提示词面板、参数区、角色面板、画风维护、设置抽屉——布局与交互照画师串工具箱与已确认的界面稿 |
 | `main/nai/` | 出图、PNG 元数据、zip 解包、落盘记账 |
 | `main/danbooru/` | 只服务右侧 WIKI 区 |
 | `main/tagdb/` | 本地标签库：索引加载与补全、LLM 工具数据的惰性加载、分类浏览、释义与废弃表、角色特征、搜索结果格式化 |

@@ -35,7 +35,9 @@ body {
 .app-title { font-weight: 600; }
 .app-version { color: var(--ink-faint); font-size: 12px; }
 
-.workarea { display: flex; flex-direction: column; gap: 12px; padding: 12px; overflow: auto; }
+/* 指令区以上的部分（顶栏、提示条、工作区）。日志抽屉的遮罩只盖这里，底部指令区不被盖住 */
+.stage { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.workarea { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 12px; overflow: auto; }
 
 .pane { border: 1px solid var(--line); border-radius: 6px; background: var(--panel); overflow: hidden; }
 
@@ -327,9 +329,17 @@ body {
 .btn-primary { background: var(--accent); border-color: var(--accent); color: #0b1b2b; font-weight: 600; }
 .btn-danger { border-color: hsl(4 70% 45%); color: #ffb3ae; }
 .btn:disabled { opacity: .45; cursor: default; }
+.btn-sm { padding: 0 10px; font-size: 12.5px; }
 
-/* ── LLM 指令区（界面稿 2026-09-13-llm-console-mockup.html 第 3 版） ── */
-.ask2 { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+/* ── LLM 指令区：固定在窗口底部（界面稿 2026-09-14-llm-console-drawer-mockup.html 第 4 版） ── */
+.llm-dock { flex-shrink: 0; border-top: 1px solid var(--line); background: var(--panel); }
+.llm-dock .pane-bar { justify-content: flex-start; gap: 10px; }
+.llm-dock .pane-bar .grow { flex: 1; }
+.state-running { color: var(--accent); }
+.state-ok { color: var(--ok); }
+.state-bad { color: var(--danger); }
+.state-stop { color: var(--warn); }
+.ask2 { padding: 8px 12px 10px; display: flex; flex-direction: column; gap: 8px; }
 .ask2 textarea { resize: none; height: 54px; background: #15181c; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); font: inherit; font-size: 14px; line-height: 1.6; padding: 6px 9px; }
 .ask2 textarea:focus { outline: none; border-color: var(--accent); }
 .opts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: 13px; color: var(--ink-dim); }
@@ -338,17 +348,15 @@ body {
 .opts .grow { flex: 1; }
 .opts .hint { font-size: 12px; color: var(--ink-faint); }
 
-/* ── LLM 日志区 ───────────────────────────────────────────── */
-.console { border-top: 1px solid var(--line); }
-.con-head { display: flex; align-items: center; gap: 10px; padding: 6px 12px; font-size: 13px; color: var(--ink-dim); background: #1a1d22; border-bottom: 1px solid var(--line); }
-.con-head .grow { flex: 1; }
-.con-head .state-running { color: var(--accent); }
-.con-head .state-ok { color: var(--ok); }
-.con-head .state-bad { color: var(--danger); }
-.con-head .state-stop { color: var(--warn); }
+/* ── LLM 日志抽屉：贴着指令区顶边向上展开 ─────────────────── */
+/* z-index 低于设置抽屉（10）：两个都开着时设置抽屉在上 */
+.log-backdrop { position: absolute; inset: 0; z-index: 9; background: rgba(0, 0, 0, .45); display: flex; flex-direction: column; justify-content: flex-end; }
+.log-drawer { height: 60%; display: flex; flex-direction: column; background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -8px 24px rgba(0, 0, 0, .35); }
+.log-drawer-head { display: flex; align-items: center; gap: 10px; padding: 6px 12px; font-size: 13px; color: var(--ink-dim); background: #1a1d22; border-bottom: 1px solid var(--line); }
+.log-drawer-head .grow { flex: 1; }
 .spin { display: inline-block; width: 10px; height: 10px; border: 2px solid var(--accent); border-right-color: transparent; border-radius: 50%; margin-right: 6px; vertical-align: -1px; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.log { max-height: 290px; overflow: auto; padding: 6px 12px; background: #121418; font-family: var(--mono); font-size: 13px; line-height: 1.65; }
+.log { flex: 1; min-height: 0; overflow: auto; padding: 6px 12px; background: #121418; font-family: var(--mono); font-size: 13px; line-height: 1.65; }
 /* 悬挂缩进：折行后的续行对齐到正文，不钻到时间戳下面。13.2ch ≈ "12:30:09 [I] " */
 .ln { white-space: pre-wrap; word-break: break-all; padding-left: 13.2ch; text-indent: -13.2ch; color: var(--ink); }
 .ln .t { color: var(--ink-faint); }

@@ -187,6 +187,46 @@ describe('useLlm', () => {
     expect(state().phase).toEqual({ kind: 'idle' })
   })
 
+  it('日志抽屉：发送时自动打开；可手动收起、再打开', () => {
+    expect(state().logOpen).toBe(false)
+    void state().run(input, vi.fn())
+    expect(state().logOpen).toBe(true)
+    state().closeLog()
+    expect(state().logOpen).toBe(false)
+    state().openLog()
+    expect(state().logOpen).toBe(true)
+  })
+
+  it('日志抽屉：运行中再 run 被忽略时不改抽屉', () => {
+    void state().run(input, vi.fn())
+    state().closeLog()
+    void state().run(input, vi.fn())
+    expect(state().logOpen).toBe(false)
+  })
+
+  it('日志抽屉：回填成功后自动收起——接下来要去操作参数区', () => {
+    void state().run(input, vi.fn())
+    state().handleEvent({ kind: 'finished', result: filled })
+    expect(state().logOpen).toBe(false)
+  })
+
+  it('日志抽屉：没有回填的结束保持原样——原因在日志里', () => {
+    for (const result of [noParams, { status: 'failed', rounds: 1, elapsedMs: 1, message: 'x' }, { status: 'aborted', rounds: 1, elapsedMs: 1 }] as LlmRunResult[]) {
+      void state().run(input, vi.fn())
+      state().handleEvent({ kind: 'finished', result })
+      expect(state().logOpen).toBe(true)
+    }
+  })
+
+  it('日志抽屉：清空后收起；运行中清空无效时也不收起', () => {
+    void state().run(input, vi.fn())
+    state().clear()
+    expect(state().logOpen).toBe(true)
+    state().handleEvent({ kind: 'finished', result: noParams })
+    state().clear()
+    expect(state().logOpen).toBe(false)
+  })
+
   it('initLlmEvents 订阅事件交给 handleEvent，返回退订函数', () => {
     const off = vi.fn()
     api.onLlmEvent.mockReturnValue(off)

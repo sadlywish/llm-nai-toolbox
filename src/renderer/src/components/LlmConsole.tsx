@@ -1,11 +1,11 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo } from 'react'
 import { applyFill } from '@shared/applyFill'
 import type { ApiType, AppConfig } from '@shared/config'
 import { buildRunInput, presetSelectionStale, selectStyleMode } from '@shared/consoleRun'
 import { MULTI_CHARACTER_MODES, type MultiCharacterMode } from '@shared/llm'
 import { usableStyles, type StylePreset } from '@shared/styles'
 import type { ConsoleOptions, StyleMode, Workspace } from '@shared/workspace'
-import { statusText, statusTone, useLlm, type ConsoleLine } from '../state/llm'
+import { statusText, statusTone, useLlm } from '../state/llm'
 
 interface Props {
   workspace: Workspace
@@ -30,28 +30,24 @@ const STYLE_MODES: readonly StyleMode[] = ['none', 'preset', 'current']
 /** 预设下拉末尾「去维护画风…」的取值；预设 id 由 newId 生成，不会撞上 */
 const OPEN_STYLES = '__open_styles__'
 
-function lineClass(line: ConsoleLine): string {
-  if (line.ok === true) return 'ln ok'
-  if (line.level === 'W') return 'ln w'
-  if (line.level === 'E') return 'ln e'
-  return 'ln'
-}
-
 /**
- * 指令区 + 日志区。界面稿：docs/superpowers/specs/2026-09-13-llm-console-mockup.html（第 3 版）。
+ * 指令区，固定在窗口底部。日志在 LlmLogDrawer 里，从这里的顶边向上展开。
+ * 界面稿：docs/superpowers/specs/2026-09-14-llm-console-drawer-mockup.html（第 4 版；控件与文案同第 3 版）。
  * 指令区的输入与开关都存在工作区里（workspace.console），随工作区保存。
  */
 export default function LlmConsole({ workspace, config, presets, update, onOpenStyles }: Props): JSX.Element {
   const phase = useLlm((s) => s.phase)
-  const lines = useLlm((s) => s.lines)
+  const hasLog = useLlm((s) => s.phase.kind !== 'idle' || s.lines.length > 0)
+  const logOpen = useLlm((s) => s.logOpen)
   const run = useLlm((s) => s.run)
   const abort = useLlm((s) => s.abort)
-  const clear = useLlm((s) => s.clear)
+  const openLog = useLlm((s) => s.openLog)
 
   const opts = workspace.console
   const running = phase.kind === 'running'
   const usable = useMemo(() => usableStyles(presets ?? []), [presets])
   const tone = statusTone(phase)
+  const status = statusText(phase)
 
   // 选着的预设被删掉或清空时，画风退回「不覆盖」。预设还没载入时不判断，免得启动时误退
   useEffect(() => {
@@ -62,14 +58,6 @@ export default function LlmConsole({ workspace, config, presets, update, onOpenS
     }
   }, [presets, opts, update])
 
-  // 日志贴着底部时跟着新行滚；往上翻着看的时候不打扰
-  const logRef = useRef<HTMLDivElement>(null)
-  const stickToBottom = useRef(true)
-  useLayoutEffect(() => {
-    const el = logRef.current
-    if (el !== null && stickToBottom.current) el.scrollTop = el.scrollHeight
-  }, [lines])
-
   function setOption<K extends keyof ConsoleOptions>(key: K, value: ConsoleOptions[K]): void {
     update((ws) => {
       ws.console[key] = value
@@ -78,15 +66,31 @@ export default function LlmConsole({ workspace, config, presets, update, onOpenS
 
   function send(): void {
     if (running) return
-    stickToBottom.current = true
     // update 是 store 的稳定引用：这一轮跑完时即使切到了画风维护视图，回填照样写进工作区
     void run(buildRunInput(workspace, presets ?? []), (fill) => update((ws) => applyFill(ws, fill)))
   }
 
   return (
-    <section className="pane llm-console">
+    <section className="llm-dock">
       <div className="pane-bar">
         <span>LLM</span>
+        {status !== '' && (
+          <span className={`llm-status${tone === null ? '' : ` state-${tone}`}`}>
+            {running && <span className="spin" />}
+            {status}
+          </span>
+        )}
+        {hasLog && !logOpen && (
+          <button type="button" className="link-button" onClick={openLog}>
+            查看日志
+          </button>
+        )}
+        {running && (
+          <button type="button" className="btn btn-danger btn-sm" onClick={abort}>
+            中止
+          </button>
+        )}
+        <span className="grow" />
         <span>
           {API_LABELS[config.apiType]} · {config.model}
         </span>
@@ -185,41 +189,6 @@ export default function LlmConsole({ workspace, config, presets, update, onOpenS
           </button>
         </div>
       </div>
-
-      {(phase.kind !== 'idle' || lines.length > 0) && (
-        <div className="console">
-          <div className="con-head">
-            <span className={tone === null ? undefined : `state-${tone}`}>
-              {running && <span className="spin" />}
-              {statusText(phase)}
-            </span>
-            <span className="grow" />
-            {running ? (
-              <button type="button" className="btn btn-danger" onClick={abort}>
-                中止
-              </button>
-            ) : (
-              <button type="button" className="btn" onClick={clear}>
-                清空
-              </button>
-            )}
-          </div>
-          <div
-            className="log"
-            ref={logRef}
-            onScroll={(e) => {
-              const el = e.currentTarget
-              stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 8
-            }}
-          >
-            {lines.map((line) => (
-              <div key={line.seq} className={lineClass(line)}>
-                <span className="t">{line.time}</span> <span className="lv">[{line.level}]</span> {line.text}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </section>
   )
 }

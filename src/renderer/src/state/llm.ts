@@ -70,20 +70,26 @@ function ipcErrorMessage(err: unknown): string {
 interface LlmState {
   phase: ConsolePhase
   lines: ConsoleLine[]
+  /** 日志抽屉（从指令区顶边向上展开）是否打开。界面稿第 4 版 */
+  logOpen: boolean
   run: (input: LlmRunInput, onFilled: (fill: FillResult) => void) => Promise<void>
   handleEvent: (e: LlmEvent) => void
   abort: () => void
   clear: () => void
+  openLog: () => void
+  closeLog: () => void
 }
 
 export const useLlm = create<LlmState>((set, get) => ({
   phase: { kind: 'idle' },
   lines: [],
+  logOpen: false,
 
   run: async (input, onFilled) => {
     if (get().phase.kind === 'running') return
     pendingFill = onFilled
-    set({ phase: { kind: 'running', round: 0, maxRounds: 0 } })
+    // 发送即打开日志抽屉
+    set({ phase: { kind: 'running', round: 0, maxRounds: 0 }, logOpen: true })
     try {
       // 结果不从返回值取：结束经 finished 事件送达，和日志同一条通道，先后有保证
       await window.api.llmRun(input)
@@ -118,7 +124,8 @@ export const useLlm = create<LlmState>((set, get) => ({
     if (e.result.status === 'filled' && onFilled !== null) {
       onFilled(e.result.fill)
       const line = makeLine({ time: clockText(new Date()), level: 'I', text: fillSummary(e.result.fill) }, true)
-      set((s) => ({ lines: appendCapped(s.lines, line) }))
+      // 回填成功就收起抽屉：接下来要去操作参数区。没有回填的结束不动抽屉——原因在日志里
+      set((s) => ({ lines: appendCapped(s.lines, line), logOpen: false }))
     }
   },
 
@@ -128,8 +135,12 @@ export const useLlm = create<LlmState>((set, get) => ({
 
   clear: () => {
     if (get().phase.kind === 'running') return
-    set({ phase: { kind: 'idle' }, lines: [] })
+    set({ phase: { kind: 'idle' }, lines: [], logOpen: false })
   },
+
+  openLog: () => set({ logOpen: true }),
+
+  closeLog: () => set({ logOpen: false }),
 }))
 
 /** 订阅主进程推来的 llm:event，返回退订函数。由 App 挂载时调用 */
