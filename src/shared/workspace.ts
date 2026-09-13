@@ -1,0 +1,165 @@
+import { emptyValues, sanitizeFieldText, type FieldValues } from './blockDoc'
+import { CHARACTER_FIELDS, MAIN_FIELDS, type FieldSpec } from './fields'
+import { newId } from './ids'
+
+/** seed 分配策略：每张随机，或固定用参数区里的 seed */
+export type SeedMode = 'fixed' | 'perImage'
+
+export interface GenParams {
+  model: string
+  width: number
+  height: number
+  steps: number
+  /** Guidance / CFG */
+  scale: number
+  sampler: string
+  noiseSchedule: string
+  cfgRescale: number
+  ucPreset: number
+  qualityToggle: boolean
+  varietyBoost: boolean
+  /** perImage 模式下该值不参与计算，仅用于展示与回填 */
+  seed: number
+  seedMode: SeedMode
+  transparentBackground: boolean
+}
+
+export interface CharacterPrompt {
+  id: string
+  /** 是否参与本轮生成 */
+  enabled: boolean
+  /** 角色的五项提示词字段（CHARACTER_FIELDS），由分块编辑器编辑 */
+  fields: FieldValues
+  negative: string
+  /** 自由坐标 "0.3,0.5" 或 5×5 网格 "B3"，留空即居中 */
+  position: string
+}
+
+/**
+ * 当前工作状态（workspace.json）。
+ *
+ * `text` 是画面内文字：它在提示词拼接完成之后才接到末尾，提示词排序里没有
+ * 它的位置，所以不在 main 的字段里，单独一项。
+ */
+export interface Workspace {
+  main: FieldValues
+  text: string
+  negative: string
+  params: GenParams
+  characters: CharacterPrompt[]
+  /** 角色坐标是否发送给 NAI；关闭时由模型安排位置 */
+  useCoords: boolean
+}
+
+/**
+ * 默认生成参数，照插件 NovelAI 配置的默认值。宽高是插件默认像素上限
+ * 1024×1024 按 1:1 换算的结果。每次新建对象。
+ */
+export function defaultGenParams(): GenParams {
+  return {
+    model: 'nai-diffusion-5-full',
+    width: 1024,
+    height: 1024,
+    steps: 28,
+    scale: 5,
+    sampler: 'k_euler_ancestral',
+    noiseSchedule: 'karras',
+    cfgRescale: 0,
+    ucPreset: 0,
+    qualityToggle: true,
+    varietyBoost: false,
+    seed: -1,
+    seedMode: 'perImage',
+    transparentBackground: false,
+  }
+}
+
+export function createCharacter(): CharacterPrompt {
+  return {
+    id: newId('ch'),
+    enabled: true,
+    fields: emptyValues(CHARACTER_FIELDS),
+    negative: '',
+    position: '',
+  }
+}
+
+export function emptyWorkspace(): Workspace {
+  return {
+    main: emptyValues(MAIN_FIELDS),
+    text: '',
+    negative: '',
+    params: defaultGenParams(),
+    characters: [],
+    useCoords: false,
+  }
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v)
+}
+
+const str = (v: unknown): string => (typeof v === 'string' ? v : '')
+
+/**
+ * 字段值只认字段集里有的名字；值里的换行与分隔符剥掉——分块文档必须是
+ * 单行（见 blockDoc.ts），手改出来的换行会让装饰整片消失。
+ */
+function normalizeValues(raw: unknown, specs: readonly FieldSpec[]): FieldValues {
+  const out = emptyValues(specs)
+  if (!isRecord(raw)) return out
+  for (const spec of specs) out[spec.name] = sanitizeFieldText(str(raw[spec.name]))
+  return out
+}
+
+function normalizeParams(raw: unknown): GenParams {
+  const base = defaultGenParams()
+  if (!isRecord(raw)) return base
+  const out = { ...base } as Record<keyof GenParams, unknown>
+  for (const key of Object.keys(base) as (keyof GenParams)[]) {
+    const v = raw[key]
+    if (typeof v !== typeof base[key]) continue
+    if (typeof v === 'number' && !Number.isFinite(v)) continue
+    out[key] = v
+  }
+  const params = out as GenParams
+  if (params.seedMode !== 'fixed' && params.seedMode !== 'perImage') params.seedMode = base.seedMode
+  return params
+}
+
+/**
+ * 读回的工作区补齐 + 自愈。任何来源（旧版本文件、手改、IPC 传进来的）
+ * 都先过这里，界面与主进程拿到的永远是完整合法的形状。
+ */
+export function normalizeWorkspace(raw: unknown): Workspace {
+  const base = emptyWorkspace()
+  if (!isRecord(raw)) return base
+
+  const seen = new Set<string>()
+  const characters: CharacterPrompt[] = []
+  if (Array.isArray(raw.characters)) {
+    for (const c of raw.characters) {
+      if (!isRecord(c)) continue
+      // 缺 id 或 id 重复都补新的：重复 id 会让两个角色共用一个编辑器实例与 undo 栈
+      let id = typeof c.id === 'string' && c.id !== '' ? c.id : newId('ch')
+      if (seen.has(id)) id = newId('ch')
+      seen.add(id)
+      characters.push({
+        id,
+        enabled: typeof c.enabled === 'boolean' ? c.enabled : true,
+        fields: normalizeValues(c.fields, CHARACTER_FIELDS),
+        negative: str(c.negative),
+        position: str(c.position),
+      })
+    }
+  }
+
+  return {
+    main: normalizeValues(raw.main, MAIN_FIELDS),
+    text: str(raw.text),
+    negative: str(raw.negative),
+    params: normalizeParams(raw.params),
+    characters,
+    useCoords: typeof raw.useCoords === 'boolean' ? raw.useCoords : base.useCoords,
+  }
+}

@@ -1,0 +1,117 @@
+import { describe, expect, it } from 'vitest'
+import { BLOCK_SEP } from '@shared/blockDoc'
+import { CHARACTER_FIELDS, MAIN_FIELDS } from '@shared/fields'
+import { alignTo64 } from '@shared/naiOptions'
+import {
+  createCharacter,
+  defaultGenParams,
+  emptyWorkspace,
+  normalizeWorkspace,
+  type Workspace,
+} from '@shared/workspace'
+
+const names = (specs: readonly { name: string }[]): string[] => specs.map((s) => s.name).sort()
+
+describe('默认值', () => {
+  it('空工作区：整图字段全空、没有角色、坐标定位关', () => {
+    const ws = emptyWorkspace()
+    expect(Object.keys(ws.main).sort()).toEqual(names(MAIN_FIELDS))
+    expect(Object.values(ws.main).every((v) => v === '')).toBe(true)
+    expect(ws.text).toBe('')
+    expect(ws.negative).toBe('')
+    expect(ws.characters).toEqual([])
+    expect(ws.useCoords).toBe(false)
+  })
+
+  it('默认参数照插件：28 步、CFG 5、质量词开、负面预设 Heavy、宽高已对齐 64', () => {
+    const p = defaultGenParams()
+    expect(p.steps).toBe(28)
+    expect(p.scale).toBe(5)
+    expect(p.qualityToggle).toBe(true)
+    expect(p.ucPreset).toBe(0)
+    expect(p.width).toBe(alignTo64(p.width))
+    expect(p.height).toBe(alignTo64(p.height))
+    expect(p.transparentBackground).toBe(false)
+  })
+
+  it('每次返回新对象', () => {
+    const a = defaultGenParams()
+    a.steps = 1
+    expect(defaultGenParams().steps).toBe(28)
+    expect(emptyWorkspace().params).not.toBe(emptyWorkspace().params)
+  })
+
+  it('新角色：五个字段全空、参与本轮、id 互不相同', () => {
+    const a = createCharacter()
+    const b = createCharacter()
+    expect(Object.keys(a.fields).sort()).toEqual(names(CHARACTER_FIELDS))
+    expect(a.enabled).toBe(true)
+    expect(a.negative).toBe('')
+    expect(a.position).toBe('')
+    expect(a.id).not.toBe(b.id)
+  })
+})
+
+describe('normalizeWorkspace', () => {
+  it('不是对象时给空工作区', () => {
+    expect(normalizeWorkspace(null).characters).toEqual([])
+    expect(normalizeWorkspace('x').main.count).toBe('')
+  })
+
+  it('合法工作区原样通过', () => {
+    const ws: Workspace = {
+      ...emptyWorkspace(),
+      main: { ...emptyWorkspace().main, count: '1girl', artist: 'artist:wlop' },
+      text: 'HELLO',
+      negative: 'lowres',
+      characters: [{ ...createCharacter(), position: '0.3,0.5' }],
+      useCoords: true,
+    }
+    const plain = JSON.parse(JSON.stringify(ws)) as unknown
+    expect(normalizeWorkspace(plain)).toEqual(ws)
+  })
+
+  it('缺的项补默认值，不认识的键丢弃', () => {
+    const ws = normalizeWorkspace({ text: 'T', artistSets: [] })
+    expect(ws.text).toBe('T')
+    expect(ws.params).toEqual(defaultGenParams())
+    expect('artistSets' in ws).toBe(false)
+  })
+
+  it('字段值里的换行与分隔符被剥掉 —— 分块文档必须是单行', () => {
+    const ws = normalizeWorkspace({ main: { count: `1girl\n${BLOCK_SEP}solo` } })
+    expect(ws.main.count).toBe('1girlsolo')
+  })
+
+  it('不认识的字段名丢弃，缺的字段补空串', () => {
+    const ws = normalizeWorkspace({ main: { lora: 'x', count: 'a' } })
+    expect(Object.keys(ws.main).sort()).toEqual(names(MAIN_FIELDS))
+    expect(ws.main.count).toBe('a')
+  })
+
+  it('角色：不是数组给空数组；不是对象的条目丢弃', () => {
+    expect(normalizeWorkspace({ characters: 'x' }).characters).toEqual([])
+    expect(normalizeWorkspace({ characters: [1, null, { fields: { character: 'skadi' } }] }).characters).toHaveLength(1)
+  })
+
+  it('角色：缺 id 或 id 重复时补新 id —— 重复 id 会让两个编辑器共用一个实例', () => {
+    const ws = normalizeWorkspace({ characters: [{ id: 'ch-1' }, { id: 'ch-1' }, {}] })
+    const ids = ws.characters.map((c) => c.id)
+    expect(new Set(ids).size).toBe(3)
+    expect(ids[0]).toBe('ch-1')
+  })
+
+  it('角色的字段集是角色的五项，不是整图的十项', () => {
+    const ws = normalizeWorkspace({ characters: [{ fields: { artist: 'x', character: 'skadi' } }] })
+    expect(Object.keys(ws.characters[0].fields).sort()).toEqual(names(CHARACTER_FIELDS))
+    expect(ws.characters[0].fields.character).toBe('skadi')
+  })
+
+  it('参数：类型不对或不是有限数的项回默认值，seedMode 不在范围回每张随机', () => {
+    const ws = normalizeWorkspace({ params: { steps: '30', scale: Number.NaN, seedMode: 'always', width: 896 } })
+    expect(ws.params.steps).toBe(28)
+    expect(ws.params.scale).toBe(5)
+    expect(ws.params.seedMode).toBe('perImage')
+    expect(ws.params.width).toBe(896)
+  })
+})
