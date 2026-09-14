@@ -41,6 +41,35 @@ describe('defaultAppConfig', () => {
     expect(cfg.negativePrompt).toBe(DEFAULT_TEXTS.negativePrompt)
   })
 
+  it('用户定下的默认值（V5 角色上限、出图节奏、工具循环、标签查询）', () => {
+    expect(defaultAppConfig()).toMatchObject({
+      naiMaxCharacters: 22,
+      naiTimeoutSec: 120,
+      taskIntervalMs: 500,
+      historyDays: 30,
+      maxToolRounds: 10,
+      tagBrowsePageChars: 12000,
+      autoSkipSearch: false,
+      tagManualEnabled: true,
+      tagQueryCharacterMax: 0,
+      tagQueryCharacterAliases: true,
+      tagQueryCharacterWiki: true,
+      tagQueryCharacterSeries: true,
+      tagQueryCharacterAppearance: true,
+      tagQueryCharacterClothing: false,
+      tagQueryArtistMax: 0,
+      tagQueryArtistAliases: true,
+      tagQueryArtistWiki: false,
+      tagQueryGeneralMax: 5,
+      tagQueryGeneralAliases: true,
+      tagQueryGeneralWiki: true,
+      tagQuerySeriesMax: 5,
+      tagQuerySeriesAliases: true,
+      tagQuerySeriesWiki: false,
+      tagQueryWikiLength: 300,
+    })
+  })
+
   it('两个顺序串取 fields.ts 的默认值', () => {
     expect(defaultAppConfig().promptOrder).toBe(DEFAULT_PROMPT_ORDER)
     expect(defaultAppConfig().naiCharPromptOrder).toBe(DEFAULT_CHAR_PROMPT_ORDER)
@@ -82,7 +111,7 @@ describe('mergeConfig', () => {
   it('类型不对的项回到默认值', () => {
     const cfg = mergeConfig({ maxTokens: '32000', autoSkipSearch: 'yes', proxy: 7890 })
     expect(cfg.maxTokens).toBe(16000)
-    expect(cfg.autoSkipSearch).toBe(true)
+    expect(cfg.autoSkipSearch).toBe(defaultAppConfig().autoSkipSearch)
     expect(cfg.proxy).toBe('')
   })
 
@@ -173,7 +202,7 @@ describe('RESTORABLE_KEYS', () => {
 })
 
 describe('NovelAI 设置项', () => {
-  it('默认值照画师串工具箱', () => {
+  it('默认值（间隔与历史天数按用户配置）', () => {
     const c = defaultAppConfig()
     expect([c.naiBaseUrl, c.saveDir, c.imageFormat, c.naiTimeoutSec, c.retryCount, c.taskIntervalMs, c.historyDays]).toEqual([
       'https://image.novelai.net',
@@ -181,8 +210,8 @@ describe('NovelAI 设置项', () => {
       'png',
       120,
       2,
-      1000,
-      7,
+      500,
+      30,
     ])
   })
 

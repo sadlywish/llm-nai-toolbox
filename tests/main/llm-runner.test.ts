@@ -103,10 +103,13 @@ const firstUserText = (s: Seen): string => String(((s.messages[0].content as Jso
 
 describe('runLlm：跑通一轮', () => {
   it('第 1 轮查标签、第 2 轮收口：回填内容、轮次事件、上下文里带着工具结果', async () => {
-    const h = harness([
-      reply([call('search_tags', { characters: [{ name: '初音未来' }] })]),
-      reply([call('generate_image', { character: 'hatsune miku', artist: 'artist:wlop', tags: 'smile', aspect_ratio: '2:3' })]),
-    ])
+    const h = harness(
+      [
+        reply([call('search_tags', { characters: [{ name: '初音未来' }] })]),
+        reply([call('generate_image', { character: 'hatsune miku', artist: 'artist:wlop', tags: 'smile', aspect_ratio: '2:3' })]),
+      ],
+      { config: { tagManualEnabled: false } },
+    )
     const r = await runLlm(input(), h.deps)
     expect(r.status).toBe('filled')
     if (r.status !== 'filled') return
@@ -146,7 +149,7 @@ describe('runLlm：跑通一轮', () => {
 describe('runLlm：工具集', () => {
   it('搜索全部高置信且开着 autoSkipSearch：下一轮撤掉 search_tags；关掉开关则保留', async () => {
     const steps = () => [reply([call('search_tags', { characters: '初音未来' })]), reply([call('generate_image', { artist: 'a' })])]
-    const on = harness(steps())
+    const on = harness(steps(), { config: { autoSkipSearch: true } })
     await runLlm(input(), on.deps)
     expect(on.seen[1].tools).not.toContain('search_tags')
     expect(on.lines()).toContain('[I] 所有搜索结果高置信度 (≥0.85)，下一轮禁用 search_tags')
@@ -170,7 +173,10 @@ describe('runLlm：工具集', () => {
   })
 
   it('标签数据缺失的工具不注册，分类目录也不进系统提示词', async () => {
-    const h = harness([reply([call('generate_image', { artist: 'a' })])], { data: { categories: null, browse: null, characters: null } })
+    const h = harness([reply([call('generate_image', { artist: 'a' })])], {
+      data: { categories: null, browse: null, characters: null },
+      config: { tagManualEnabled: false },
+    })
     await runLlm(input(), h.deps)
     expect(h.seen[0].tools).toEqual(['generate_image'])
     expect(h.seen[0].system).not.toContain('标签分类目录')

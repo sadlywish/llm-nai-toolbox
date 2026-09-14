@@ -93,7 +93,13 @@ describe('prepareTagData', () => {
 
   it('没开任何「返回 wiki」时不去读 tags_detail_v2.json', async () => {
     const s = sources()
-    const config = { ...defaultAppConfig(), tagQueryGeneralWiki: false }
+    const config = {
+      ...defaultAppConfig(),
+      tagQueryCharacterWiki: false,
+      tagQueryArtistWiki: false,
+      tagQueryGeneralWiki: false,
+      tagQuerySeriesWiki: false,
+    }
     const data = await prepareTagData(index(READY, LOADED), s.extras, config, logger().log)
     expect(s.wikiCalls()).toBe(0)
     expect(data.wikiMap).toBeNull()

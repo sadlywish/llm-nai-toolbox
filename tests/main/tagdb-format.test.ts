@@ -60,7 +60,7 @@ describe('formatSearchResults', () => {
   it('关掉 wiki 开关的类别既不给释义也不给 wiki 摘要', () => {
     const gloss = parseGlossDb({ saber: { g: '剑士职阶' } })
     const r: SearchResult[] = [{ query: 'saber', type: '角色', matches: [m('saber', 1, { wiki: 'Saber class servant' })] }]
-    const text = formatSearchResults(r, seriesDb, display(), gloss)
+    const text = formatSearchResults(r, seriesDb, display({ tagQueryCharacterWiki: false }), gloss)
     expect(text).not.toContain('释义')
     expect(text).not.toContain('wiki')
   })

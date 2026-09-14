@@ -42,7 +42,12 @@ function logger() {
 describe('executeSearchTags', () => {
   it('入参、每条结果写日志；全部 ≥0.85 时 allHigh；返回格式化文本并附角色特征', () => {
     const { log, texts } = logger()
-    const o = executeSearchTags({ characters: [{ name: '初音未来' }] }, data(), defaultAppConfig(), log)
+    const o = executeSearchTags(
+      { characters: [{ name: '初音未来' }] },
+      data(),
+      { ...defaultAppConfig(), tagQueryCharacterClothing: true },
+      log,
+    )
     expect(o.allHigh).toBe(true)
     expect(o.queryCount).toBe(1)
     expect(texts()[0]).toBe('search_tags 入参: artists=[], characters=[{"name":"初音未来"}], concepts=[], series=[]')
