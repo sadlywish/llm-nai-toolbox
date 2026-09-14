@@ -1,0 +1,30 @@
+# 打包配置（electron-builder）。先 `npm run build` 生成 out/，再 `npm run dist`。
+appId: com.lyf.llm-nai-toolbox
+productName: llm-nai-toolbox
+directories:
+  output: release/${version}
+files:
+  - out/**
+  - package.json
+# 标签库 80MB+，不进 asar：主进程打包后从 process.resourcesPath/tagdb 读（见 src/main/tagdb/paths.ts）
+extraResources:
+  - from: resources/tagdb
+    to: tagdb
+    filter:
+      - "*.json"
+      - "*.csv"
+asar: true
+# 用本地已装好的 Electron，不再联网下载运行时
+electronDist: node_modules/electron/dist
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: zip
+      arch: [x64]
+  artifactName: ${productName}-${version}-win-x64.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: ${productName}-${version}-setup.${ext}
