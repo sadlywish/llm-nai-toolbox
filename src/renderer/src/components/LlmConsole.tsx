@@ -2,16 +2,22 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { applyFill } from '@shared/applyFill'
 import type { ApiType, AppConfig } from '@shared/config'
 import { buildRunInput, presetSelectionStale, selectStyleMode } from '@shared/consoleRun'
+import type { FieldSpec } from '@shared/fields'
 import { MULTI_CHARACTER_MODES, type MultiCharacterMode } from '@shared/llm'
 import { usableStyles, type StylePreset } from '@shared/styles'
 import type { ConsoleOptions, StyleMode, Workspace } from '@shared/workspace'
+import { useGen } from '../state/gen'
 import { statusText, statusTone, useLlm } from '../state/llm'
+import { useWorkspace } from '../state/workspace'
 
 interface Props {
   workspace: Workspace
   config: AppConfig
   /** null = 画风预设还没载入 */
   presets: StylePreset[] | null
+  /** 按 promptOrder 排好的字段集：「回填后自动生成」的 token 检查用 */
+  mainSpecs: readonly FieldSpec[]
+  charSpecs: readonly FieldSpec[]
   update: (fn: (draft: Workspace) => void) => void
   /** 预设下拉里的「去维护画风…」 */
   onOpenStyles: () => void
@@ -35,7 +41,7 @@ const OPEN_STYLES = '__open_styles__'
  * 界面稿：docs/superpowers/specs/2026-09-14-llm-console-drawer-mockup.html（第 4 版；控件与文案同第 3 版）。
  * 指令区的输入与开关都存在工作区里（workspace.console），随工作区保存。
  */
-export default function LlmConsole({ workspace, config, presets, update, onOpenStyles }: Props): JSX.Element {
+export default function LlmConsole({ workspace, config, presets, mainSpecs, charSpecs, update, onOpenStyles }: Props): JSX.Element {
   const phase = useLlm((s) => s.phase)
   const hasLog = useLlm((s) => s.phase.kind !== 'idle' || s.lines.length > 0)
   const logOpen = useLlm((s) => s.logOpen)
@@ -86,7 +92,12 @@ export default function LlmConsole({ workspace, config, presets, update, onOpenS
   function send(): void {
     if (running) return
     // update 是 store 的稳定引用：这一轮跑完时即使切到了画风维护视图，回填照样写进工作区
-    void run(buildRunInput(workspace, presets ?? []), (fill) => update((ws) => applyFill(ws, fill)))
+    void run(buildRunInput(workspace, presets ?? []), (fill) => {
+      update((ws) => applyFill(ws, fill))
+      // 回填后自动生成：用回填之后的工作区（update 同步写 store），跑图次数照工具栏
+      const ws = useWorkspace.getState().workspace
+      if (ws !== null && ws.console.autoGenerate) void useGen.getState().generate(ws, mainSpecs, charSpecs)
+    })
   }
 
   return (
@@ -204,6 +215,15 @@ export default function LlmConsole({ workspace, config, presets, update, onOpenS
               </select>
             </label>
           )}
+          <label>
+            <input
+              type="checkbox"
+              checked={opts.autoGenerate}
+              disabled={running}
+              onChange={(e) => setOption('autoGenerate', e.target.checked)}
+            />
+            回填后自动生成
+          </label>
           <span className="grow" />
           <span className="hint">Ctrl+Enter 发送</span>
           <button type="button" className="btn btn-primary" disabled={running} onClick={send}>

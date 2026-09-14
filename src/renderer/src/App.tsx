@@ -5,7 +5,9 @@ import LlmLogDrawer from './components/LlmLogDrawer'
 import PromptPane from './components/PromptPane'
 import SettingsDrawer from './components/SettingsDrawer'
 import StyleManager from './components/StyleManager'
+import Toolbar from './components/Toolbar'
 import { useConfig } from './state/config'
+import { initGenSubscriptions } from './state/gen'
 import { initLlmEvents } from './state/llm'
 import { initStylesPersistence, useStyles } from './state/styles'
 import { useTagdb } from './state/tagdb'
@@ -50,6 +52,8 @@ export default function App(): JSX.Element {
   useEffect(() => initStylesPersistence(), [])
   // 日志与一轮的结束都经 llm:event 推来；订阅挂在 App 上，切到画风维护视图时照样收
   useEffect(() => initLlmEvents(), [])
+  // 出图进度、单张结果、seed 回填都经事件推来；挂在 App 上，切到画风维护视图时照样收
+  useEffect(() => initGenSubscriptions(), [])
 
   /**
    * 从没保存过设置时，启动后自动弹设置抽屉（规格 §14.3）。
@@ -78,81 +82,94 @@ export default function App(): JSX.Element {
 
   return (
     <div className="app">
-      {/* 指令区以上的部分：工作区整体滚动，日志抽屉的遮罩只盖这里 */}
-      <div className="stage">
-        <header className="app-header">
-          <span className="app-title">llm-nai-toolbox</span>
-          {version !== '' && <span className="app-version">v{version}</span>}
-          <div className="view-switch" role="tablist">
-            <button type="button" role="tab" className={view === 'workbench' ? 'is-on' : ''} onClick={() => setView('workbench')}>
-              工作台
-            </button>
-            <button type="button" role="tab" className={view === 'styles' ? 'is-on' : ''} onClick={() => setView('styles')}>
-              画风维护
-            </button>
-          </div>
-          <span className="header-spacer" />
-          <button type="button" className="header-button" onClick={() => setSettingsOpen(true)}>
-            设置
+      <header className="app-header">
+        <span className="app-title">llm-nai-toolbox</span>
+        {version !== '' && <span className="app-version">v{version}</span>}
+        <div className="view-switch" role="tablist">
+          <button type="button" role="tab" className={view === 'workbench' ? 'is-on' : ''} onClick={() => setView('workbench')}>
+            工作台
           </button>
-        </header>
+          <button type="button" role="tab" className={view === 'styles' ? 'is-on' : ''} onClick={() => setView('styles')}>
+            画风维护
+          </button>
+        </div>
+        <span className="header-spacer" />
+        <button type="button" className="header-button" onClick={() => setSettingsOpen(true)}>
+          设置
+        </button>
+      </header>
 
-        {tagdbStatus !== null && tagdbStatus.state !== 'ready' && (
-          <div
-            className={tagdbStatus.state === 'loading' ? 'tagdb-bar' : 'tagdb-bar tagdb-bar-warn'}
-            role="status"
-          >
-            {tagdbStatus.detail}
-          </div>
-        )}
+      {tagdbStatus !== null && tagdbStatus.state !== 'ready' && (
+        <div
+          className={tagdbStatus.state === 'loading' ? 'tagdb-bar' : 'tagdb-bar tagdb-bar-warn'}
+          role="status"
+        >
+          {tagdbStatus.detail}
+        </div>
+      )}
 
-        {configLoadError !== null && (
-          <div className="banner-error" role="alert">
-            {configLoadError}（已按默认配置运行）
-          </div>
-        )}
-        {workspaceLoadError !== null && (
-          <div className="banner-error" role="alert">
-            {workspaceLoadError}
-          </div>
-        )}
-        {workspaceSaveError !== null && (
-          <div className="banner-error" role="alert">
-            {workspaceSaveError}
-            <button type="button" onClick={dismissWorkspaceSaveError}>
-              知道了
-            </button>
-          </div>
-        )}
+      {configLoadError !== null && (
+        <div className="banner-error" role="alert">
+          {configLoadError}（已按默认配置运行）
+        </div>
+      )}
+      {workspaceLoadError !== null && (
+        <div className="banner-error" role="alert">
+          {workspaceLoadError}
+        </div>
+      )}
+      {workspaceSaveError !== null && (
+        <div className="banner-error" role="alert">
+          {workspaceSaveError}
+          <button type="button" onClick={dismissWorkspaceSaveError}>
+            知道了
+          </button>
+        </div>
+      )}
 
-        <main className="workarea">
-          {view === 'styles' ? (
-            <StyleManager />
-          ) : workbench !== null ? (
-            <PromptPane
-              workspace={workbench}
-              mainSpecs={mainSpecs}
-              charSpecs={charSpecs}
-              maxCharacters={config.naiMaxCharacters}
-              update={updateWorkspace}
-            />
-          ) : (
-            <div className="placeholder">载入中…</div>
-          )}
-        </main>
-
-        {workbench !== null && <LlmLogDrawer />}
-      </div>
-
-      {/* 指令区固定在窗口底部，不随工作区滚动 */}
       {workbench !== null && (
-        <LlmConsole
-          workspace={workbench}
-          config={config}
-          presets={presets}
-          update={updateWorkspace}
-          onOpenStyles={() => setView('styles')}
-        />
+        <Toolbar workspace={workbench} mainSpecs={mainSpecs} charSpecs={charSpecs} update={updateWorkspace} />
+      )}
+
+      {view === 'styles' ? (
+        <main className="workarea">
+          <StyleManager />
+        </main>
+      ) : (
+        // 版面 A：左历史竖栏 ｜ 中间一列（工作区整体滚动 + 日志抽屉 + 底部指令区）；右 WIKI 竖栏留给计划 6
+        <div className="body">
+          <div className="center">
+            {/* 日志抽屉的遮罩只盖这一块：工作区。指令区不被盖住 */}
+            <div className="stage">
+              <main className="workarea">
+                {workbench !== null ? (
+                  <PromptPane
+                    workspace={workbench}
+                    mainSpecs={mainSpecs}
+                    charSpecs={charSpecs}
+                    maxCharacters={config.naiMaxCharacters}
+                    update={updateWorkspace}
+                  />
+                ) : (
+                  <div className="placeholder">载入中…</div>
+                )}
+              </main>
+              {workbench !== null && <LlmLogDrawer />}
+            </div>
+            {/* 指令区固定在中间一列底部，不随工作区滚动 */}
+            {workbench !== null && (
+              <LlmConsole
+                workspace={workbench}
+                config={config}
+                presets={presets}
+                mainSpecs={mainSpecs}
+                charSpecs={charSpecs}
+                update={updateWorkspace}
+                onOpenStyles={() => setView('styles')}
+              />
+            )}
+          </div>
+        </div>
       )}
 
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
