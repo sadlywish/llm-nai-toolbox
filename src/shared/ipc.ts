@@ -25,6 +25,17 @@ export const IPC = {
   stylesSave: 'styles:save',
   /** 关窗前的同步冲刷（sendSync），同 workspace:flush */
   stylesFlush: 'styles:flush',
+  /** 开跑一轮出图；整轮结束才返回最终进度 */
+  genStart: 'gen:start',
+  genResume: 'gen:resume',
+  genCancel: 'gen:cancel',
+  /** 主进程 → 渲染进程：进度、单张结果、要写回参数区的 seed */
+  genProgress: 'gen:progress',
+  genImage: 'gen:image',
+  genSeed: 'gen:seed',
+  historyLoad: 'history:load',
+  imageRead: 'image:read',
+  imageMeta: 'image:meta',
 } as const
 
 export interface TagdbCompleteInput {

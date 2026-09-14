@@ -7,6 +7,7 @@ import {
   type TagdbCompleteResult,
   type TagdbStatus,
 } from '@shared/ipc'
+import type { GenImageEvent, GenStartInput, ImageMeta, ReadImageInput, RoundRecord, RunProgress } from '@shared/gen'
 import type { LlmEvent, LlmRunInput, LlmRunResult } from '@shared/llm'
 import type { StylePreset } from '@shared/styles'
 import type { Workspace } from '@shared/workspace'
@@ -58,6 +59,43 @@ const api = {
 
   /** 同步写盘，只给关窗前的 beforeunload 用 */
   flushStyles: (presets: StylePreset[]): boolean => ipcRenderer.sendSync(IPC.stylesFlush, presets),
+
+  /** 开跑一轮出图。整轮结束（完成、取消、中止）才 resolve；预检失败（没设目录、没填 Token、已有一轮在跑）时 reject */
+  genStart: (input: GenStartInput): Promise<RunProgress> => ipcRenderer.invoke(IPC.genStart, input),
+
+  /** 429 暂停后继续 */
+  genResume: (): Promise<void> => ipcRenderer.invoke(IPC.genResume),
+
+  genCancel: (): Promise<void> => ipcRenderer.invoke(IPC.genCancel),
+
+  /** 返回取消订阅的函数（同 onTagdbStatus） */
+  onGenProgress: (cb: (p: RunProgress) => void): (() => void) => {
+    const handler = (_e: unknown, p: RunProgress): void => cb(p)
+    ipcRenderer.on(IPC.genProgress, handler)
+    return () => ipcRenderer.off(IPC.genProgress, handler)
+  },
+
+  onGenImage: (cb: (e: GenImageEvent) => void): (() => void) => {
+    const handler = (_e: unknown, ev: GenImageEvent): void => cb(ev)
+    ipcRenderer.on(IPC.genImage, handler)
+    return () => ipcRenderer.off(IPC.genImage, handler)
+  },
+
+  /** 要写回参数区的 seed */
+  onGenSeed: (cb: (seed: number) => void): (() => void) => {
+    const handler = (_e: unknown, seed: number): void => cb(seed)
+    ipcRenderer.on(IPC.genSeed, handler)
+    return () => ipcRenderer.off(IPC.genSeed, handler)
+  },
+
+  /** 保存目录下最近「历史保留天数」天的轮次，最新的在前 */
+  loadHistory: (): Promise<RoundRecord[]> => ipcRenderer.invoke(IPC.historyLoad),
+
+  /** 读一张已落盘的图；不存在或路径越界返回 null */
+  readImage: (input: ReadImageInput): Promise<ArrayBuffer | null> => ipcRenderer.invoke(IPC.imageRead, input),
+
+  /** 直接从图片文件里读元信息；读不到文件返回 null */
+  readImageMeta: (input: ReadImageInput): Promise<ImageMeta | null> => ipcRenderer.invoke(IPC.imageMeta, input),
 }
 
 contextBridge.exposeInMainWorld('api', api)

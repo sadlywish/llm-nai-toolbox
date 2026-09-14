@@ -7,15 +7,19 @@ import {
   type ConfigSaveInput,
   type TagdbCompleteInput,
 } from '@shared/ipc'
+import { parseGenStartInput, type ReadImageInput } from '@shared/gen'
 import { parseLlmRunInput, type LlmEvent, type LlmRunResult } from '@shared/llm'
 import { normalizeStyles } from '@shared/styles'
 import { normalizeWorkspace } from '@shared/workspace'
 import { ConfigStore } from './config-store'
+import { GenRunner } from './gen/runner'
 import { createClaudeChat } from './llm/claude'
 import { prepareTagData } from './llm/data'
 import { createOpenAIChat } from './llm/openai'
 import { TAG_MANUALS, TAG_MANUAL_TOC, TAG_SKILL_CORE } from './llm/resources'
 import { runLlm } from './llm/runner'
+import { generateImage } from './nai/client'
+import { loadRecentRounds, readRoundImage, readRoundImageMeta } from './nai/index-store'
 import { appFetch, applyProxy } from './net'
 import { SecretStore, type SecretCrypto } from './secret-store'
 import { JsonStore } from './store'
@@ -56,6 +60,13 @@ let registered = false
 const electronCrypto: SecretCrypto = {
   encrypt: (plain) => safeStorage.encryptString(plain).toString('base64'),
   decrypt: (cipher) => safeStorage.decryptString(Buffer.from(cipher, 'base64')),
+}
+
+/** image:read / image:meta 的入参守卫：渲染进程可任意调用，不是对象时下游解构会抛 */
+function asReadImageInput(v: unknown): ReadImageInput | null {
+  if (typeof v !== 'object' || v === null) return null
+  const { roundStartedAt, file } = v as Record<string, unknown>
+  return typeof roundStartedAt === 'string' && typeof file === 'string' ? { roundStartedAt, file } : null
 }
 
 export function registerIpc(
@@ -214,6 +225,55 @@ export function registerIpc(
 
   ipcMain.handle(IPC.llmAbort, () => {
     currentRun?.abort()
+  })
+
+  /** 出图事件广播给当前所有窗口（同 tagdb 状态）：跑图中重开的窗口也要能看到进度 */
+  const broadcast = (channel: string, payload: unknown): void => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed()) w.webContents.send(channel, payload)
+    }
+  }
+
+  const genRunner = new GenRunner({
+    generate: (body, config, token) =>
+      generateImage(
+        {
+          baseUrl: config.naiBaseUrl,
+          token,
+          timeoutMs: config.naiTimeoutSec * 1000,
+          imageFormat: config.imageFormat,
+          fetchImpl: appFetch,
+        },
+        body,
+      ),
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    onProgress: (p) => broadcast(IPC.genProgress, p),
+    onImage: (e) => broadcast(IPC.genImage, e),
+    onSeedResolved: (seed) => broadcast(IPC.genSeed, seed),
+    now: () => new Date(),
+    randomSeed: () => Math.floor(Math.random() * 4294967295),
+  })
+
+  ipcMain.handle(IPC.genStart, (_e, raw: unknown) => {
+    const input = parseGenStartInput(raw)
+    if (typeof input === 'string') throw new Error(input)
+    // 配置与 Token 在开跑那一刻读一次；明文 Token 只在主进程里用，不进事件与返回值
+    return genRunner.start(input, configStore.read(), secrets.read('naiToken').trim())
+  })
+  ipcMain.handle(IPC.genResume, () => genRunner.resume())
+  ipcMain.handle(IPC.genCancel, () => genRunner.cancel())
+
+  ipcMain.handle(IPC.historyLoad, () => {
+    const config = configStore.read()
+    return loadRecentRounds(config.saveDir, config.historyDays)
+  })
+  ipcMain.handle(IPC.imageRead, (_e, raw: unknown) => {
+    const input = asReadImageInput(raw)
+    return input === null ? null : readRoundImage(configStore.read().saveDir, input)
+  })
+  ipcMain.handle(IPC.imageMeta, (_e, raw: unknown) => {
+    const input = asReadImageInput(raw)
+    return input === null ? null : readRoundImageMeta(configStore.read().saveDir, input)
   })
 
   void loader.load()
