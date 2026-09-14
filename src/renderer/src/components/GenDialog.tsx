@@ -41,7 +41,7 @@ export default function GenDialog({ mainSpecs, charSpecs, update }: Props): JSX.
 
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const [viewer, setViewer] = useState<{ url: string; alt: string } | null>(null)
-  // 点遮罩关闭：按下与松开都落在遮罩本身才算（同设置抽屉）。在弹窗里拖选文字、松手落到遮罩上不能误关
+  // 点遮罩关闭：按下与松开都落在遮罩本身才算（同日志抽屉）。在弹窗里拖选文字、松手落到遮罩上不能误关
   const downOnBackdrop = useRef(false)
 
   // 格子区域的实际尺寸：排版按它试算列数。用回调 ref——网格要等弹窗打开、轮次就绪才挂上，

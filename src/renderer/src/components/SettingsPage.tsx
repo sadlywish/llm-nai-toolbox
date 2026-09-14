@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import {
   API_TYPES,
   IMAGE_FORMATS,
-  NUMBER_RULES,
   OPENAI_REASONING_DIALECTS,
   OPENAI_REASONING_EFFORTS,
   RESTORABLE_KEYS,
@@ -17,8 +16,12 @@ import {
 } from '@shared/config'
 import { PIXEL_PRESETS, pixelPresetOf } from '@shared/naiOptions'
 import { useConfig } from '../state/config'
+import { isSettingsDirty, numericTextFrom, type NumericText } from '../settingsDraft'
+import AutoTextarea from './AutoTextarea'
 
 const MANUAL_PIXELS = 'manual'
+/** 保存成功后「已保存」在保存栏停留多久 */
+const SAVED_NOTICE_MS = 2000
 
 type BooleanKey = { [K in keyof AppConfig]: AppConfig[K] extends boolean ? K : never }[keyof AppConfig]
 type StringKey = { [K in keyof AppConfig]: AppConfig[K] extends string ? K : never }[keyof AppConfig]
@@ -40,13 +43,7 @@ const OPENAI_DIALECT_LABELS: Record<OpenAIReasoningDialect, string> = {
   enable_thinking: 'enable_thinking（通义千问）',
 }
 
-function numericTextFrom(cfg: AppConfig): Record<NumericKey, string> {
-  const out = {} as Record<NumericKey, string>
-  for (const key of Object.keys(NUMBER_RULES) as NumericKey[]) out[key] = String(cfg[key])
-  return out
-}
-
-/** 可折叠的一组。展开状态不持久化：抽屉关掉就卸载，下次打开回到默认 */
+/** 可折叠的一组。设置页常驻挂载，展开状态切标签时保留；重启应用回到默认 */
 function Group({
   title,
   summary,
@@ -60,25 +57,31 @@ function Group({
 }): JSX.Element {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <section className={`drawer-group ${open ? '' : 'is-closed'}`}>
-      <button type="button" className="drawer-group-head" onClick={() => setOpen((o) => !o)}>
+    <section className={`settings-group ${open ? '' : 'is-closed'}`}>
+      <button type="button" className="settings-group-head" onClick={() => setOpen((o) => !o)}>
         <span>{title}</span>
-        <span className="drawer-group-summary">
+        <span className="settings-group-summary">
           {summary !== undefined ? `${summary} ` : ''}
           {open ? '▾' : '▸'}
         </span>
       </button>
-      {open && <div className="drawer-group-body">{children}</div>}
+      {open && <div className="settings-group-body">{children}</div>}
     </section>
   )
 }
 
 interface Props {
-  open: boolean
-  onClose: () => void
+  /** 当前是不是在「设置」标签。不在时整页隐藏但不卸载：没保存的草稿、分组展开状态都得留着 */
+  active: boolean
+  /** 有无未保存修改变化时通知 App，给顶栏「设置」标签挂黄点 */
+  onDirtyChange: (dirty: boolean) => void
 }
 
-export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | null {
+/**
+ * 设置页：顶栏与「工作台」「画风维护」并排的第三个标签（界面稿 2026-09-15-settings-tab-mockup.html，方案 A）。
+ * 单列居中，分组照原来的抽屉；保存栏钉在页底，切走标签草稿不丢。
+ */
+export default function SettingsPage({ active, onDirtyChange }: Props): JSX.Element {
   const config = useConfig((s) => s.config)
   const loaded = useConfig((s) => s.loaded)
   const hasLlmApiKey = useConfig((s) => s.hasLlmApiKey)
@@ -93,30 +96,44 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [naiTokenInput, setNaiTokenInput] = useState('')
   const [danbooruKeyInput, setDanbooruKeyInput] = useState('')
-  const [numericText, setNumericText] = useState<Record<NumericKey, string>>(() => numericTextFrom(config))
+  const [numericText, setNumericText] = useState<NumericText>(() => numericTextFrom(config))
   const [saving, setSaving] = useState(false)
-  // 在系统提示词框里拖选文字、松开时鼠标落在遮罩上：Chromium 把 click 事件
-  // 派给按下与松开两个目标的最近公共祖先——正是遮罩——于是 onClose 被
-  // 触发，草稿（连同刚填的 API Key）全丢。只有按下和松开都落在遮罩本身
-  // 才算真的点了遮罩要关闭。
-  const downOnBackdrop = useRef(false)
+  const [savedNotice, setSavedNotice] = useState(false)
 
-  useEffect(() => {
-    // 必须等 loaded 才重置草稿：配置还没读回来就用默认值初始化草稿，
-    // 随手一保存就把已存配置覆盖了。loaded 从 false 变 true 时这条会再跑一次。
-    if (!open || !loaded) return
+  /** 草稿、数值原文、三个密钥框全部回到已保存的样子 */
+  function resetDraft(): void {
     setDraft(config)
     setApiKeyInput('')
     setNaiTokenInput('')
     setDanbooruKeyInput('')
     setNumericText(numericTextFrom(config))
     dismissSaveError()
-    // 只在「打开且已载入」这一刻取快照；config 若进依赖数组，编辑期间
+  }
+
+  useEffect(() => {
+    // 必须等 loaded 才重置草稿：配置还没读回来就用默认值初始化草稿，
+    // 随手一保存就把已存配置覆盖了。设置页常驻挂载，这条只在 loaded 变 true 时跑一次。
+    if (!loaded) return
+    resetDraft()
+    // 只在「已载入」这一刻取快照；config 若进依赖数组，编辑期间
     // 每次按键触发的重渲染都会被这条 effect 用旧值把草稿冲掉
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, loaded])
+  }, [loaded])
 
-  if (!open) return null
+  // 配置没读回来之前草稿是默认值，不算「改过」
+  const dirty =
+    loaded &&
+    isSettingsDirty({ draft, numericText, secrets: [apiKeyInput, naiTokenInput, danbooruKeyInput] }, config)
+
+  useEffect(() => {
+    onDirtyChange(dirty)
+  }, [dirty, onDirtyChange])
+
+  useEffect(() => {
+    if (!savedNotice) return
+    const timer = setTimeout(() => setSavedNotice(false), SAVED_NOTICE_MS)
+    return () => clearTimeout(timer)
+  }, [savedNotice])
 
   function set<K extends keyof AppConfig>(key: K, value: AppConfig[K]): void {
     setDraft((d) => ({ ...d, [key]: value }))
@@ -131,7 +148,7 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
   }
 
   function restore(key: StringKey): void {
-    // 立即替换，不弹确认（规格 §14.2）：改的是草稿，关掉不保存就是撤销
+    // 立即替换，不弹确认（规格 §14.2）：改的是草稿，不保存或点「撤销修改」就回去了
     set(key, defaultAppConfig()[key])
   }
 
@@ -199,13 +216,15 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
       danbooruKeyInput === '' ? undefined : danbooruKeyInput,
     )
     setSaving(false)
-    // 只在成功时清空并关闭：失败多半是磁盘之类与输入无关的原因，
+    // 只在成功时清空：失败多半是磁盘之类与输入无关的原因，
     // 用户接下来大概率要重试，把刚输入的 Key 清掉等于逼他重新输一遍
     if (useConfig.getState().saveError === null) {
       setApiKeyInput('')
       setNaiTokenInput('')
       setDanbooruKeyInput('')
-      onClose()
+      // 原文按存下的值重写：「 16 」这种能解析的写法存成 16 后，框里不该还算没保存
+      setNumericText(numericTextFrom(draft))
+      setSavedNotice(true)
     }
   }
 
@@ -246,10 +265,31 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
         {label}
         {isRestorable(key) && restoreButton(key)}
       </span>
-      <textarea rows={rows} value={draft[key]} onChange={(e) => set(key, e.target.value)} />
+      <AutoTextarea minRows={rows} value={draft[key]} onChange={(v) => set(key, v)} />
       {errorOf(key)}
     </label>
   )
+
+  /** 单行值但可能很长（质量词、负面词）：按内容撑高、折行显示；留空时框高亮提醒，不拦保存 */
+  const lineAreaField = (key: StringKey, label: string): ReactNode => {
+    const empty = draft[key].trim() === ''
+    return (
+      <label className="field">
+        <span className="field-label">
+          {label}
+          {isRestorable(key) && restoreButton(key)}
+        </span>
+        <AutoTextarea
+          singleLine
+          className={empty ? 'is-empty-warn' : undefined}
+          title={empty ? `${label}为空` : undefined}
+          value={draft[key]}
+          onChange={(v) => set(key, v)}
+        />
+        {errorOf(key)}
+      </label>
+    )
+  }
 
   const numberField = (key: NumericKey, label: string, opts: { hint?: string; disabled?: boolean } = {}): ReactNode => (
     <label className={`field ${opts.disabled === true ? 'is-disabled' : ''}`}>
@@ -274,35 +314,20 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
   )
 
   return (
-    <div
-      className="drawer-backdrop"
-      onMouseDown={(e) => {
-        downOnBackdrop.current = e.target === e.currentTarget
-      }}
-      onClick={(e) => {
-        if (downOnBackdrop.current && e.target === e.currentTarget) onClose()
-      }}
-    >
-      <form className="settings-drawer" onClick={(e) => e.stopPropagation()} onSubmit={(e) => void handleSubmit(e)}>
-        <div className="drawer-header">
-          <span>设置</span>
-          <button type="button" className="drawer-close" title="关闭" onClick={onClose}>
-            ×
-          </button>
-        </div>
-
+    <main className="settings-page" hidden={!active}>
+      <form className="settings-form" onSubmit={(e) => void handleSubmit(e)}>
         {!loaded && <div className="placeholder">载入配置中…</div>}
 
         {loaded && (
           <>
-            {/* 抽屉是自己弹出来的，得说清为什么；也要讲明「不保存就还会再弹」——那是刻意的 */}
+            {/* 首次启动是自己切到设置页的，得说清为什么；也要讲明「不保存下次还会先打开这里」——那是刻意的 */}
             {!configExists && (
-              <div className="drawer-firstrun" role="status">
-                首次启动：填好 LLM 的 API 地址、Key 与模型后点保存。不保存的话，下次启动还会弹出。
+              <div className="settings-firstrun" role="status">
+                首次启动：填好 LLM 的 API 地址、Key 与模型后点保存。不保存的话，下次启动还会先打开设置。
               </div>
             )}
             {saveError !== null && (
-              <div className="drawer-error" role="alert">
+              <div className="settings-error" role="alert">
                 {saveError}
               </div>
             )}
@@ -339,12 +364,12 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
               {draft.apiType === 'openai' && (
                 <label className="field">
                   <span>附加请求参数（JSON）</span>
-                  <textarea
-                    rows={3}
+                  <AutoTextarea
+                    minRows={3}
                     spellCheck={false}
                     value={draft.openaiExtraParams}
                     placeholder={'{"top_p": 0.9}'}
-                    onChange={(e) => set('openaiExtraParams', e.target.value)}
+                    onChange={(v) => set('openaiExtraParams', v)}
                   />
                   <span className="field-hint">原样合并进请求体，同名字段以这里为准</span>
                   {errorOf('openaiExtraParams')}
@@ -390,7 +415,7 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
                 {numberField('taskIntervalMs', '任务间隔（毫秒）')}
                 {numberField('historyDays', '历史保留天数')}
               </div>
-              <div className="drawer-subtitle">多角色与分辨率</div>
+              <div className="settings-subtitle">多角色与分辨率</div>
               <div className="two-col">{numberField('naiMaxCharacters', '角色数上限')}</div>
               <label className="field">
                 <span>像素上限</span>
@@ -525,8 +550,8 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
               {areaField('systemPrompt', '系统提示词', 6)}
               {areaField('naiCharSystemPrompt', '多角色附加', 3)}
               <div className="two-col">
-                {textField('quality', '质量词')}
-                {textField('negativePrompt', '负面词')}
+                {lineAreaField('quality', '质量词')}
+                {lineAreaField('negativePrompt', '负面词')}
               </div>
               {textField('promptOrder', '字段顺序', { hint: '同时决定编辑器里块的先后' })}
               {textField('naiCharPromptOrder', '角色字段顺序', { hint: '同时决定角色编辑器里块的先后' })}
@@ -544,22 +569,22 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
             </Group>
 
             <Group title="标签查询返回" summary="16 项" defaultOpen={false}>
-              <div className="drawer-subtitle">角色</div>
+              <div className="settings-subtitle">角色</div>
               {numberField('tagQueryCharacterMax', '最多返回条数', { hint: '0 = 不限制' })}
               {checkField('tagQueryCharacterAliases', '返回中文别名')}
               {checkField('tagQueryCharacterWiki', '返回 wiki 摘要')}
               {checkField('tagQueryCharacterSeries', '返回所属作品')}
               {checkField('tagQueryCharacterAppearance', '返回外貌标签')}
               {checkField('tagQueryCharacterClothing', '返回服装标签')}
-              <div className="drawer-subtitle">画师</div>
+              <div className="settings-subtitle">画师</div>
               {numberField('tagQueryArtistMax', '最多返回条数', { hint: '0 = 不限制' })}
               {checkField('tagQueryArtistAliases', '返回中文别名')}
               {checkField('tagQueryArtistWiki', '返回 wiki 摘要')}
-              <div className="drawer-subtitle">概念</div>
+              <div className="settings-subtitle">概念</div>
               {numberField('tagQueryGeneralMax', '最多返回条数', { hint: '0 = 不限制' })}
               {checkField('tagQueryGeneralAliases', '返回中文别名')}
               {checkField('tagQueryGeneralWiki', '返回释义')}
-              <div className="drawer-subtitle">作品</div>
+              <div className="settings-subtitle">作品</div>
               {numberField('tagQuerySeriesMax', '最多返回条数', { hint: '0 = 不限制' })}
               {checkField('tagQuerySeriesAliases', '返回中文别名')}
               {checkField('tagQuerySeriesWiki', '返回 wiki 摘要')}
@@ -570,10 +595,17 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
               {textField('proxy', '代理', { placeholder: '留空跟随系统代理，例如 http://127.0.0.1:7890' })}
             </Group>
 
-            <div className="drawer-actions">
-              <button type="button" onClick={onClose}>
-                取消
+            {/* 保存栏钉在页底：系统提示词很长，滚到哪都要能直接保存 */}
+            <div className="settings-actions">
+              {dirty ? (
+                <span className="settings-status is-dirty">有未保存的修改</span>
+              ) : (
+                savedNotice && <span className="settings-status is-saved">已保存</span>
+              )}
+              <button type="button" disabled={!dirty || saving} onClick={resetDraft}>
+                撤销修改
               </button>
+              {/* 没改也能保存：首次启动时草稿就是默认值，不保存 config.json 就不会落盘 */}
               <button type="submit" className="primary" disabled={hasErrors || saving}>
                 {saving ? '保存中…' : '保存'}
               </button>
@@ -581,6 +613,6 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
           </>
         )}
       </form>
-    </div>
+    </main>
   )
 }

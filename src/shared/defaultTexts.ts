@@ -11,7 +11,7 @@ import tailMd from '../../resources/prompts/tail.md?raw'
  * 上万字，塞进 TS 字符串字面量里没法读、没法 diff。
  *
  * ⚠️ 只在「config.json 不存在」时经 defaultAppConfig() 进入配置，
- * 以及设置抽屉的「恢复默认」。任何取值处都不许拿它当空白回退。
+ * 以及设置页的「恢复默认」。任何取值处都不许拿它当空白回退。
  *
  * 换行统一成 LF：Windows 上 git 的 autocrlf 会把检出的文件改成 CRLF，
  * 不统一的话 \r 会跟着进配置、进发给 LLM 的请求。

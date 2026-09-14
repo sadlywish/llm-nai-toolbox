@@ -207,7 +207,8 @@ body {
 .prompt-editor.tag-text-editor .cm-content { padding: 8px 12px; line-height: 1.7; }
 .prompt-editor.tag-text-editor .cm-placeholder { color: var(--ink-faint); font-family: "Microsoft YaHei", system-ui, sans-serif; font-size: 13px; }
 .text-row { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
-.text-row input { width: 26em; max-width: 100%; }
+/* 画面文字是单行值：沿用输入框的字体，长了才折行撑高 */
+.text-row textarea { width: 26em; max-width: 100%; font-family: inherit; font-size: 13px; line-height: 1.4; }
 .text-row .field-hint { flex-basis: 100%; }
 .token-bar { color: var(--ink-dim); font-size: 12px; }
 .token-bar.is-over { color: var(--danger); }
@@ -255,54 +256,68 @@ body {
 .character-prompts > .prompt-editor { flex: 3 1 0; min-width: 0; }
 .character-prompts > .prompt-editor + .prompt-editor { flex: 2 1 0; }
 
-/* ── 顶栏按钮 ─────────────────────────────────────────────── */
-.header-spacer { flex: 1; }
-.header-button {
-  background: none; border: 1px solid var(--line); border-radius: 4px; color: var(--ink);
-  padding: 2px 12px; font: inherit; font-size: 13px; cursor: pointer; align-self: center;
+/* ── 设置页（界面稿 2026-09-15-settings-tab-mockup.html 方案 A：单列居中，最宽 960px） ── */
+.settings-page { flex: 1; min-height: 0; overflow-y: auto; }
+/* 不在设置标签时只隐藏不卸载；上面的 display 会盖过 hidden 属性的默认样式，得显式写回 */
+.settings-page[hidden] { display: none; }
+.settings-form {
+  max-width: 960px; min-height: 100%; margin: 0 auto; padding: 16px 24px 0;
+  display: flex; flex-direction: column; gap: 10px; font-size: 13px;
 }
-.header-button:hover { border-color: var(--accent); }
-
-/* ── 设置抽屉（照工具箱，宽度放到 520px 容纳长提示词） ─────────────── */
-.drawer-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); display: flex; justify-content: flex-end; z-index: 10; }
-.settings-drawer {
-  width: 520px; max-width: 100%; height: 100%; overflow-y: auto;
-  background: var(--panel); border-left: 1px solid var(--line);
-  padding: 12px 14px 0; display: flex; flex-direction: column; gap: 10px; font-size: 13px;
-}
-.drawer-header { display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
-.drawer-close { background: none; border: none; color: var(--ink-dim); cursor: pointer; font-size: 18px; line-height: 1; }
-.drawer-close:hover { color: var(--ink); }
 /* 首次启动的说明条。用 accent 而不是错误红：这不是出错，是一次正常的引导 */
-.drawer-firstrun { border: 1px solid var(--accent); border-radius: 4px; padding: 7px 9px; font-size: 12.5px; line-height: 1.7; background: var(--input); }
-.drawer-error { background: #5a1d1d; color: #ffd7d7; border: 1px solid #7a2a2a; border-radius: 3px; padding: 6px 8px; font-size: 12.5px; }
-.drawer-group { border: 1px solid var(--line); border-radius: 5px; flex-shrink: 0; }
-.drawer-group-head {
+.settings-firstrun { border: 1px solid var(--accent); border-radius: 4px; padding: 7px 9px; font-size: 12.5px; line-height: 1.7; background: var(--input); }
+.settings-error { background: #5a1d1d; color: #ffd7d7; border: 1px solid #7a2a2a; border-radius: 3px; padding: 6px 8px; font-size: 12.5px; }
+.settings-group { border: 1px solid var(--line); border-radius: 5px; flex-shrink: 0; background: var(--panel); }
+.settings-group-head {
   display: flex; justify-content: space-between; width: 100%; padding: 6px 10px;
   background: var(--panel-2); color: var(--ink); border: none; border-bottom: 1px solid var(--line);
   border-radius: 5px 5px 0 0; font: inherit; font-size: 13px; cursor: pointer; text-align: left;
 }
-.drawer-group.is-closed .drawer-group-head { border-bottom: none; border-radius: 5px; }
-.drawer-group-summary { color: var(--ink-faint); font-size: 12px; }
-.drawer-group-body { padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
-.drawer-subtitle { color: var(--ink); font-size: 12.5px; margin-top: 4px; }
+.settings-group.is-closed .settings-group-head { border-bottom: none; border-radius: 5px; }
+.settings-group-summary { color: var(--ink-faint); font-size: 12px; }
+.settings-group-body { padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+.settings-subtitle { color: var(--ink); font-size: 12.5px; margin-top: 4px; }
+.settings-form .field-row input { flex: 1; min-width: 0; }
+.settings-form .field-row select.pixel-preset { flex: 0 0 220px; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-/* 保存栏钉在抽屉底部：分组很长，滚到中间也要能直接保存 */
-.drawer-actions {
-  position: sticky; bottom: 0; margin-top: auto; display: flex; justify-content: flex-end; gap: 8px;
-  padding: 8px 0 12px; border-top: 1px solid var(--line); background: var(--panel);
+/* 保存栏钉在页底：系统提示词很长，滚到哪都要能直接保存 */
+.settings-actions {
+  position: sticky; bottom: 0; margin-top: auto; display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  padding: 8px 0 12px; border-top: 1px solid var(--line); background: var(--ground);
 }
-.drawer-actions button {
+.settings-status { margin-right: auto; font-size: 12.5px; }
+.settings-status.is-dirty { color: var(--warn); }
+.settings-status.is-saved { color: var(--ok); }
+.settings-actions button {
   background: none; border: 1px solid var(--line); border-radius: 4px; color: var(--ink);
   padding: 4px 16px; font: inherit; font-size: 13px; cursor: pointer;
 }
-.drawer-actions button.primary { background: var(--accent); border-color: var(--accent); color: #0b1b2b; font-weight: 600; }
-.drawer-actions button:disabled { opacity: .45; cursor: not-allowed; }
+.settings-actions button.primary { background: var(--accent); border-color: var(--accent); color: #0b1b2b; font-weight: 600; }
+.settings-actions button:disabled { opacity: .45; cursor: not-allowed; }
+/* 质量词、负面词留空：黄框提醒（同固定 seed 的黄），不拦保存 */
+.field textarea.is-empty-warn { border-color: #b8862e; background: rgba(229, 192, 123, .12); }
 
-/* ── 顶栏视图切换（工作台 / 画风维护） ─────────────────────── */
+/* ── 按内容撑高的文本框（AutoTextarea）：最少 --min-rows 行，最高约一屏，超出在框内滚动 ── */
+/* 选择器带上元素名：要压过前面 .field textarea 的 resize: vertical。10px = 上下内边距 8 + 边框 2 */
+textarea.auto-textarea {
+  field-sizing: content; resize: none; overflow-y: auto;
+  min-height: calc(var(--min-rows, 1) * 1lh + 10px);
+  max-height: calc(100vh - 180px);
+}
+
+/* 横排工具行里把后面的东西推到最右（画风维护的工具行在用） */
+.header-spacer { flex: 1; }
+
+/* 日志抽屉的收起按钮 */
+.drawer-close { background: none; border: none; color: var(--ink-dim); cursor: pointer; font-size: 18px; line-height: 1; }
+.drawer-close:hover { color: var(--ink); }
+
+/* ── 顶栏视图切换（工作台 / 画风维护 / 设置） ─────────────────── */
 .view-switch { display: flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; margin-left: 14px; align-self: center; }
 .view-switch button { background: none; border: none; color: var(--ink-dim); padding: 2px 14px; font: inherit; font-size: 13px; cursor: pointer; }
 .view-switch button.is-on { background: var(--panel); color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+/* 设置页有没保存的修改 */
+.tab-dirty { color: var(--warn); margin-left: 4px; font-size: 10px; vertical-align: 1px; }
 
 /* ── 画风维护（照画师串工具箱的画师串编辑器） ──────────────── */
 .style-manager .style-tabs { padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel-2); }
@@ -361,7 +376,6 @@ body {
 .opts .hint { font-size: 12px; color: var(--ink-faint); }
 
 /* ── LLM 日志抽屉：贴着指令区顶边向上展开 ─────────────────── */
-/* z-index 低于设置抽屉（10）：两个都开着时设置抽屉在上 */
 .log-backdrop { position: absolute; inset: 0; z-index: 9; background: rgba(0, 0, 0, .45); display: flex; flex-direction: column; justify-content: flex-end; }
 .log-drawer { height: 60%; display: flex; flex-direction: column; background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -8px 24px rgba(0, 0, 0, .35); }
 .log-drawer-head { display: flex; align-items: center; gap: 10px; padding: 6px 12px; font-size: 13px; color: var(--ink-dim); background: var(--sunken-head); border-bottom: 1px solid var(--line); }
@@ -375,8 +389,6 @@ body {
 .ln .lv { color: var(--ink-dim); }
 .ln.w, .ln.w .lv { color: var(--warn); }
 .ln.e, .ln.e .lv { color: var(--danger); }
-.settings-drawer .field-row input { flex: 1; min-width: 0; }
-.settings-drawer .field-row select.pixel-preset { flex: 0 0 220px; }
 .ln.ok { color: var(--ok); }
 
 /* ── 原图查看器（1:1 + 拖动平移） ───────────────────────── */
