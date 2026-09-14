@@ -18,9 +18,16 @@ describe('singleLineText', () => {
 })
 
 describe('DEFAULT_TEXTS', () => {
-  it('随包文案都已提供（非空）且不含 CR', () => {
+  it('三段提示词随包提供（非空），质量词与负面词默认留空', () => {
+    expect(DEFAULT_TEXTS.systemPrompt).not.toBe('')
+    expect(DEFAULT_TEXTS.naiCharSystemPrompt).not.toBe('')
+    expect(DEFAULT_TEXTS.tailInjection).not.toBe('')
+    expect(DEFAULT_TEXTS.quality).toBe('')
+    expect(DEFAULT_TEXTS.negativePrompt).toBe('')
+  })
+
+  it('随包文案都不含 CR', () => {
     for (const [key, value] of Object.entries(DEFAULT_TEXTS)) {
-      expect(value, key).not.toBe('')
       expect(value.includes('\r'), key).toBe(false)
     }
   })
