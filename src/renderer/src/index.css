@@ -636,3 +636,21 @@ body {
 .gen-inspector-close { background: none; border: none; color: var(--ink-dim); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; }
 .gen-inspector-close:hover { color: var(--ink); }
 .gen-inspector-preview { width: 160px; align-self: center; border-radius: 4px; border: 1px solid var(--line); cursor: zoom-in; }
+
+/* ── 溯源信息（界面稿第 3 版状态 3、3b） ─────────────────────── */
+.gen-tabs { display: flex; gap: 4px; }
+.gen-tabs button { background: none; border: 1px solid var(--line); border-radius: 3px; color: var(--ink-dim); padding: 2px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.gen-tabs button.is-on { border-color: var(--accent); background: rgba(74, 158, 255, .12); color: var(--ink); }
+.gen-inspector-body { display: flex; flex-direction: column; gap: 8px; }
+.gen-field { display: flex; flex-direction: column; gap: 2px; }
+.gen-field-label { color: var(--ink-faint); font-size: 11px; }
+details.gen-field > summary { cursor: pointer; }
+.gen-field-value { font-family: var(--mono); word-break: break-all; color: var(--ink); }
+.gen-blocks { background: #15181c; border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; font-family: var(--mono); line-height: 1.9; }
+/* 块配色与分块编辑器同一套（hsl(var(--h) …)） */
+.gen-block { display: inline-block; border-radius: 3px; padding: 0 5px; margin: 0 4px 3px 0; background: hsl(var(--h) 48% 56% / .14); box-shadow: inset 0 0 0 1px hsl(var(--h) 45% 52% / .42); }
+.gen-block i { font-style: normal; font-size: 10.5px; background: hsl(var(--h) 48% 58%); color: #0f1115; border-radius: 2px; padding: 0 3px; margin-right: 4px; }
+.gen-pre { margin: 0; background: #15181c; border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; font-family: var(--mono); font-size: 11.5px; white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow: auto; color: var(--ink); }
+.gen-copy-btn { margin-top: auto; background: var(--accent); border: none; border-radius: 3px; color: #0b1b2b; cursor: pointer; padding: 6px 10px; font: inherit; font-weight: 600; }
+.gen-copy-btn:disabled { opacity: .45; cursor: default; }
+.gen-copy-hint { color: var(--ink-faint); font-size: 11.5px; line-height: 1.6; }
