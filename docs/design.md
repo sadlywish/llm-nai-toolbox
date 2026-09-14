@@ -25,11 +25,11 @@ llm-nai-toolbox 的架构与关键取舍。使用方法见 [README](../README.md
 | `main/net.ts` | `appFetch`（`net.fetch`）与代理应用；主进程所有外部请求都走它 |
 | `main/store.ts` · `config-store.ts` · `secret-store.ts` | `workspace.json` / `styles.json` / `config.json` / `secrets.json` 的原子读写；密钥用 `safeStorage` 加密 |
 | `renderer/components/` | 指令区（固定在窗口底部）与日志抽屉（从指令区向上展开）、提示词面板、参数区、角色面板、画风维护、设置抽屉——布局与交互照画师串工具箱与已确认的界面稿 |
-| `main/nai/` | 出图、PNG 元数据、zip 解包、落盘记账 |
+| `main/nai/` | NovelAI 协议：请求体、出图客户端与错误分级、zip 解包、读 PNG 元信息、画面文字处理、落盘与 `_index.json` |
 | `main/danbooru/` | 只服务右侧 WIKI 区 |
 | `main/tagdb/` | 本地标签库：索引加载与补全、LLM 工具数据的惰性加载、分类浏览、释义与废弃表、角色特征、搜索结果格式化 |
 | `main/llm/` | 一轮 LLM 交互：两个端点、工具 schema、参数兜底与 NovelAI 规范化、上下文组装、收口后处理、多轮循环 |
-| `main/gen/` | 顺序发 N 张，无队列无并发控制 |
+| `main/gen/` | 一轮出图的编排：快照与拼接、串行队列（429 暂停、Token/点数中止、按张重试）、seed 分配与回填 |
 | `shared/` | 字段定义、分块文档、配置与工作区的类型/默认值/校验/自愈、token 计算——纯函数，两端共用 |
 | `renderer/editor/` | CodeMirror 接线：装饰、守卫、快捷键 |
 
@@ -200,6 +200,30 @@ API Key 在 `secrets.json`，渲染进程只知道「有没有存过」，明文
 
 ---
 
+## 出图与落盘
+
+结构照搬画师串工具箱（错误分级、队列、落盘、记账的规则与文案都一致），领域从「画师串 × 例图」换成「一套提示词出 N 张」。
+
+```
+渲染进程  gen:start({ workspace, count })
+   ↓
+主进程 GenRunner（main/gen/runner.ts）
+  预检：保存目录、NovelAI Token、已有一轮在跑 → 直接拒绝，不留轮次
+  seed：每张随机逐张各随机；固定模式给了值全程用它，给 -1 就随机一次全程复用并立即写回参数区
+  快照（本工具格式，只含参与本轮的角色）→ 拼接结果（按字段顺序拼接，画面文字按插件 applyTextRendering 接到末尾）
+  _index.json 先记这一轮 → 队列逐张：请求 → 落盘 → 覆盖式记这一张 → gen:image
+  429 暂停（这张留在队首，不记失败）；没填 Token / Token 失效 / 点数不足中止整批；其余错误按张重试
+  终态才 finish；每张随机模式跑完把最后一张的 seed 写回参数区
+```
+
+**请求体按 koishi 插件的格式**，去掉负面预设与质量词（`ucPreset: 3`、`qualityToggle: false`）、不开 Variety Boost；透明背景才带 `straight_alpha`。角色负面词独立发送，与整图负面词互不相干。
+
+**落盘**：`保存目录/YYYY-MM-DD/<5位序号>-<seed>.<ext>`，同目录 `_index.json` 记整轮快照、拼接结果与逐张记录。序号扫描目录取最大值 +1（重启、手删文件都不会乱）；图片字节原样落盘，不写自己的元数据。seed 取接口回报 → PNG 元数据 → 请求时的值。读取时 running/paused 推导为「已中断」，不回写。
+
+**所有请求走 `appFetch`**；超时用 `raceAbort` 包住请求与读 body，不依赖 `net.fetch` 是否认 `AbortSignal`。
+
+---
+
 ## 历史：三份不同的东西
 
 一次生成产生三份互不相同的记录，分开存：
@@ -209,6 +233,8 @@ API Key 在 `secrets.json`，渲染进程只知道「有没有存过」，明文
 | 字段快照 + 参数 + 真正发出去的拼接结果 | `_index.json` 的一条记录 |
 | 完整 LLM 对话（含 thinking、工具结果全文） | `llm/<transcriptId>.json` |
 | 图片 | 日期目录下 |
+
+LLM 对话落盘与 llmStale 在计划 5 实现。
 
 对话单独落盘的原因：一轮 `search_tags` 的结果动辄几十 KB，塞进 `_index.json` 会拖垮历史列表启动时的全量扫描。
 
