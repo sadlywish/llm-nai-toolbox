@@ -1,0 +1,51 @@
+# sexual positions — 体位
+
+共 45 个标签，按使用量降序。
+
+| 标签 | 含义 |
+|---|---|
+| sex | 阴道或肛门的插入式性交（阴茎或假阳具） |
+| girl_on_top | 女性趴或坐在另一角色上方，不必为性行为 |
+| cowgirl_position | 女上位，被插入方骑坐并面向对方 |
+| missionary | 传教士体位，仰卧者与插入方面对面的性交姿势 |
+| doggystyle | 后入体位，受方四肢着地被从后进入 |
+| bound_wrists | 双手手腕被绑在一起 |
+| top-down_bottom-up | 脸贴地面、臀部高高翘起的姿势 |
+| standing_sex | 接受方单脚或双脚站立进行的性行为 |
+| bound_arms | 双臂被某种束缚物绑在一起 |
+| folded | 上腿尽量后折使身体对折的体位，常见于性行为 |
+| reverse_cowgirl_position | 插入方仰卧，被插入方背对其跨坐的性交体位 |
+| bound_legs | 双腿被绑缚固定在一起 |
+| squatting_cowgirl_position | 女上位变体，接受方双脚踏地蹲踞骑乘 |
+| reverse_suspended_congress | 将人悬空抱起并从背后插入的性交体位 |
+| upright_straddle | 跨坐在直坐着的人身上 |
+| spitroast | 中间者一边被后方插入一边为前方口交或乳交的双重插入 |
+| prone_bone | 趴卧后入体位，受方俯卧被从后插入 |
+| reverse_upright_straddle | 两人直立坐姿性交，被插入方背对插入方坐于其腿上 |
+| mating_press | 屈曲位性交，上位者身体几乎遮住下位者 |
+| frogtie | 将脚踝绑到大腿或手腕的捆绑姿势，双腿折叠张开 |
+| suspension | 绑缚中被吊起的姿势，身体或接触地面或悬空 |
+| bound_ankles | 双脚踝被束缚捆在一起 |
+| full_nelson | 从背后双臂穿腋锁颈的摔跤锁技，也常见于同名性爱体位 |
+| pet_play | 扮演宠物动物的性癖行为 |
+| 69 | 互相口交的体位，双方各对着对方胯部 |
+| spooning | 两人侧卧、一人前贴另一人背的姿势，也指该体位性行为 |
+| suspended_congress | 插入方将被插入方抱离地面在空中交合 |
+| legs_over_head | 双腿抬到头后或头顶上方 |
+| bound_together | 两人或多人被捆绑在一起 |
+| bound_torso | 角色的上半身被捆绑 |
+| standing_doggystyle | 站立后入式，接受方站立弯腰而非四肢着地 |
+| amazon_position | 女上位性姿势，伴侣双腿折向胸前或张开朝天，大腿在女方前方 |
+| hogtie | 手腕脚踝一并绑于背后的捆绑姿势 |
+| piledriver_(sex) | 类似摔角招式的性爱体位 |
+| reverse_squatting_cowgirl_position | 反向蹲姿骑乘位/反蹲骑乘 |
+| bound_thighs | 束缚大腿/缚腿 |
+| legs_bound_apart | 双腿束缚分开 |
+| box_tie | 高手小手/箱型捆绑 |
+| separated_legs | 双腿被分开束缚/腿部分开束缚 |
+| standing_missionary | 対面立位/站立正常位 |
+| mounting | 逆駅弁/骑乘体位（攻方在上） |
+| arms_bound_apart | 双臂束缚分开 |
+| separated_arms | 双臂分开束缚/分臂束缚 |
+| male_spitroast | 男性烤叉式双插/男性烤叉 |
+| bound_knees | 膝部束缚/绑膝 |

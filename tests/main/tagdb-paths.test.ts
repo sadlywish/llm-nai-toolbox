@@ -38,7 +38,7 @@ describe('tagdbFilePath', () => {
 })
 
 describe('TAGDB_FILES', () => {
-  it('只声明本计划真正会加载的文件 —— 没有消费方的声明是死代码', () => {
-    expect(Object.keys(TAGDB_FILES)).toEqual(['index'])
+  it('index 之外还声明 LLM 工具用的五个附加数据文件', () => {
+    expect(Object.keys(TAGDB_FILES)).toEqual(['index', 'detail', 'browse', 'gloss', 'deprecated', 'characterFeatures'])
   })
 })

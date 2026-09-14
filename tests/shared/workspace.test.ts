@@ -23,12 +23,11 @@ describe('默认值', () => {
     expect(ws.useCoords).toBe(false)
   })
 
-  it('默认参数照插件：28 步、CFG 5、质量词开、负面预设 Heavy、宽高已对齐 64', () => {
+  it('默认参数照插件：28 步、CFG 5、宽高已对齐 64；没有负面预设、质量词、Variety Boost', () => {
     const p = defaultGenParams()
     expect(p.steps).toBe(28)
     expect(p.scale).toBe(5)
-    expect(p.qualityToggle).toBe(true)
-    expect(p.ucPreset).toBe(0)
+    for (const key of ['ucPreset', 'qualityToggle', 'varietyBoost']) expect(key in p).toBe(false)
     expect(p.width).toBe(alignTo64(p.width))
     expect(p.height).toBe(alignTo64(p.height))
     expect(p.transparentBackground).toBe(false)
@@ -107,6 +106,11 @@ describe('normalizeWorkspace', () => {
     expect(ws.characters[0].fields.character).toBe('skadi')
   })
 
+  it('参数：旧版本存下的负面预设、质量词、Variety Boost 丢弃', () => {
+    const ws = normalizeWorkspace({ params: { ucPreset: 0, qualityToggle: true, varietyBoost: true } })
+    for (const key of ['ucPreset', 'qualityToggle', 'varietyBoost']) expect(key in ws.params).toBe(false)
+  })
+
   it('参数：类型不对或不是有限数的项回默认值，seedMode 不在范围回每张随机', () => {
     const ws = normalizeWorkspace({ params: { steps: '30', scale: Number.NaN, seedMode: 'always', width: 896 } })
     expect(ws.params.steps).toBe(28)
@@ -115,21 +119,66 @@ describe('normalizeWorkspace', () => {
     expect(ws.params.width).toBe(896)
   })
 
-  it('参数：采样器、噪声调度、负面预设不在选项表里时回默认值；模型允许自定义名', () => {
+  it('参数：采样器、噪声调度不在选项表里时回默认值；模型允许自定义名', () => {
     const ws = normalizeWorkspace({
       params: {
         sampler: 'k_bogus',
         noiseSchedule: 'linear',
-        ucPreset: 99,
         model: 'my-custom-model',
       },
     })
     expect(ws.params.sampler).toBe('k_euler_ancestral')
     expect(ws.params.noiseSchedule).toBe('karras')
-    expect(ws.params.ucPreset).toBe(0)
     // 合法但非默认的采样器要保留，不能被误判成非法
     expect(normalizeWorkspace({ params: { sampler: 'k_dpmpp_2m' } }).params.sampler).toBe('k_dpmpp_2m')
     // 模型名不校验：V5 系列名未公布，允许用户手填自定义名
     expect(ws.params.model).toBe('my-custom-model')
+  })
+})
+
+describe('指令区选项', () => {
+  it('空工作区带默认的指令区选项', () => {
+    expect(emptyWorkspace().console).toEqual({
+      instruction: '',
+      multiCharacter: 'off',
+      editExisting: false,
+      transparent: false,
+      styleMode: 'none',
+      presetId: '',
+      autoGenerate: false,
+    })
+  })
+
+  it('读回时逐项校验：枚举不认识回默认，类型不对回默认，合法值保留', () => {
+    const ws = normalizeWorkspace({
+      console: { instruction: '画初音', multiCharacter: 'on', editExisting: 'yes', transparent: true, styleMode: 'preset', presetId: 7 },
+    })
+    expect(ws.console).toEqual({
+      instruction: '画初音',
+      multiCharacter: 'off',
+      editExisting: false,
+      transparent: true,
+      styleMode: 'preset',
+      presetId: '',
+      autoGenerate: false,
+    })
+    expect(normalizeWorkspace({ console: { multiCharacter: 'coords', styleMode: 'x' } }).console).toMatchObject({
+      multiCharacter: 'coords',
+      styleMode: 'none',
+    })
+  })
+})
+
+describe('跑图次数与自动生成', () => {
+  it('默认跑 1 张、不自动生成', () => {
+    const ws = emptyWorkspace()
+    expect([ws.runCount, ws.console.autoGenerate]).toEqual([1, false])
+  })
+
+  it('跑图次数只认正整数；自动生成只认布尔', () => {
+    expect(normalizeWorkspace({ runCount: 4 }).runCount).toBe(4)
+    for (const runCount of [0, -2, 1.5, '3', null]) expect(normalizeWorkspace({ runCount }).runCount).toBe(1)
+    expect(normalizeWorkspace({ console: { autoGenerate: true } }).console.autoGenerate).toBe(true)
+    expect(normalizeWorkspace({ console: { autoGenerate: 'yes' } }).console.autoGenerate).toBe(false)
   })
 })

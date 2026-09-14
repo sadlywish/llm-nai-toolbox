@@ -26,13 +26,6 @@ export const SAMPLER_OPTIONS: readonly string[] = [
 
 export const NOISE_SCHEDULE_OPTIONS: readonly string[] = ['karras', 'native', 'exponential', 'polyexponential']
 
-export const UC_PRESET_OPTIONS: ReadonlyArray<{ value: number; label: string }> = [
-  { value: 0, label: 'Heavy' },
-  { value: 1, label: 'Light' },
-  { value: 2, label: 'Human Focus' },
-  { value: 3, label: 'None' },
-]
-
 /**
  * 对齐到 64 的倍数，下限 64。
  *
@@ -42,4 +35,28 @@ export const UC_PRESET_OPTIONS: ReadonlyArray<{ value: number; label: string }> 
  */
 export function alignTo64(v: number): number {
   return Math.max(64, Math.round(v / 64) * 64)
+}
+
+export type PixelPresetId = 'normal' | 'large' | 'wallpaper'
+
+/**
+ * 设置里「像素上限」的预设，取 NAI 官网分辨率预设的总像素。Large 取方图 1472×1472
+ * （用户定的）：1:1 换算回正好 1472×1472，竖/横图会换算成 1216×1728 这类非官网尺寸。
+ */
+export const PIXEL_PRESETS: ReadonlyArray<{ id: PixelPresetId; label: string; size: string; pixels: number }> = [
+  { id: 'normal', label: 'Normal', size: '1024×1024', pixels: 1024 * 1024 },
+  { id: 'large', label: 'Large', size: '1472×1472', pixels: 1472 * 1472 },
+  { id: 'wallpaper', label: 'Wallpaper', size: '1920×1088', pixels: 1920 * 1088 },
+]
+
+/** 像素上限恰好等于某个预设时返回它；否则 null，下拉显示「手动设置」 */
+export function pixelPresetOf(pixels: number): PixelPresetId | null {
+  return PIXEL_PRESETS.find((p) => p.pixels === pixels)?.id ?? null
+}
+
+/** Opus 订阅免费出图的总像素上限；超过就按张消耗 Anlas */
+export const OPUS_FREE_MAX_PIXELS = 1024 * 1024
+
+export function exceedsOpusFree(width: number, height: number): boolean {
+  return width * height > OPUS_FREE_MAX_PIXELS
 }

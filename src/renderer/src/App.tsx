@@ -1,8 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CHARACTER_FIELDS, MAIN_FIELDS, orderSpecs } from '@shared/fields'
+import GenDialog from './components/GenDialog'
+import GenRunDialogs from './components/GenRunDialogs'
+import HistoryRail from './components/HistoryRail'
+import LlmConsole from './components/LlmConsole'
+import LlmLogDrawer from './components/LlmLogDrawer'
 import PromptPane from './components/PromptPane'
 import SettingsDrawer from './components/SettingsDrawer'
+import StyleManager from './components/StyleManager'
+import Toolbar from './components/Toolbar'
+import WikiRail from './components/WikiRail'
 import { useConfig } from './state/config'
+import { initGenSubscriptions, useGen } from './state/gen'
+import { initLlmEvents } from './state/llm'
+import { initStylesPersistence, useStyles } from './state/styles'
 import { useTagdb } from './state/tagdb'
 import { initWorkspacePersistence, useWorkspace } from './state/workspace'
 
@@ -22,6 +33,10 @@ export default function App(): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const tagdbStatus = useTagdb((s) => s.status)
   const initTagdb = useTagdb((s) => s.init)
+  const loadStyles = useStyles((s) => s.load)
+  const presets = useStyles((s) => s.presets)
+  // 顶栏的视图切换。不持久化：每次启动回到工作台
+  const [view, setView] = useState<'workbench' | 'styles'>('workbench')
 
   useEffect(() => {
     void window.api.appVersion().then(setVersion)
@@ -34,9 +49,15 @@ export default function App(): JSX.Element {
   useEffect(() => {
     void loadConfig()
     void loadWorkspace()
-  }, [loadConfig, loadWorkspace])
+    void loadStyles()
+  }, [loadConfig, loadWorkspace, loadStyles])
 
   useEffect(() => initWorkspacePersistence(), [])
+  useEffect(() => initStylesPersistence(), [])
+  // 日志与一轮的结束都经 llm:event 推来；订阅挂在 App 上，切到画风维护视图时照样收
+  useEffect(() => initLlmEvents(), [])
+  // 出图进度、单张结果、seed 回填都经事件推来；挂在 App 上，切到画风维护视图时照样收
+  useEffect(() => initGenSubscriptions(), [])
 
   /**
    * 从没保存过设置时，启动后自动弹设置抽屉（规格 §14.3）。
@@ -60,11 +81,22 @@ export default function App(): JSX.Element {
     [config.naiCharPromptOrder],
   )
 
+  // 配置读不回来时照样放出工作台（按默认配置，顶部已写明）；工作区读不回来时停在载入中，顶部同样写明原因
+  const workbench = view === 'workbench' && workspace !== null && (configLoaded || configLoadError !== null) ? workspace : null
+
   return (
     <div className="app">
       <header className="app-header">
         <span className="app-title">llm-nai-toolbox</span>
         {version !== '' && <span className="app-version">v{version}</span>}
+        <div className="view-switch" role="tablist">
+          <button type="button" role="tab" className={view === 'workbench' ? 'is-on' : ''} onClick={() => setView('workbench')}>
+            工作台
+          </button>
+          <button type="button" role="tab" className={view === 'styles' ? 'is-on' : ''} onClick={() => setView('styles')}>
+            画风维护
+          </button>
+        </div>
         <span className="header-spacer" />
         <button type="button" className="header-button" onClick={() => setSettingsOpen(true)}>
           设置
@@ -99,21 +131,62 @@ export default function App(): JSX.Element {
         </div>
       )}
 
-      <main className="workarea">
-        {/* 配置读不回来时照样放出界面（按默认配置，顶部已写明）；
-            工作区读不回来时停在载入中，顶部同样写明原因 */}
-        {workspace !== null && (configLoaded || configLoadError !== null) ? (
-          <PromptPane
-            workspace={workspace}
-            mainSpecs={mainSpecs}
-            charSpecs={charSpecs}
-            maxCharacters={config.naiMaxCharacters}
-            update={updateWorkspace}
-          />
-        ) : (
-          <div className="placeholder">载入中…</div>
-        )}
-      </main>
+      {workbench !== null && (
+        <Toolbar />
+      )}
+
+      {view === 'styles' ? (
+        <main className="workarea">
+          <StyleManager />
+        </main>
+      ) : (
+        // 版面 A：左历史竖栏 ｜ 中间一列 ｜ 右 WIKI 竖栏（可整体收起）
+        <div className="body">
+          {workbench !== null && <HistoryRail />}
+          <div className="center">
+            {/* 日志抽屉的遮罩只盖这一块：工作区。指令区不被盖住 */}
+            <div className="stage">
+              <main className="workarea">
+                {workbench !== null ? (
+                  <PromptPane
+                    workspace={workbench}
+                    mainSpecs={mainSpecs}
+                    charSpecs={charSpecs}
+                    maxCharacters={config.naiMaxCharacters}
+                    update={updateWorkspace}
+                  />
+                ) : (
+                  <div className="placeholder">载入中…</div>
+                )}
+              </main>
+              {workbench !== null && <LlmLogDrawer />}
+            </div>
+            {/* 指令区固定在中间一列底部，不随工作区滚动 */}
+            {workbench !== null && (
+              <LlmConsole
+                workspace={workbench}
+                config={config}
+                presets={presets}
+                mainSpecs={mainSpecs}
+                charSpecs={charSpecs}
+                update={updateWorkspace}
+                onOpenStyles={() => setView('styles')}
+              />
+            )}
+          </div>
+          {workbench !== null && <WikiRail />}
+        </div>
+      )}
+
+      {/* 出图弹窗与暂停/中止弹框是全局浮层：切到画风维护视图照样弹 */}
+      <GenDialog mainSpecs={mainSpecs} charSpecs={charSpecs} update={updateWorkspace} />
+      <GenRunDialogs
+        onOpenSettings={() => {
+          // 出图弹窗的层级高于设置抽屉，不关掉它设置抽屉会被挡住
+          useGen.getState().closeDialog()
+          setSettingsOpen(true)
+        }}
+      />
 
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>

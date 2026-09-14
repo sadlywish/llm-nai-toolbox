@@ -1,8 +1,17 @@
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { EditorSelection, EditorState } from '@codemirror/state'
-import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/view'
+import {
+  Decoration,
+  EditorView,
+  ViewPlugin,
+  keymap,
+  placeholder as cmPlaceholder,
+  type DecorationSet,
+  type ViewUpdate,
+} from '@codemirror/view'
 import { useEffect, useRef } from 'react'
 import { completionTargetInText, type CompletionPrefer } from '@shared/blockCompletion'
+import { findFullWidthCommas, fullWidthCommaMessage } from '@renderer/prompt/fullWidthComma'
 import { WEIGHT_STEP, adjustWeight } from '@renderer/prompt/weight'
 import { tagCompletion } from './completion'
 
@@ -13,6 +22,8 @@ interface Props {
   placeholder?: string
   /** 补全偏好，只在创建编辑器时读取一次。负面词里写的是通用标签 */
   prefer?: CompletionPrefer
+  /** 标红全角逗号与顿号，只在创建编辑器时读取一次。标签串用；自然语言内容不要开 */
+  flagFullWidthComma?: boolean
 }
 
 /** Ctrl+↑/↓ 调权重。算法与分块编辑器共用 prompt/weight.ts，只是不需要换算段内坐标 */
@@ -30,6 +41,28 @@ function weightCommand(delta: number) {
   }
 }
 
+function commaMarks(view: EditorView): DecorationSet {
+  return Decoration.set(
+    findFullWidthCommas(view.state.doc.toString()).map((hit) =>
+      Decoration.mark({ class: 'blk-comma', attributes: { title: fullWidthCommaMessage(hit.char) } }).range(hit.from, hit.to),
+    ),
+  )
+}
+
+/** 全角逗号标红，外观与分块编辑器同一个 .blk-comma 样式 */
+const fullWidthCommaPlugin = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet
+    constructor(view: EditorView) {
+      this.decorations = commaMarks(view)
+    }
+    update(update: ViewUpdate): void {
+      if (update.docChanged) this.decorations = commaMarks(update.view)
+    }
+  },
+  { decorations: (v) => v.decorations },
+)
+
 /**
  * 纯文本的标签编辑器：本地标签补全 + Ctrl+↑/↓ 调权重。
  *
@@ -41,6 +74,7 @@ export default function TagTextEditor({
   onChange,
   placeholder = '',
   prefer = 'general',
+  flagFullWidthComma = false,
 }: Props): JSX.Element {
   const host = useRef<HTMLDivElement | null>(null)
   const view = useRef<EditorView | null>(null)
@@ -63,6 +97,7 @@ export default function TagTextEditor({
         tagCompletion((doc, pos) => completionTargetInText(doc, pos, prefer)),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
+        ...(flagFullWidthComma ? [fullWidthCommaPlugin] : []),
         cmPlaceholder(placeholder),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) onChangeRef.current(update.state.doc.toString())

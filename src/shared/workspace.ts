@@ -1,11 +1,16 @@
 import { emptyValues, sanitizeFieldText, type FieldValues } from './blockDoc'
 import { CHARACTER_FIELDS, MAIN_FIELDS, type FieldSpec } from './fields'
 import { newId } from './ids'
-import { NOISE_SCHEDULE_OPTIONS, SAMPLER_OPTIONS, UC_PRESET_OPTIONS } from './naiOptions'
+import type { MultiCharacterMode } from './llm'
+import { NOISE_SCHEDULE_OPTIONS, SAMPLER_OPTIONS } from './naiOptions'
 
 /** seed 分配策略：每张随机，或固定用参数区里的 seed */
 export type SeedMode = 'fixed' | 'perImage'
 
+/**
+ * 生成参数。没有负面预设、质量词开关与 Variety Boost：工具主要面向 V5，V5 不支持 Variety Boost；
+ * 官网的默认正面/负面词不悄悄加进请求，将来要用也是在设置里选「用官网配置覆盖」。
+ */
 export interface GenParams {
   model: string
   width: number
@@ -16,9 +21,6 @@ export interface GenParams {
   sampler: string
   noiseSchedule: string
   cfgRescale: number
-  ucPreset: number
-  qualityToggle: boolean
-  varietyBoost: boolean
   /** perImage 模式下该值不参与计算，仅用于展示与回填 */
   seed: number
   seedMode: SeedMode
@@ -36,6 +38,25 @@ export interface CharacterPrompt {
   position: string
 }
 
+export type StyleMode = 'none' | 'preset' | 'current'
+
+/** 指令区的输入与开关。随工作区保存，重开应用时还是上次的样子 */
+export interface ConsoleOptions {
+  instruction: string
+  /** 多角色：关闭 / 位置由模型安排 / 手动指定坐标 */
+  multiCharacter: MultiCharacterMode
+  /** 在现有内容上修改 */
+  editExisting: boolean
+  /** 透明背景 */
+  transparent: boolean
+  /** 画风：不覆盖 / 用选用的预设覆盖 / 用当前 artist 块覆盖 */
+  styleMode: StyleMode
+  /** 选中的画风预设 id；styleMode 不是 preset 时无意义 */
+  presetId: string
+  /** 回填后自动生成：LLM 回填成功后直接按跑图次数开始生成 */
+  autoGenerate: boolean
+}
+
 /**
  * 当前工作状态（workspace.json）。
  *
@@ -50,6 +71,9 @@ export interface Workspace {
   characters: CharacterPrompt[]
   /** 角色坐标是否发送给 NAI；关闭时由模型安排位置 */
   useCoords: boolean
+  /** 跑图次数：手动生成与「回填后自动生成」共用 */
+  runCount: number
+  console: ConsoleOptions
 }
 
 /**
@@ -66,13 +90,14 @@ export function defaultGenParams(): GenParams {
     sampler: 'k_euler_ancestral',
     noiseSchedule: 'karras',
     cfgRescale: 0,
-    ucPreset: 0,
-    qualityToggle: true,
-    varietyBoost: false,
     seed: -1,
     seedMode: 'perImage',
     transparentBackground: false,
   }
+}
+
+export function defaultConsoleOptions(): ConsoleOptions {
+  return { instruction: '', multiCharacter: 'off', editExisting: false, transparent: false, styleMode: 'none', presetId: '', autoGenerate: false }
 }
 
 export function createCharacter(): CharacterPrompt {
@@ -93,6 +118,8 @@ export function emptyWorkspace(): Workspace {
     params: defaultGenParams(),
     characters: [],
     useCoords: false,
+    runCount: 1,
+    console: defaultConsoleOptions(),
   }
 }
 
@@ -125,14 +152,30 @@ function normalizeParams(raw: unknown): GenParams {
   }
   const params = out as GenParams
   if (params.seedMode !== 'fixed' && params.seedMode !== 'perImage') params.seedMode = base.seedMode
-  // sampler / noiseSchedule / ucPreset 是接口认的固定字面量（见 naiOptions.ts）：
+  // sampler / noiseSchedule 是接口认的固定字面量（见 naiOptions.ts）：
   // 类型对但值不在选项表里（如手改文件、旧版本遗留值）一样要回默认值，
   // 否则下拉框会显示成空白，真正发起生成时又会被 NovelAI 报 400。
   // model 不做这层校验——V5 系列模型名未公布，允许用户填自定义名（见 ParamsPanel 的「自定义」入口）。
   if (!SAMPLER_OPTIONS.includes(params.sampler)) params.sampler = base.sampler
   if (!NOISE_SCHEDULE_OPTIONS.includes(params.noiseSchedule)) params.noiseSchedule = base.noiseSchedule
-  if (!UC_PRESET_OPTIONS.some((o) => o.value === params.ucPreset)) params.ucPreset = base.ucPreset
   return params
+}
+
+const MULTI_MODES: readonly MultiCharacterMode[] = ['off', 'auto', 'coords']
+const STYLE_MODES: readonly StyleMode[] = ['none', 'preset', 'current']
+
+function normalizeConsole(raw: unknown): ConsoleOptions {
+  const base = defaultConsoleOptions()
+  if (!isRecord(raw)) return base
+  return {
+    instruction: str(raw.instruction),
+    multiCharacter: MULTI_MODES.find((m) => m === raw.multiCharacter) ?? base.multiCharacter,
+    editExisting: typeof raw.editExisting === 'boolean' ? raw.editExisting : base.editExisting,
+    transparent: typeof raw.transparent === 'boolean' ? raw.transparent : base.transparent,
+    styleMode: STYLE_MODES.find((m) => m === raw.styleMode) ?? base.styleMode,
+    presetId: str(raw.presetId),
+    autoGenerate: typeof raw.autoGenerate === 'boolean' ? raw.autoGenerate : base.autoGenerate,
+  }
 }
 
 /**
@@ -169,5 +212,7 @@ export function normalizeWorkspace(raw: unknown): Workspace {
     params: normalizeParams(raw.params),
     characters,
     useCoords: typeof raw.useCoords === 'boolean' ? raw.useCoords : base.useCoords,
+    runCount: typeof raw.runCount === 'number' && Number.isInteger(raw.runCount) && raw.runCount >= 1 ? raw.runCount : base.runCount,
+    console: normalizeConsole(raw.console),
   }
 }

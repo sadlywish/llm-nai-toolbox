@@ -10,10 +10,44 @@ export const IPC = {
   tagdbStatusGet: 'tagdb:status:get',
   configLoad: 'config:load',
   configSave: 'config:save',
+  pickDirectory: 'dialog:pick-directory',
   workspaceLoad: 'workspace:load',
   workspaceSave: 'workspace:save',
   /** 关窗前的同步冲刷（sendSync），防抖窗口内还没落盘的那一次 */
   workspaceFlush: 'workspace:flush',
+  /** 跑一轮 LLM（invoke）。同一时刻只允许一轮 */
+  llmRun: 'llm:run',
+  /** 中止正在跑的那一轮（invoke） */
+  llmAbort: 'llm:abort',
+  /** 主进程 → 渲染进程：日志行与轮次 */
+  llmEvent: 'llm:event',
+  stylesLoad: 'styles:load',
+  stylesSave: 'styles:save',
+  /** 关窗前的同步冲刷（sendSync），同 workspace:flush */
+  stylesFlush: 'styles:flush',
+  /** 开跑一轮出图；整轮结束才返回最终进度 */
+  genStart: 'gen:start',
+  genResume: 'gen:resume',
+  genCancel: 'gen:cancel',
+  /** 主进程 → 渲染进程：进度、单张结果、要写回参数区的 seed */
+  genProgress: 'gen:progress',
+  genImage: 'gen:image',
+  genSeed: 'gen:seed',
+  historyLoad: 'history:load',
+  imageRead: 'image:read',
+  imageMeta: 'image:meta',
+  copyImageAt: 'clipboard:copy-image-at',
+  /** WIKI 栏：本地库精确查找（分类、中文别名、帖子数） */
+  tagdbLookup: 'tagdb:lookup',
+  /** 「加入」插不进去时的退路 */
+  clipboardWriteText: 'clipboard:write-text',
+  danbooruTags: 'danbooru:tags',
+  danbooruTagInfo: 'danbooru:tag-info',
+  danbooruWiki: 'danbooru:wiki',
+  danbooruArtist: 'danbooru:artist',
+  danbooruPosts: 'danbooru:posts',
+  danbooruSearchByOtherName: 'danbooru:search-artists-by-other-name',
+  danbooruSearchByUrl: 'danbooru:search-artists-by-url',
 } as const
 
 export interface TagdbCompleteInput {
@@ -49,10 +83,22 @@ export type TagdbCompleteResult =
   | { ok: true; items: CompletionItem[] }
   | { ok: false; status: TagdbStatus }
 
+/** 本地库精确查找结果（tagdb:lookup） */
+export interface TagLookup {
+  tag: string
+  category: CompletionPrefer
+  zh: string[]
+  count: number
+}
+
 export interface ConfigLoadResult {
   config: AppConfig
   /** 只回传「有没有存过」，明文永远不进渲染进程 */
   hasLlmApiKey: boolean
+  /** 同上：NovelAI Token 有没有存过 */
+  hasNaiToken: boolean
+  /** 同上：Danbooru API Key 有没有存过 */
+  hasDanbooruApiKey: boolean
   /** config.json 在不在；false 时启动自动弹设置抽屉（规格 §14.3） */
   configExists: boolean
 }
@@ -61,4 +107,8 @@ export interface ConfigSaveInput {
   config: AppConfig
   /** undefined = 不改动已存的 Key。设置抽屉不回显明文，没填就不能把已存的覆盖掉 */
   llmApiKey?: string
+  /** 同 llmApiKey：undefined = 不改动已存的 Token */
+  naiToken?: string
+  /** 同 llmApiKey：undefined = 不改动已存的 Key */
+  danbooruApiKey?: string
 }

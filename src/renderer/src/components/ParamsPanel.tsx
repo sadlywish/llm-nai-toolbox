@@ -1,10 +1,4 @@
-import {
-  MODEL_OPTIONS,
-  NOISE_SCHEDULE_OPTIONS,
-  SAMPLER_OPTIONS,
-  UC_PRESET_OPTIONS,
-  alignTo64,
-} from '@shared/naiOptions'
+import { MODEL_OPTIONS, NOISE_SCHEDULE_OPTIONS, SAMPLER_OPTIONS, alignTo64, exceedsOpusFree } from '@shared/naiOptions'
 import type { GenParams } from '@shared/workspace'
 
 const CUSTOM_MODEL = '__custom__'
@@ -19,6 +13,8 @@ interface NumberFieldProps {
   hint?: string
   /** hint 旁的一键修正按钮；目前只有宽高的「对齐到 64」用到 */
   hintAction?: { label: string; onClick: () => void }
+  /** 附加到 label 上的 class，用于按状态高亮 */
+  className?: string
   onCommit: (v: number) => void
 }
 
@@ -31,10 +27,11 @@ function NumberField({
   disabled = false,
   hint,
   hintAction,
+  className,
   onCommit,
 }: NumberFieldProps): JSX.Element {
   return (
-    <label className={`field ${disabled ? 'is-disabled' : ''}`}>
+    <label className={`field ${className ?? ''} ${disabled ? 'is-disabled' : ''}`}>
       <span>{label}</span>
       <input
         type="number"
@@ -75,6 +72,9 @@ export default function ParamsPanel({ params, onChange }: Props): JSX.Element {
   // perImage 模式下 seed 不参与计算，可填反而误导以为钉住了 seed；
   // 置灰后仍展示出图后回填的最后一次实际值，供查看/复制
   const seedDisabled = params.seedMode === 'perImage'
+  // 真正发出去的是对齐到 64 之后的宽高，免费范围按它算
+  const sentWidth = alignTo64(params.width)
+  const sentHeight = alignTo64(params.height)
 
   /**
    * 预览「会被对齐成多少」。不提示的后果不是少个体验优化：用户填 800、
@@ -85,7 +85,7 @@ export default function ParamsPanel({ params, onChange }: Props): JSX.Element {
   }
 
   return (
-    <div className="params">
+    <div className={`params ${params.seedMode === 'fixed' ? 'is-fixed-seed' : ''}`}>
       <label className="field span2">
         <span>模型</span>
         <select
@@ -124,39 +124,86 @@ export default function ParamsPanel({ params, onChange }: Props): JSX.Element {
         </label>
       )}
 
-      <NumberField
-        label="宽度"
-        value={params.width}
-        step={64}
-        hint={dimensionHint(params.width)}
-        hintAction={{
-          label: '对齐到 64',
-          onClick: () =>
+      {/* 尺寸与 Seed 是反复改动的热参数，紧跟模型。尺寸单独框出：LLM 回填会整组覆盖它 */}
+      <div className="size-box">
+        <div className="size-box-head">
+          <span>尺寸</span>
+          {exceedsOpusFree(sentWidth, sentHeight) && (
+            <span
+              className="opus-warn"
+              role="note"
+              title={`总像素 ${sentWidth}×${sentHeight} = ${sentWidth * sentHeight}，超过 1024×1024，每张图都会消耗 Anlas`}
+            >
+              超出 Opus 免费范围
+            </span>
+          )}
+          <span className="size-box-note">LLM 回填时会按宽高比与像素上限重算，覆盖这里的宽高</span>
+        </div>
+        <div className="two-col">
+          <NumberField
+            label="宽度"
+            value={params.width}
+            step={64}
+            hint={dimensionHint(params.width)}
+            hintAction={{
+              label: '对齐到 64',
+              onClick: () =>
+                onChange((p) => {
+                  p.width = alignTo64(p.width)
+                }),
+            }}
+            onCommit={(v) =>
+              onChange((p) => {
+                p.width = v
+              })
+            }
+          />
+          <NumberField
+            label="高度"
+            value={params.height}
+            step={64}
+            hint={dimensionHint(params.height)}
+            hintAction={{
+              label: '对齐到 64',
+              onClick: () =>
+                onChange((p) => {
+                  p.height = alignTo64(p.height)
+                }),
+            }}
+            onCommit={(v) =>
+              onChange((p) => {
+                p.height = v
+              })
+            }
+          />
+        </div>
+      </div>
+
+      <label className="field row-start seed-mode">
+        <span>Seed 模式</span>
+        <select
+          value={params.seedMode}
+          onChange={(e) => {
+            const v = e.target.value
+            if (v !== 'fixed' && v !== 'perImage') return
             onChange((p) => {
-              p.width = alignTo64(p.width)
-            }),
-        }}
+              p.seedMode = v
+            })
+          }}
+        >
+          <option value="perImage">每张随机</option>
+          <option value="fixed">固定</option>
+        </select>
+      </label>
+      <NumberField
+        label="Seed"
+        value={params.seed}
+        disabled={seedDisabled}
+        hint={seedDisabled ? '每张随机，出图后回填最后一次的值' : undefined}
+        className="seed-value"
         onCommit={(v) =>
           onChange((p) => {
-            p.width = v
-          })
-        }
-      />
-      <NumberField
-        label="高度"
-        value={params.height}
-        step={64}
-        hint={dimensionHint(params.height)}
-        hintAction={{
-          label: '对齐到 64',
-          onClick: () =>
-            onChange((p) => {
-              p.height = alignTo64(p.height)
-            }),
-        }}
-        onCommit={(v) =>
-          onChange((p) => {
-            p.height = v
+            p.seed = v
           })
         }
       />
@@ -228,79 +275,6 @@ export default function ParamsPanel({ params, onChange }: Props): JSX.Element {
         onCommit={(v) =>
           onChange((p) => {
             p.cfgRescale = v
-          })
-        }
-      />
-      <label className="field">
-        <span>负面预设</span>
-        <select
-          value={params.ucPreset}
-          onChange={(e) => {
-            const v = Number(e.target.value)
-            onChange((p) => {
-              p.ucPreset = v
-            })
-          }}
-        >
-          {UC_PRESET_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="field-check">
-        <input
-          type="checkbox"
-          checked={params.qualityToggle}
-          onChange={(e) => {
-            const checked = e.target.checked
-            onChange((p) => {
-              p.qualityToggle = checked
-            })
-          }}
-        />
-        质量词（Quality Toggle）
-      </label>
-      <label className="field-check">
-        <input
-          type="checkbox"
-          checked={params.varietyBoost}
-          onChange={(e) => {
-            const checked = e.target.checked
-            onChange((p) => {
-              p.varietyBoost = checked
-            })
-          }}
-        />
-        Variety Boost
-      </label>
-
-      <label className="field">
-        <span>Seed 模式</span>
-        <select
-          value={params.seedMode}
-          onChange={(e) => {
-            const v = e.target.value
-            if (v !== 'fixed' && v !== 'perImage') return
-            onChange((p) => {
-              p.seedMode = v
-            })
-          }}
-        >
-          <option value="perImage">每张随机</option>
-          <option value="fixed">固定</option>
-        </select>
-      </label>
-      <NumberField
-        label="Seed"
-        value={params.seed}
-        disabled={seedDisabled}
-        hint={seedDisabled ? '每张随机，出图后回填最后一次的值' : undefined}
-        onCommit={(v) =>
-          onChange((p) => {
-            p.seed = v
           })
         }
       />
