@@ -10,6 +10,7 @@ import {
   stripUnsupportedLoras,
 } from '../../src/main/llm/nai'
 import type { JsonObject } from '../../src/main/llm/types'
+import { PIXEL_PRESETS } from '../../src/shared/naiOptions'
 
 describe('normalizeNaiArtists', () => {
   it('词首的 @ 换成 artist:，含权重与括号写法', () => {
@@ -51,6 +52,14 @@ describe('calcNaiDimensions', () => {
 
   it('比例写坏了按 1:1', () => {
     expect(calcNaiDimensions('abc', 1048576)).toEqual([1024, 1024])
+  })
+
+  it('三个像素上限预设在各自的官网比例上换算回官网尺寸', () => {
+    const px = (id: string): number => PIXEL_PRESETS.find((p) => p.id === id)!.pixels
+    expect(calcNaiDimensions('2:3', px('normal'))).toEqual([832, 1216])
+    expect(calcNaiDimensions('1:1', px('large'))).toEqual([1472, 1472])
+    expect(calcNaiDimensions('16:9', px('wallpaper'))).toEqual([1920, 1088])
+    expect(calcNaiDimensions('9:16', px('wallpaper'))).toEqual([1088, 1920])
   })
 })
 

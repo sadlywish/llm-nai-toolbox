@@ -41,8 +41,9 @@ function Blocks({ values, specs }: { values: FieldValues; specs: readonly FieldS
   )
 }
 
+/** 尺寸不在这一行：它和 Seed 一起单独放在最前面 */
 function paramsLine(p: GenParams): string {
-  return `${p.model} · ${p.width}×${p.height} · steps ${p.steps} · CFG ${p.scale} · CFG Rescale ${p.cfgRescale} · ${p.sampler} · ${p.noiseSchedule} · 透明背景 ${p.transparentBackground ? '开' : '关'}`
+  return `${p.model} · steps ${p.steps} · CFG ${p.scale} · CFG Rescale ${p.cfgRescale} · ${p.sampler} · ${p.noiseSchedule} · 透明背景 ${p.transparentBackground ? '开' : '关'}`
 }
 
 /** Comment 里是 JSON：排版后显示；不是 JSON 就原样 */
@@ -124,6 +125,19 @@ export default function GenInspector({ item, mainSpecs, charSpecs, update, onClo
 
       {tab === 'tool' ? (
         <div className="gen-inspector-body">
+          {/* 尺寸与 Seed 是最常要对照的两项，并排放最前 */}
+          <div className="gen-hot-row">
+            <div className="gen-field">
+              <span className="gen-field-label">尺寸</span>
+              <span className="gen-field-value">
+                {snapshot.params.width}×{snapshot.params.height}
+              </span>
+            </div>
+            <div className="gen-field">
+              <span className="gen-field-label">Seed</span>
+              <span className="gen-field-value">{record.seed}</span>
+            </div>
+          </div>
           <div className="gen-field">
             <span className="gen-field-label">整图</span>
             <Blocks values={snapshot.main} specs={mainSpecs} />
@@ -148,10 +162,6 @@ export default function GenInspector({ item, mainSpecs, charSpecs, update, onClo
           <div className="gen-field">
             <span className="gen-field-label">参数 · 使用坐标定位 {snapshot.useCoords ? '开' : '关'}</span>
             <span className="gen-field-value">{paramsLine(snapshot.params)}</span>
-          </div>
-          <div className="gen-field">
-            <span className="gen-field-label">Seed</span>
-            <span className="gen-field-value">{record.seed}</span>
           </div>
           <details className="gen-field">
             <summary className="gen-field-label">拼接结果</summary>

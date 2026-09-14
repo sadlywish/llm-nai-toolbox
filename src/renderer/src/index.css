@@ -209,6 +209,11 @@ body {
 .token-bar.is-over { color: var(--danger); }
 .params { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-content: start; min-width: 0; }
 .params .row-start { grid-column: 1; }
+/* 尺寸框（界面稿 2026-09-14-pixel-preset-mockup 第二部分方案 1） */
+.size-box { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: 5px; padding: 7px 9px 9px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.size-box-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12.5px; color: var(--ink-dim); }
+.size-box-note { color: var(--ink-faint); font-size: 12px; }
+.opus-warn { border: 1px solid #b8862e; background: rgba(229, 192, 123, .14); color: #f0d9a8; border-radius: 4px; padding: 5px 9px; font-size: 12.5px; }
 .placeholder { color: var(--ink-faint); padding: 12px; }
 
 .banner-error {
@@ -366,6 +371,7 @@ body {
 .ln.w, .ln.w .lv { color: var(--warn); }
 .ln.e, .ln.e .lv { color: var(--danger); }
 .settings-drawer .field-row input { flex: 1; min-width: 0; }
+.settings-drawer .field-row select.pixel-preset { flex: 0 0 220px; }
 .ln.ok { color: var(--ok); }
 
 /* ── 原图查看器（1:1 + 拖动平移） ───────────────────────── */
@@ -643,6 +649,7 @@ body {
 .gen-tabs button.is-on { border-color: var(--accent); background: rgba(74, 158, 255, .12); color: var(--ink); }
 .gen-inspector-body { display: flex; flex-direction: column; gap: 8px; }
 .gen-field { display: flex; flex-direction: column; gap: 2px; }
+.gen-hot-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .gen-field-label { color: var(--ink-faint); font-size: 11px; }
 details.gen-field > summary { cursor: pointer; }
 .gen-field-value { font-family: var(--mono); word-break: break-all; color: var(--ink); }

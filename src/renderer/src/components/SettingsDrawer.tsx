@@ -15,7 +15,10 @@ import {
   type OpenAIReasoningDialect,
   type OpenAIReasoningEffort,
 } from '@shared/config'
+import { PIXEL_PRESETS, pixelPresetOf } from '@shared/naiOptions'
 import { useConfig } from '../state/config'
+
+const MANUAL_PIXELS = 'manual'
 
 type BooleanKey = { [K in keyof AppConfig]: AppConfig[K] extends boolean ? K : never }[keyof AppConfig]
 type StringKey = { [K in keyof AppConfig]: AppConfig[K] extends string ? K : never }[keyof AppConfig]
@@ -206,6 +209,10 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
   const errorOf = (key: keyof AppConfig): ReactNode =>
     errors[key] !== undefined ? <span className="field-error">{errors[key]}</span> : null
 
+  // 下拉跟着输入框的文本走：恰好等于某个预设就显示它，否则（含半截输入）显示「手动设置」
+  const pixelsText = numericText.naiMaxPixels.trim()
+  const pixelPreset = pixelsText === '' ? null : pixelPresetOf(Number(pixelsText))
+
   const restoreButton = (key: StringKey): ReactNode => (
     <button type="button" onClick={() => restore(key)}>
       恢复默认
@@ -374,6 +381,39 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
                 {numberField('taskIntervalMs', '任务间隔（毫秒）')}
                 {numberField('historyDays', '历史保留天数')}
               </div>
+              <div className="drawer-subtitle">多角色与分辨率</div>
+              <div className="two-col">{numberField('naiMaxCharacters', '角色数上限')}</div>
+              <label className="field">
+                <span>像素上限</span>
+                <div className="field-row">
+                  <select
+                    className="pixel-preset"
+                    value={pixelPreset ?? MANUAL_PIXELS}
+                    onChange={(e) => {
+                      const preset = PIXEL_PRESETS.find((p) => p.id === e.target.value)
+                      // 选「手动设置」不改值：输入框里是什么就还是什么
+                      if (preset) setNumber('naiMaxPixels', String(preset.pixels))
+                    }}
+                  >
+                    <option value={MANUAL_PIXELS}>手动设置</option>
+                    {PIXEL_PRESETS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}（{p.size}）
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={numericText.naiMaxPixels}
+                    onChange={(e) => setNumber('naiMaxPixels', e.target.value)}
+                  />
+                </div>
+                <span className="field-hint">
+                  宽高比换算宽高时的总像素上限。选预设即写入右边的值；手改成不等于任何预设的值时，下拉回到「手动设置」
+                </span>
+                {errorOf('naiMaxPixels')}
+              </label>
             </Group>
 
             <Group title="思维链">
@@ -468,13 +508,6 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
               {textField('naiCharPromptOrder', '角色字段顺序', { hint: '同时决定角色编辑器里块的先后' })}
               {checkField('tailInjectionEnabled', '尾部注入')}
               {draft.tailInjectionEnabled && areaField('tailInjection', '尾部注入内容', 3)}
-            </Group>
-
-            <Group title="多角色与分辨率">
-              <div className="two-col">
-                {numberField('naiMaxCharacters', '角色数上限')}
-                {numberField('naiMaxPixels', '像素上限', { hint: '宽高比换算宽高时的总像素上限' })}
-              </div>
             </Group>
 
             <Group title="工具循环">
