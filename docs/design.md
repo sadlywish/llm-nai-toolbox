@@ -26,7 +26,7 @@ llm-nai-toolbox 的架构与关键取舍。使用方法见 [README](../README.md
 | `main/store.ts` · `config-store.ts` · `secret-store.ts` | `workspace.json` / `styles.json` / `config.json` / `secrets.json` 的原子读写；密钥用 `safeStorage` 加密 |
 | `renderer/components/` | 工具栏、历史竖栏、出图弹窗与溯源信息、指令区（固定在中间列底部）与日志抽屉、提示词面板、参数区、角色面板、画风维护、设置抽屉——布局与交互照画师串工具箱与已确认的界面稿 |
 | `main/nai/` | NovelAI 协议：请求体、出图客户端与错误分级、zip 解包、读 PNG 元信息、画面文字处理、落盘与 `_index.json` |
-| `main/danbooru/` | 只服务右侧 WIKI 区 |
+| `main/danbooru/` | 只服务右侧 WIKI 栏：`client.ts`（令牌桶容量 6、每秒回补 1；10s 超时；内存 LRU + 磁盘 7 天缓存；`tagInfo`、posts 排序；测试用 `LLM_NAI_DANBOORU_BASE_URL` 换桩地址）、`cache.ts`、`cdn.ts`（给 `cdn.donmai.us` 图片请求补 Referer） |
 | `main/tagdb/` | 本地标签库：索引加载与补全、LLM 工具数据的惰性加载、分类浏览、释义与废弃表、角色特征、搜索结果格式化 |
 | `main/llm/` | 一轮 LLM 交互：两个端点、工具 schema、参数兜底与 NovelAI 规范化、上下文组装、收口后处理、多轮循环 |
 | `main/gen/` | 一轮出图的编排：快照与拼接、串行队列（429 暂停、Token/点数中止、按张重试）、seed 分配与回填 |
@@ -142,7 +142,9 @@ llm:event finished { LlmRunResult：filled（带 FillResult）/ noParams / faile
 
 **字段顺序串必须恰好包含全部字段。** 它同时决定拼接顺序与编辑器里块的先后；插件允许漏写字段（漏掉的不拼接），这里不允许，否则会有一个看得见却发不出去的块。
 
-API Key 在 `secrets.json`，渲染进程只知道「有没有存过」，明文不进渲染进程。
+设置抽屉的 Danbooru 分组另有一项非密钥配置：`danbooruLogin`（用户名，默认空串，不填也能匿名查询，填了翻页上限更高、限流更宽）。
+
+密钥全部在 `secrets.json`，渲染进程只知道「有没有存过」，明文不进渲染进程；`SecretName` 现有 `llmApiKey`、`naiToken`、`danbooruApiKey` 三项。Danbooru API Key 只走 `Authorization: Basic` 头，绝不进 URL、缓存键或错误文案。
 
 ---
 
@@ -225,6 +227,24 @@ API Key 在 `secrets.json`，渲染进程只知道「有没有存过」，明文
 **界面**照工具箱：工具栏（跑图次数、生成、继续、取消、状态）贯穿全宽；左侧历史竖栏读最近「历史保留天数」天的轮次，跑图中最上面那条实时走进度；点「生成」自动弹出图弹窗，关掉不中断任务。弹窗里单击一张打开溯源信息——「本工具参数」是落盘的快照与拼接结果，「图片元信息」直接读图片文件；双击格子或点预览图打开原图查看器（1:1 优先、滚轮缩放、拖拽平移）。图片一律经 `image:read` 读成 object URL，开发态与打包态一条路。
 
 **复制信息**把快照整套覆盖到参数区，唯一例外是 seed：取图片元信息里的 seed（读不到用记录里的）并改成固定模式；固定模式在参数区与工具栏都有醒目提示。生成前 token 超限直接拦下，不发请求。
+
+---
+
+## WIKI 竖栏
+
+右侧 400px 竖栏，按「画师 / 标签」两种数据源查 Danbooru，显示词条信息、wiki 正文、See also、例图；「跟随光标」时随正向提示词里光标所在的词自动查询；「加入」把当前词插回提示词里上次光标的位置。
+
+**收起 = 整栏不渲染 + 不订阅光标广播**：开关是工具栏最右端的按钮（收起「◂ WIKI」、展开「WIKI ▸」高亮）。收起、跟随、数据源三项存 `localStorage`（`wiki.collapsed` / `wiki.follow-cursor` / `wiki.source`，读写 try/catch），读不到时默认展开、跟随开、标签源。
+
+**数据流**：`PromptEditor`（整图与各角色的分块编辑器，`editorId` 分别是 `main` 与 `char:<id>`）在 `updateListener` 里对选区变化调 `cursorBus.emit`——但只在**有订阅者**时才取文档（`cursorBus.active()`），WIKI 栏收起或跟随关闭时没有订阅者，编辑器那侧零开销。WIKI 栏展开且跟随开着时订阅 `cursorBus`，用 `completionTargetAt(doc, specs, head)` 取光标处的词，交给 `useWiki.onCursorWord`（清洗掉 `{}`/`[]`/纯数字、同一个词不重复查询、400ms 防抖、`tagdb:lookup` 判定是否画师）→ `show(tag, source)` → 两源并发发请求；每次 `show` 带递增序号，旧序号的结果回来直接丢弃。
+
+**标签源**：并发取 `tagInfo` + `wiki` + `posts`（`order:score`，评分最高 6 张；被拒——例如匿名用户的排序限制——退回不带 `order` 重试一次，至少有图）。**画师源**：并发取 `artist` + `wiki`，再用画师条目给的规范名（查不到就退回输入的规范化写法）查 `tags` 取总帖子数，`computePageBuckets` 算出新/中/旧三档页码（每页 20 张，各显示前 6 张；总页数不够分三档时退化显示现有页数，并提示「作品页数不足以分出新/中/旧三档」）。
+
+**「加入」**：`editorRegistry.insertIntoLastEditor` 取最后聚焦的正向提示词编辑器与其当前选区，按 `insertTagAt` 规则（光标所在单元非空则插到单元末尾，自动补「, 」分隔）改写该字段并把焦点还回去；插不进去（从没聚焦过、那个框已卸载、改动被分块守卫拒绝）就退回 `clipboard:write-text` 并在词条头下方提示「已复制到剪贴板」。插入文本：画师是 `artist:` + 名字，所有 `_` 换成空格。
+
+**DText**：`shared/dtext.ts` 把 wiki 正文解析成节点树（标题降两级、列表、引用、代码块、行内样式、`[[内链]]`、外链、`!post #id` 内嵌图），`DText.tsx` 只负责渲染，不拼 HTML 字符串。内链点击在栏内切换词条；外链渲染成 `target="_blank"`，交给主进程 `setWindowOpenHandler`（只放行 http/https）用系统浏览器打开；站内相对链接补全成绝对地址。See also：识别标题文字为「see also」（不分大小写）的一节，把其中的内链收集成一行芯片，该节本身不进正文渲染。
+
+Danbooru 失败是唯一的静默降级：不弹窗，只在词条头/正文/例图各自的区块里写一行灰字「D 站请求失败：原因」；本地标签库那部分（中文别名、分类）照常显示。
 
 ---
 
