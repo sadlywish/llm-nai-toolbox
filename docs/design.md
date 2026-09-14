@@ -45,7 +45,7 @@ llm-nai-toolbox 的架构与关键取舍。使用方法见 [README](../README.md
 主进程 runner（main/llm/runner.ts，循环只有这一份）
   0. 备齐标签数据：缺哪个文件就摘掉对应工具，日志写明
   1. system = 系统提示词 + 多角色说明 + tag-skill-core + 手册目录 + 分类目录 + 修改模式规则
-  2. user   = [标签释义] + 指令 + [质量词] + [画风已锁定] + [负面词]
+  2. user   = [标签释义] + 指令 + [质量词] + [负面词]
             修改模式：<现有参数>（取自工作区）+ [用户的修改要求]
   3. 循环 ≤ maxToolRounds：
        工具集 = 生成工具 + search_tags + search_character_features + load_tag_manual + browse_tags
@@ -152,7 +152,7 @@ llm:event finished { LlmRunResult：filled（带 FillResult）/ noParams / faile
 
 三选一，决定 LLM 返回的 `artist` 字段怎么处理：不覆盖 / 用选用的预设覆盖 / 用当前 artist 块覆盖。
 
-后两档会把最终画风以 `[画风已锁定: …]` 注入上下文并要求模型不要写 `artist`。既然写了也会被丢，提前告知既省 token，又让 `appearance` 与 `environment` 不至于写出跟画风打架的内容。
+画风不注入上下文：后两档在回填前直接用锁定的画风覆盖 `artist`（`fill.ts`），模型写什么都会被替换，没必要占用户消息。
 
 两处退化明确处理：选了预设覆盖但预设列表为空 → 该项置灰；选了保持当前但 `artist` 块本来就空 → 退化成不锁定并写明，而不是注入一个空画风让模型犯迷糊。
 

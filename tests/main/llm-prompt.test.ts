@@ -10,7 +10,6 @@ import {
   buildUserPrompt,
   effectiveMultiCharacter,
   resolveStyleLock,
-  styleLockLine,
   workspaceToEditArgs,
 } from '../../src/main/llm/prompt'
 
@@ -42,22 +41,20 @@ describe('buildSystemPrompt', () => {
 })
 
 describe('buildUserPrompt', () => {
-  it('普通：指令，空一行，设置行（质量词、画风锁定、负面词）', () => {
-    expect(buildUserPrompt({ instruction: '画初音', config, lockedStyle: 'artist:wlop', existingParams: null, injection: null })).toBe(
-      `画初音\n\n[质量词: Q]\n${styleLockLine('artist:wlop')}\n[负面词: N]`,
-    )
+  it('普通：指令，空一行，设置行（质量词、负面词）；画风不注入——回填前 artist 会被锁定的画风直接覆盖', () => {
+    expect(buildUserPrompt({ instruction: '画初音', config, existingParams: null, injection: null })).toBe('画初音\n\n[质量词: Q]\n[负面词: N]')
   })
 
   it('有注入块时放在最前；没有任何设置行时只有指令', () => {
     const bare = { ...config, quality: '', negativePrompt: '' }
-    expect(buildUserPrompt({ instruction: '画初音', config: bare, lockedStyle: null, existingParams: null, injection: 'INJ' })).toBe(
+    expect(buildUserPrompt({ instruction: '画初音', config: bare, existingParams: null, injection: 'INJ' })).toBe(
       'INJ\n\n画初音',
     )
   })
 
   it('修改模式：<现有参数> 在前，[用户的修改要求] 在后', () => {
     expect(
-      buildUserPrompt({ instruction: '换成短发', config, lockedStyle: null, existingParams: 'tags: smile', injection: 'INJ' }),
+      buildUserPrompt({ instruction: '换成短发', config, existingParams: 'tags: smile', injection: 'INJ' }),
     ).toBe(
       [
         '[修改模式] 以下是当前的完整生成参数：',
@@ -74,11 +71,6 @@ describe('buildUserPrompt', () => {
         '[负面词: N]',
       ].join('\n'),
     )
-  })
-
-  it('画风锁定行要求不写 artist', () => {
-    expect(styleLockLine('artist:wlop')).toContain('[画风已锁定: artist:wlop')
-    expect(styleLockLine('artist:wlop')).toContain('不要填写 artist 字段')
   })
 })
 

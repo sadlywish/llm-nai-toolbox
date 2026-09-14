@@ -279,10 +279,10 @@ describe('runLlm：指令区的开关', () => {
     expect(h.seen[0].tools[0]).toBe('generate_image_characters')
   })
 
-  it('用选用的预设覆盖：上下文里有锁定行，收口后 artist 被替换', async () => {
+  it('用选用的预设覆盖：画风不注入上下文，收口后 artist 被替换', async () => {
     const h = harness([reply([call('generate_image', { artist: 'someone', tags: 'smile' })])])
     const r = await runLlm(input({ style: { mode: 'preset', tags: 'artist:wlop' } }), h.deps)
-    expect(firstUserText(h.seen[0])).toContain('[画风已锁定: artist:wlop')
+    expect(JSON.stringify(h.seen[0].messages)).not.toContain('artist:wlop')
     expect(r.status).toBe('filled')
     if (r.status === 'filled') expect(r.fill.main.artist).toBe('artist:wlop')
   })

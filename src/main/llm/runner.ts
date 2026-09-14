@@ -126,7 +126,7 @@ export async function runLlm(input: LlmRunInput, deps: RunnerDeps): Promise<LlmR
         : null
     if (injection) log.info(`[tag-inject] 注入 ${(injection.match(/^- /gm) ?? []).length} 条标签释义`)
 
-    const user = buildUserPrompt({ instruction, config, lockedStyle, existingParams, injection })
+    const user = buildUserPrompt({ instruction, config, existingParams, injection })
     log.info(`LLM 请求正文:\n${user}`)
 
     const messages: ChatMessage[] = [userMessage(config.apiType, user)]

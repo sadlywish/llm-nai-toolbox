@@ -11,7 +11,7 @@ import type { JsonObject } from './types'
  *
  * 与插件的差别：
  * - 没有 `[高清修复: …]`（SD 专属）、没有随机画风、没有 LoRA 列表；
- * - 画风三选一的后两档注入 `[画风已锁定: …]`，要求模型不写 artist（规格 §8）；
+ * - 画风三选一的后两档**不注入**用户消息：回填前 artist 会被锁定的画风直接覆盖（fill.ts），模型写什么都无所谓；
  * - 修改模式的 <现有参数> 来自工作区，不是缓存里的上一次参数。
  */
 
@@ -44,11 +44,6 @@ export function buildSystemPrompt(p: SystemPromptParts): string {
   if (skill) system += '\n\n' + skill
   if (p.editExisting) system += EDIT_SYSTEM_BLOCK
   return system
-}
-
-/** 画风锁定时注入用户消息的一行。写了也会被收口后处理覆盖，提前告知既省 token，又让其余字段不至于跟画风打架 */
-export function styleLockLine(tags: string): string {
-  return `[画风已锁定: ${tags}（画风由用户指定，生成时不要填写 artist 字段——收口后 artist 会被替换成这段内容；其余字段照常填写，并与这段画风协调）]`
 }
 
 /**
@@ -86,7 +81,6 @@ export function resolveStyleLock(style: StyleLock, workspace: Workspace, log: Ru
 export interface UserPromptParts {
   instruction: string
   config: AppConfig
-  lockedStyle: string | null
   /** 修改模式的 <现有参数> 文本；非修改模式为 null */
   existingParams: string | null
   /** 标签释义注入块（buildInjectionBlock 的结果） */
@@ -96,7 +90,6 @@ export interface UserPromptParts {
 export function buildUserPrompt(p: UserPromptParts): string {
   const settings: string[] = []
   if (p.config.quality) settings.push(`[质量词: ${p.config.quality}]`)
-  if (p.lockedStyle) settings.push(styleLockLine(p.lockedStyle))
   if (p.config.negativePrompt) settings.push(`[负面词: ${p.config.negativePrompt}]`)
   const settingsText = settings.join('\n')
 
