@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CHARACTER_FIELDS, MAIN_FIELDS, orderSpecs } from '@shared/fields'
+import HistoryRail from './components/HistoryRail'
 import LlmConsole from './components/LlmConsole'
 import LlmLogDrawer from './components/LlmLogDrawer'
 import PromptPane from './components/PromptPane'
@@ -138,6 +139,7 @@ export default function App(): JSX.Element {
       ) : (
         // 版面 A：左历史竖栏 ｜ 中间一列（工作区整体滚动 + 日志抽屉 + 底部指令区）；右 WIKI 竖栏留给计划 6
         <div className="body">
+          {workbench !== null && <HistoryRail />}
           <div className="center">
             {/* 日志抽屉的遮罩只盖这一块：工作区。指令区不被盖住 */}
             <div className="stage">
