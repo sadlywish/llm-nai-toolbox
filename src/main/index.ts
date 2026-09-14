@@ -1,11 +1,18 @@
 import { join } from 'path'
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, screen, shell } from 'electron'
+import { installContextMenu } from './context-menu'
 import { registerIpc } from './ipc'
 
+/* 默认窗口按 1080P 开，并按工作区上限收窄（同画师串工具箱）：
+   设计基准是 1920 − 200（历史竖栏）− 400（WIKI 竖栏）≈ 1320 的中间列。
+   取 workAreaSize 而不是屏幕尺寸，任务栏才不会被盖住；比 1080P 小的屏幕照样能开。 */
 function createWindow(): void {
+  const { workAreaSize } = screen.getPrimaryDisplay()
   const win = new BrowserWindow({
-    width: 1600,
-    height: 1000,
+    width: Math.min(1920, workAreaSize.width),
+    height: Math.min(1080, workAreaSize.height),
+    minWidth: 1024,
+    minHeight: 720,
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#15171b',
@@ -19,6 +26,7 @@ function createWindow(): void {
 
   // 等首屏画完再显示，避免白屏闪一下
   win.on('ready-to-show', () => win.show())
+  installContextMenu(win)
 
   // 页面里的外链一律交给系统浏览器，不在应用内开新窗口
   win.webContents.setWindowOpenHandler(({ url }) => {

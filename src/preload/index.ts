@@ -96,6 +96,9 @@ const api = {
 
   /** 直接从图片文件里读元信息；读不到文件返回 null */
   readImageMeta: (input: ReadImageInput): Promise<ImageMeta | null> => ipcRenderer.invoke(IPC.imageMeta, input),
+
+  /** 复制视口坐标处已渲染的那张图到剪贴板（查看器的「复制」） */
+  copyImageAt: (x: number, y: number): Promise<boolean> => ipcRenderer.invoke(IPC.copyImageAt, { x, y }),
 }
 
 contextBridge.exposeInMainWorld('api', api)

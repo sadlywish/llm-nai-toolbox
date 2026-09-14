@@ -125,6 +125,16 @@ export function registerIpc(
     return result.canceled ? '' : (result.filePaths[0] ?? '')
   })
 
+  ipcMain.handle(IPC.copyImageAt, (event, input: unknown) => {
+    // 入参守卫先于使用：坐标不是数字时 copyImageAt 会抛，异常逃出 handler 就破坏了「永不 reject」
+    if (typeof input !== 'object' || input === null) return false
+    const { x, y } = input as { x?: unknown; y?: unknown }
+    if (typeof x !== 'number' || !Number.isFinite(x)) return false
+    if (typeof y !== 'number' || !Number.isFinite(y)) return false
+    event.sender.copyImageAt(Math.round(x), Math.round(y))
+    return true
+  })
+
   ipcMain.handle(IPC.workspaceLoad, () => normalizeWorkspace(workspaceStore.read()))
 
   ipcMain.handle(IPC.workspaceSave, (_e, ws: unknown) => {

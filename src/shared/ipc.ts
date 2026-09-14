@@ -36,6 +36,7 @@ export const IPC = {
   historyLoad: 'history:load',
   imageRead: 'image:read',
   imageMeta: 'image:meta',
+  copyImageAt: 'clipboard:copy-image-at',
 } as const
 
 export interface TagdbCompleteInput {

@@ -367,3 +367,109 @@ body {
 .ln.e, .ln.e .lv { color: var(--danger); }
 .settings-drawer .field-row input { flex: 1; min-width: 0; }
 .ln.ok { color: var(--ok); }
+
+/* ── 原图查看器（1:1 + 拖动平移） ───────────────────────── */
+
+/* z-index 高于 .dialog-backdrop 的 20：叠在矩阵弹窗之上，而不是替换它 */
+.viewer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+}
+
+.viewer-hud {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 10px 14px;
+  flex: 0 0 auto;
+}
+
+.viewer-zoom {
+  color: #ddd;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 原来是没有内边距的 20px「×」字符，可点面积就是字符本身，用户反馈太小
+   不好点。放大到不小于 32×32 的命中区域，居中排版并加 hover 反馈；
+   位置不变，仍在 .viewer-hud 里靠右 */
+/* 复制按钮与关闭按钮同在 HUD 上。做成带边框的常规按钮，跟关闭那个
+   放大过的 × 区分开——两个都是圆形大图标的话会分不清哪个是关闭 */
+.viewer-copy {
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+.viewer-copy:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.viewer-copied {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.viewer-copied.is-ok {
+  color: #98c379;
+}
+
+.viewer-copied.is-fail {
+  color: #e06c75;
+}
+
+.viewer-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: #ddd;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.viewer-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.viewer-viewport {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  cursor: grab;
+  /* 阻止触屏/触控板把这里的拖动和滚轮手势交给系统默认的页面滚动 */
+  touch-action: none;
+}
+
+.viewer-viewport.is-dragging {
+  cursor: grabbing;
+}
+
+/* 宽高与位置由 ImageViewer 按当前缩放/偏移量算好写成 inline style——
+   这里只留跟数值无关的外观 */
+.viewer-image {
+  position: absolute;
+  left: 0;
+  top: 0;
+  user-select: none;
+}
