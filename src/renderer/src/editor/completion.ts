@@ -2,6 +2,7 @@ import { autocompletion, type CompletionContext, type CompletionResult } from '@
 import type { Extension } from '@codemirror/state'
 import { completionTargetAt, type CompletionTarget } from '@shared/blockCompletion'
 import type { FieldSpec } from '@shared/fields'
+import { formatCount } from '../format'
 
 /** 规格 §10.4 给的防抖。与「跟随光标」的 400ms 不是一回事 */
 export const COMPLETION_DEBOUNCE_MS = 250
@@ -29,13 +30,6 @@ function debounced<T>(fn: (arg: T) => Promise<CompletionResult | null>, ms: numb
         void fn(arg).then(resolve, () => resolve(null))
       }, ms)
     })
-}
-
-/** 图数够大才值得用；下拉里把量级标出来，让人一眼看出冷门词 */
-function formatCount(n: number): string {
-  if (n >= 10000) return `${Math.round(n / 1000)}k`
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
-  return String(n)
 }
 
 /**

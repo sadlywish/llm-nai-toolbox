@@ -650,7 +650,7 @@ body {
 .gen-slot.is-running { border-color: var(--accent); animation: gen-breathe 1.6s ease-in-out infinite; }
 .gen-running-label { font-size: 11px; color: var(--accent); }
 @keyframes gen-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
-@media (prefers-reduced-motion: reduce) { .gen-slot.is-running { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .gen-slot.is-running, .wiki-thumb.is-loading { animation: none; } }
 /* 溯源信息侧栏：比工具箱宽（420px），要放整套参数 */
 .gen-inspector { flex: 0 0 420px; width: 420px; overflow-y: auto; border-left: 1px solid var(--line); padding-left: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
 .gen-inspector-header { display: flex; align-items: center; justify-content: space-between; color: var(--ink-dim); }
@@ -680,3 +680,60 @@ details.gen-field > summary { cursor: pointer; }
 /* ── 固定 seed 醒目提示：只给 Seed 模式与 Seed 两个框上色，不出文字 ─────────────── */
 .params.is-fixed-seed .seed-mode select,
 .params.is-fixed-seed .seed-value input { border-color: #b8862e; background: rgba(229, 192, 123, .12); color: #f0d9a8; }
+
+/* ── WIKI 竖栏（界面稿 2026-09-14-wiki-rail-mockup.html） ─────────────── */
+.wiki-toggle { margin-left: auto; }
+.wiki-toggle.is-on { border-color: var(--accent); color: var(--ink); }
+.wiki-rail { width: 400px; flex-shrink: 0; border-left: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; font-size: 13px; }
+.wiki-controls { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.wiki-row { display: flex; align-items: center; gap: 8px; }
+.wiki-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.wiki-seg button { background: none; border: none; color: var(--ink-dim); font: inherit; font-size: 12.5px; padding: 2px 14px; cursor: pointer; }
+.wiki-seg button.is-on { background: rgba(74, 158, 255, .18); color: var(--ink); }
+.wiki-follow { display: flex; align-items: center; gap: 5px; color: var(--ink-dim); font-size: 12.5px; margin-left: auto; }
+.wiki-search { position: relative; }
+.wiki-search input { width: 100%; background: var(--input); border: 1px solid var(--line); border-radius: 3px; color: var(--ink); font: inherit; font-size: 13px; padding: 4px 8px; }
+.wiki-search input:focus { outline: none; border-color: var(--accent); }
+.wiki-suggest { position: absolute; left: 0; right: 0; top: calc(100% + 2px); background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; list-style: none; margin: 0; padding: 3px 0; z-index: 5; box-shadow: 0 6px 18px rgba(0, 0, 0, .4); max-height: 320px; overflow: auto; }
+.wiki-suggest li { display: flex; align-items: baseline; gap: 8px; padding: 3px 9px; font-family: var(--mono); font-size: 12.5px; cursor: pointer; }
+.wiki-suggest li.is-active { background: hsl(212 55% 45% / .45); }
+.wiki-suggest .zh { color: var(--ink-dim); }
+.wiki-suggest .by { color: var(--ink-faint); font-size: 11.5px; }
+.wiki-suggest .cnt { margin-left: auto; color: var(--ink-faint); font-size: 11.5px; }
+.wiki-body { flex: 1; min-height: 0; overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+.wiki-entry-head { display: flex; flex-direction: column; gap: 4px; }
+.wiki-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wiki-name { font-family: var(--mono); font-size: 15px; font-weight: 600; color: var(--ink); }
+.wiki-cat { font-size: 11.5px; padding: 0 6px; border-radius: 3px; background: hsl(var(--h) 48% 58%); color: #0f1115; }
+.wiki-badge { font-size: 11.5px; padding: 0 6px; border-radius: 3px; border: 1px solid var(--danger); color: var(--danger); }
+.wiki-count { color: var(--ink-faint); font-size: 12px; }
+.wiki-add { margin-left: auto; background: none; border: 1px solid var(--accent); color: var(--accent); border-radius: 4px; font: inherit; font-size: 12.5px; padding: 1px 10px; cursor: pointer; }
+.wiki-notice { color: var(--ok); font-size: 12px; }
+.wiki-meta { display: grid; grid-template-columns: 3.2em 1fr; gap: 2px 8px; font-size: 12.5px; }
+.wiki-meta .k { color: var(--ink-faint); }
+.wiki-url { display: block; }
+.wiki-meta a, .wiki-text a { color: var(--accent); text-decoration: none; }
+.wiki-dim { color: var(--ink-faint); font-size: 12px; }
+.wiki-error { color: var(--ink-faint); font-size: 12px; }
+.wiki-empty { color: var(--ink-faint); padding: 20px 6px; text-align: center; line-height: 1.8; }
+.wiki-text { color: var(--ink); line-height: 1.7; font-size: 13px; overflow-wrap: anywhere; }
+.wiki-text p { margin: 0 0 6px; }
+.wiki-text ul { margin: 0 0 6px; padding-left: 18px; }
+.wiki-text blockquote { margin: 0 0 6px; padding-left: 10px; border-left: 3px solid var(--line); color: var(--ink-dim); }
+.wiki-text pre { margin: 0 0 6px; background: var(--input); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; }
+.dtext-h { font-weight: 600; margin: 6px 0 2px; }
+.dtext-h3 { font-size: 14px; }
+.dtext-h4, .dtext-h5, .dtext-h6 { font-size: 13.5px; }
+.dtext-img { display: block; background: none; border: 1px solid var(--line); border-radius: 3px; padding: 0; margin: 4px 0; cursor: zoom-in; max-width: 180px; }
+.dtext-img img { display: block; max-width: 100%; }
+.dtext-img.is-loading { width: 180px; height: 120px; background: var(--input); }
+.dtext-missing { color: var(--ink-faint); }
+.wiki-seealso { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.wiki-seealso .k { color: var(--ink-faint); font-size: 12px; margin-right: 2px; }
+.wiki-chip { font-family: var(--mono); font-size: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 0 8px; color: var(--ink); background: var(--input); cursor: pointer; }
+.wiki-section-title { color: var(--ink-dim); font-size: 12px; display: flex; align-items: baseline; gap: 6px; }
+.wiki-section-title .sub { color: var(--ink-faint); font-size: 11.5px; }
+.wiki-thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.wiki-thumb { display: block; aspect-ratio: 3 / 4; border-radius: 3px; border: 1px solid var(--line); background: var(--input); padding: 0; overflow: hidden; cursor: zoom-in; }
+.wiki-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.wiki-thumb.is-loading { animation: gen-breathe 1.6s ease-in-out infinite; }

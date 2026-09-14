@@ -9,6 +9,7 @@ import PromptPane from './components/PromptPane'
 import SettingsDrawer from './components/SettingsDrawer'
 import StyleManager from './components/StyleManager'
 import Toolbar from './components/Toolbar'
+import WikiRail from './components/WikiRail'
 import { useConfig } from './state/config'
 import { initGenSubscriptions, useGen } from './state/gen'
 import { initLlmEvents } from './state/llm'
@@ -139,7 +140,7 @@ export default function App(): JSX.Element {
           <StyleManager />
         </main>
       ) : (
-        // 版面 A：左历史竖栏 ｜ 中间一列（工作区整体滚动 + 日志抽屉 + 底部指令区）；右 WIKI 竖栏留给计划 6
+        // 版面 A：左历史竖栏 ｜ 中间一列 ｜ 右 WIKI 竖栏（可整体收起）
         <div className="body">
           {workbench !== null && <HistoryRail />}
           <div className="center">
@@ -173,6 +174,7 @@ export default function App(): JSX.Element {
               />
             )}
           </div>
+          {workbench !== null && <WikiRail />}
         </div>
       )}
 

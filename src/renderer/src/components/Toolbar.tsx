@@ -1,5 +1,6 @@
 import type { RunProgress } from '@shared/gen'
 import { useGen } from '../state/gen'
+import { useWiki } from '../state/wiki'
 
 /** 按 status 分支的进度文案（照工具箱） */
 function statusText(progress: RunProgress | null): string {
@@ -29,6 +30,8 @@ export default function Toolbar(): JSX.Element {
   const resume = useGen((s) => s.resume)
   const runError = useGen((s) => s.runError)
   const dismissRunError = useGen((s) => s.dismissRunError)
+  const wikiCollapsed = useWiki((s) => s.collapsed)
+  const toggleWiki = useWiki((s) => s.toggleCollapsed)
 
   return (
     <div className="toolbar">
@@ -49,6 +52,15 @@ export default function Toolbar(): JSX.Element {
           </button>
         </span>
       )}
+
+      <button
+        type="button"
+        className={`btn btn-sm wiki-toggle ${wikiCollapsed ? '' : 'is-on'}`}
+        title={wikiCollapsed ? '展开 WIKI 栏' : '收起 WIKI 栏（跟随光标一起暂停）'}
+        onClick={toggleWiki}
+      >
+        {wikiCollapsed ? '◂ WIKI' : 'WIKI ▸'}
+      </button>
     </div>
   )
 }
