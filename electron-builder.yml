@@ -1,11 +1,17 @@
-# 打包配置（electron-builder）。先 `npm run build` 生成 out/，再 `npm run dist`。
+# 打包配置（electron-builder，照画师串工具箱）。先 `npm run build` 生成 out/，再 `npm run dist`。
 appId: com.lyf.llm-nai-toolbox
 productName: llm-nai-toolbox
 directories:
   output: release/${version}
+
+# 只装打包产物本身，不装 node_modules（同工具箱）：electron-vite 把渲染层、preload 全量打包，
+# 主进程 out/main/index.js 只 require crypto / electron / fs / fs/promises / path / zlib。
+# 以后若新增主进程运行时才 require 的第三方依赖，这一行会让它在包里缺失——改依赖后重新 grep 一次。
 files:
   - out/**
   - package.json
+  - '!node_modules/**'
+
 # 标签库 80MB+，不进 asar：主进程打包后从 process.resourcesPath/tagdb 读（见 src/main/tagdb/paths.ts）
 extraResources:
   - from: resources/tagdb
@@ -16,15 +22,26 @@ extraResources:
 asar: true
 # 用本地已装好的 Electron，不再联网下载运行时
 electronDist: node_modules/electron/dist
+
 win:
   target:
     - target: nsis
       arch: [x64]
+    - target: portable
+      arch: [x64]
     - target: zip
       arch: [x64]
   artifactName: ${productName}-${version}-win-x64.${ext}
+
 nsis:
+  # 不用一键安装：给用户选安装目录的机会，也让卸载项正常出现在控制面板
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: llm-nai-toolbox
   artifactName: ${productName}-${version}-setup.${ext}
+
+# 单文件便携版：双击即用，不写安装信息；每次启动先解压到临时目录（含 80MB 标签库），比安装版慢几秒
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
