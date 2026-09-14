@@ -654,3 +654,8 @@ details.gen-field > summary { cursor: pointer; }
 .gen-copy-btn { margin-top: auto; background: var(--accent); border: none; border-radius: 3px; color: #0b1b2b; cursor: pointer; padding: 6px 10px; font: inherit; font-weight: 600; }
 .gen-copy-btn:disabled { opacity: .45; cursor: default; }
 .gen-copy-hint { color: var(--ink-faint); font-size: 11.5px; line-height: 1.6; }
+
+/* ── 固定 seed 醒目提示（界面稿第 3 版状态 7） ─────────────── */
+.params.is-fixed-seed .seed-mode select,
+.params.is-fixed-seed .seed-value input { border-color: #b8862e; color: #f0d9a8; }
+.seed-fixed-warn { grid-column: 1 / -1; border: 1px solid #b8862e; background: rgba(229, 192, 123, .14); color: #f0d9a8; border-radius: 4px; padding: 5px 9px; font-size: 12.5px; }

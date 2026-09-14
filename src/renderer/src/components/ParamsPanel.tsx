@@ -13,6 +13,8 @@ interface NumberFieldProps {
   hint?: string
   /** hint 旁的一键修正按钮；目前只有宽高的「对齐到 64」用到 */
   hintAction?: { label: string; onClick: () => void }
+  /** 附加到 label 上的 class，用于按状态高亮 */
+  className?: string
   onCommit: (v: number) => void
 }
 
@@ -25,10 +27,11 @@ function NumberField({
   disabled = false,
   hint,
   hintAction,
+  className,
   onCommit,
 }: NumberFieldProps): JSX.Element {
   return (
-    <label className={`field ${disabled ? 'is-disabled' : ''}`}>
+    <label className={`field ${className ?? ''} ${disabled ? 'is-disabled' : ''}`}>
       <span>{label}</span>
       <input
         type="number"
@@ -79,7 +82,7 @@ export default function ParamsPanel({ params, onChange }: Props): JSX.Element {
   }
 
   return (
-    <div className="params">
+    <div className={`params ${params.seedMode === 'fixed' ? 'is-fixed-seed' : ''}`}>
       <label className="field span2">
         <span>模型</span>
         <select
@@ -227,7 +230,7 @@ export default function ParamsPanel({ params, onChange }: Props): JSX.Element {
       />
 
       {/* 另起一行：CFG Rescale 右边空着，Seed 模式与 Seed 仍在同一行 */}
-      <label className="field row-start">
+      <label className="field row-start seed-mode">
         <span>Seed 模式</span>
         <select
           value={params.seedMode}
@@ -248,12 +251,20 @@ export default function ParamsPanel({ params, onChange }: Props): JSX.Element {
         value={params.seed}
         disabled={seedDisabled}
         hint={seedDisabled ? '每张随机，出图后回填最后一次的值' : undefined}
+        className="seed-value"
         onCommit={(v) =>
           onChange((p) => {
             p.seed = v
           })
         }
       />
+
+      {/* 固定 seed 要醒目：每张都用同一个 seed，最容易出现「怎么出的图都一样」 */}
+      {params.seedMode === 'fixed' && (
+        <div className="seed-fixed-warn" role="note">
+          固定 seed：{params.seed >= 0 ? `每张都用 ${params.seed}` : '开跑时随机一个、每张都用它'}，同一套参数出的图几乎一样。要出不同的图，把 seed 模式改回「每张随机」。
+        </div>
+      )}
 
       <label className="field-check span2">
         <input
