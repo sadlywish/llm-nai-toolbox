@@ -16,6 +16,7 @@ beforeEach(async () => {
       config: { ...defaultAppConfig(), model: 'claude-opus-5' },
       hasLlmApiKey: true,
       hasNaiToken: false,
+      hasDanbooruApiKey: false,
       configExists: false,
     }),
     saveConfig: vi.fn().mockResolvedValue(undefined),
@@ -54,11 +55,14 @@ describe('useConfig', () => {
   it('save 把 Key 原样传给主进程，undefined 不转成空串', async () => {
     const cfg = defaultAppConfig()
     await mod.useConfig.getState().save(cfg)
-    expect(api.saveConfig).toHaveBeenLastCalledWith({ config: cfg, llmApiKey: undefined, naiToken: undefined })
+    expect(api.saveConfig).toHaveBeenLastCalledWith({ config: cfg, llmApiKey: undefined, naiToken: undefined, danbooruApiKey: undefined })
     await mod.useConfig.getState().save(cfg, 'sk-x')
-    expect(api.saveConfig).toHaveBeenLastCalledWith({ config: cfg, llmApiKey: 'sk-x', naiToken: undefined })
+    expect(api.saveConfig).toHaveBeenLastCalledWith({ config: cfg, llmApiKey: 'sk-x', naiToken: undefined, danbooruApiKey: undefined })
     await mod.useConfig.getState().save(cfg, undefined, 'pst-x')
-    expect(api.saveConfig).toHaveBeenLastCalledWith({ config: cfg, llmApiKey: undefined, naiToken: 'pst-x' })
+    expect(api.saveConfig).toHaveBeenLastCalledWith({ config: cfg, llmApiKey: undefined, naiToken: 'pst-x', danbooruApiKey: undefined })
+    await mod.useConfig.getState().save(cfg, undefined, undefined, 'db-key')
+    expect(api.saveConfig).toHaveBeenLastCalledWith({ config: cfg, llmApiKey: undefined, naiToken: undefined, danbooruApiKey: 'db-key' })
+    expect(mod.useConfig.getState().hasDanbooruApiKey).toBe(true)
   })
 
   it('save：NovelAI Token 与 LLM Key 各管各的 has 标记', async () => {

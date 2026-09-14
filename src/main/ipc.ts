@@ -1,6 +1,7 @@
 import { join } from 'path'
-import { BrowserWindow, dialog, ipcMain, safeStorage } from 'electron'
+import { BrowserWindow, clipboard, dialog, ipcMain, safeStorage } from 'electron'
 import { mergeConfig, validateConfig } from '@shared/config'
+import type { DanbooruArtistSearchInput, DanbooruPostsInput, DanbooruTagsInput } from '@shared/danbooru'
 import {
   IPC,
   type ConfigLoadResult,
@@ -12,6 +13,7 @@ import { parseLlmRunInput, type LlmEvent, type LlmRunResult } from '@shared/llm'
 import { normalizeStyles } from '@shared/styles'
 import { normalizeWorkspace } from '@shared/workspace'
 import { ConfigStore } from './config-store'
+import { createDanbooruClient, fail as danbooruFail, type DanbooruClient } from './danbooru/client'
 import { GenRunner } from './gen/runner'
 import { createClaudeChat } from './llm/claude'
 import { prepareTagData } from './llm/data'
@@ -26,6 +28,7 @@ import { JsonStore } from './store'
 import { COMPLETION_PREFERS, completeFrom } from './tagdb/complete'
 import { TagExtrasLoader } from './tagdb/extras'
 import { TagdbLoader } from './tagdb/loader'
+import { lookupTag } from './tagdb/lookup'
 import { resolveTagdbDir } from './tagdb/paths'
 
 /**
@@ -83,6 +86,19 @@ export function registerIpc(
   const workspaceStore = new JsonStore<unknown>(join(appInfo.userDataDir, 'workspace.json'), () => null)
   const stylesStore = new JsonStore<unknown>(join(appInfo.userDataDir, 'styles.json'), () => [])
 
+  const danbooruCacheDir = join(appInfo.userDataDir, 'danbooru-cache')
+  // 用户名与 Key 在构造时读一次；保存设置后整个重建（令牌桶、内存缓存跟着换新，磁盘缓存不受影响）
+  const buildDanbooru = (): DanbooruClient =>
+    createDanbooruClient({
+      cacheDir: danbooruCacheDir,
+      fetchImpl: appFetch,
+      login: configStore.read().danbooruLogin.trim(),
+      apiKey: secrets.read('danbooruApiKey').trim(),
+      // 只给集成测试的桩用；生产环境没有这个变量
+      baseUrl: process.env['LLM_NAI_DANBOORU_BASE_URL'] || undefined,
+    })
+  let danbooru = buildDanbooru()
+
   // 代理必须在任何请求之前生效。不 await：窗口先出来，setProxy 只影响后续请求
   void applyProxy(configStore.read().proxy)
     .then((r) => {
@@ -96,6 +112,7 @@ export function registerIpc(
       config: configStore.read(),
       hasLlmApiKey: secrets.read('llmApiKey') !== '',
       hasNaiToken: secrets.read('naiToken') !== '',
+      hasDanbooruApiKey: secrets.read('danbooruApiKey') !== '',
       configExists: configStore.exists(),
     }),
   )
@@ -110,6 +127,8 @@ export function registerIpc(
     // 去掉首尾空白：复制粘贴的 Key 常带一个换行，带着它请求会被判 401
     if (typeof input.llmApiKey === 'string') secrets.write('llmApiKey', input.llmApiKey.trim())
     if (typeof input.naiToken === 'string') secrets.write('naiToken', input.naiToken.trim())
+    if (typeof input.danbooruApiKey === 'string') secrets.write('danbooruApiKey', input.danbooruApiKey.trim())
+    danbooru = buildDanbooru()
     // 代理是 session 级设置，改了立刻重新应用，否则就是「填了要重启才生效」
     void applyProxy(config.proxy)
       .then((r) => {
@@ -134,6 +153,45 @@ export function registerIpc(
     event.sender.copyImageAt(Math.round(x), Math.round(y))
     return true
   })
+
+  ipcMain.handle(IPC.clipboardWriteText, (_e, text: unknown) => {
+    if (typeof text === 'string') clipboard.writeText(text)
+  })
+
+  // ── Danbooru（WIKI 栏）。入参先守卫再用；客户端方法永不 reject ──
+  const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
+  const isPositiveInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v > 0
+  ipcMain.handle(IPC.danbooruTags, (_e, input: unknown) =>
+    isObj(input) && typeof input.nameMatches === 'string' && isPositiveInt(input.limit)
+      ? danbooru.tags((input as unknown as DanbooruTagsInput).nameMatches, input.limit)
+      : danbooruFail('invalid', '参数不合法'),
+  )
+  ipcMain.handle(IPC.danbooruTagInfo, (_e, tag: unknown) =>
+    typeof tag === 'string' ? danbooru.tagInfo(tag) : danbooruFail('invalid', '参数不合法'),
+  )
+  ipcMain.handle(IPC.danbooruWiki, (_e, tag: unknown) =>
+    typeof tag === 'string' ? danbooru.wiki(tag) : danbooruFail('invalid', '参数不合法'),
+  )
+  ipcMain.handle(IPC.danbooruArtist, (_e, tag: unknown) =>
+    typeof tag === 'string' ? danbooru.artist(tag) : danbooruFail('invalid', '参数不合法'),
+  )
+  ipcMain.handle(IPC.danbooruPosts, (_e, input: unknown) => {
+    if (!isObj(input) || typeof input.tag !== 'string' || !isPositiveInt(input.limit) || !isPositiveInt(input.page)) {
+      return danbooruFail('invalid', '参数不合法')
+    }
+    const { tag, limit, page, order } = input as unknown as DanbooruPostsInput
+    return danbooru.posts(tag, limit, page, order)
+  })
+  ipcMain.handle(IPC.danbooruSearchByOtherName, (_e, input: unknown) =>
+    isObj(input) && typeof input.query === 'string' && isPositiveInt(input.limit)
+      ? danbooru.searchArtistsByOtherName((input as unknown as DanbooruArtistSearchInput).query, input.limit)
+      : danbooruFail('invalid', '参数不合法'),
+  )
+  ipcMain.handle(IPC.danbooruSearchByUrl, (_e, input: unknown) =>
+    isObj(input) && typeof input.query === 'string' && isPositiveInt(input.limit)
+      ? danbooru.searchArtistsByUrl((input as unknown as DanbooruArtistSearchInput).query, input.limit)
+      : danbooruFail('invalid', '参数不合法'),
+  )
 
   ipcMain.handle(IPC.workspaceLoad, () => normalizeWorkspace(workspaceStore.read()))
 
@@ -193,6 +251,11 @@ export function registerIpc(
 
   // 渲染进程可能在第一条 status 广播之后才挂上监听，所以它也要能主动问一次
   ipcMain.handle(IPC.tagdbStatusGet, () => loader.status)
+
+  ipcMain.handle(IPC.tagdbLookup, (_e, tag: unknown) => {
+    const cats = loader.categories
+    return typeof tag === 'string' && cats !== null ? lookupTag(cats, tag) : null
+  })
 
   const extras = new TagExtrasLoader(dir)
   /** 正在跑的那一轮。同一时刻只允许一轮：两轮并发写同一份工作区，回填结果谁先谁后说不清 */

@@ -1,6 +1,7 @@
 import { join } from 'path'
-import { app, BrowserWindow, ipcMain, screen, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, screen, session, shell } from 'electron'
 import { installContextMenu } from './context-menu'
+import { DANBOORU_CDN_URLS, withDanbooruReferer } from './danbooru/cdn'
 import { registerIpc } from './ipc'
 
 /* 默认窗口按 1080P 开，并按工作区上限收窄（同画师串工具箱）：
@@ -46,6 +47,10 @@ function createWindow(): void {
 ipcMain.handle('app:version', () => app.getVersion())
 
 void app.whenReady().then(() => {
+  session.defaultSession.webRequest.onBeforeSendHeaders({ urls: DANBOORU_CDN_URLS }, (details, callback) => {
+    callback({ requestHeaders: withDanbooruReferer(details.requestHeaders) })
+  })
+
   // 必须在 createWindow 之前、且整个应用只调一次。放进 createWindow 会让
   // macOS 的「窗口全关后再激活」走到第二次注册，`ipcMain.handle` 会抛
   // 「Attempted to register a second handler」（实测），窗口建不出来。

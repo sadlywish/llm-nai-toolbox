@@ -37,6 +37,17 @@ export const IPC = {
   imageRead: 'image:read',
   imageMeta: 'image:meta',
   copyImageAt: 'clipboard:copy-image-at',
+  /** WIKI 栏：本地库精确查找（分类、中文别名、帖子数） */
+  tagdbLookup: 'tagdb:lookup',
+  /** 「加入」插不进去时的退路 */
+  clipboardWriteText: 'clipboard:write-text',
+  danbooruTags: 'danbooru:tags',
+  danbooruTagInfo: 'danbooru:tag-info',
+  danbooruWiki: 'danbooru:wiki',
+  danbooruArtist: 'danbooru:artist',
+  danbooruPosts: 'danbooru:posts',
+  danbooruSearchByOtherName: 'danbooru:search-artists-by-other-name',
+  danbooruSearchByUrl: 'danbooru:search-artists-by-url',
 } as const
 
 export interface TagdbCompleteInput {
@@ -72,12 +83,22 @@ export type TagdbCompleteResult =
   | { ok: true; items: CompletionItem[] }
   | { ok: false; status: TagdbStatus }
 
+/** 本地库精确查找结果（tagdb:lookup） */
+export interface TagLookup {
+  tag: string
+  category: CompletionPrefer
+  zh: string[]
+  count: number
+}
+
 export interface ConfigLoadResult {
   config: AppConfig
   /** 只回传「有没有存过」，明文永远不进渲染进程 */
   hasLlmApiKey: boolean
   /** 同上：NovelAI Token 有没有存过 */
   hasNaiToken: boolean
+  /** 同上：Danbooru API Key 有没有存过 */
+  hasDanbooruApiKey: boolean
   /** config.json 在不在；false 时启动自动弹设置抽屉（规格 §14.3） */
   configExists: boolean
 }
@@ -88,4 +109,6 @@ export interface ConfigSaveInput {
   llmApiKey?: string
   /** 同 llmApiKey：undefined = 不改动已存的 Token */
   naiToken?: string
+  /** 同 llmApiKey：undefined = 不改动已存的 Key */
+  danbooruApiKey?: string
 }

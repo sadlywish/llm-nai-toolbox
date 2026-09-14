@@ -14,10 +14,9 @@ export interface SecretCrypto {
 }
 
 /**
- * 钥匙的名字：LLM 的 API Key 与 NovelAI Token。Danbooru Key 由用到它的计划
- * 加进来——没有消费方就先不声明。
+ * 钥匙的名字：LLM 的 API Key、NovelAI Token、Danbooru API Key。
  */
-export type SecretName = 'llmApiKey' | 'naiToken'
+export type SecretName = 'llmApiKey' | 'naiToken' | 'danbooruApiKey'
 
 type SecretFile = Partial<Record<SecretName, string>>
 

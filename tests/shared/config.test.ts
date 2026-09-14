@@ -84,6 +84,10 @@ describe('defaultAppConfig', () => {
     const numericKeys = (Object.keys(cfg) as (keyof AppConfig)[]).filter((k) => typeof cfg[k] === 'number')
     expect(Object.keys(NUMBER_RULES).sort()).toEqual([...numericKeys].sort())
   })
+
+  it('Danbooru 用户名默认空（匿名）', () => {
+    expect(defaultAppConfig().danbooruLogin).toBe('')
+  })
 })
 
 describe('mergeConfig', () => {

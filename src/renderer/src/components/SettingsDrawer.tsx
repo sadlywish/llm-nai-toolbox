@@ -83,6 +83,7 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
   const loaded = useConfig((s) => s.loaded)
   const hasLlmApiKey = useConfig((s) => s.hasLlmApiKey)
   const hasNaiToken = useConfig((s) => s.hasNaiToken)
+  const hasDanbooruApiKey = useConfig((s) => s.hasDanbooruApiKey)
   const configExists = useConfig((s) => s.configExists)
   const saveError = useConfig((s) => s.saveError)
   const save = useConfig((s) => s.save)
@@ -91,6 +92,7 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
   const [draft, setDraft] = useState<AppConfig>(config)
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [naiTokenInput, setNaiTokenInput] = useState('')
+  const [danbooruKeyInput, setDanbooruKeyInput] = useState('')
   const [numericText, setNumericText] = useState<Record<NumericKey, string>>(() => numericTextFrom(config))
   const [saving, setSaving] = useState(false)
   // 在系统提示词框里拖选文字、松开时鼠标落在遮罩上：Chromium 把 click 事件
@@ -106,6 +108,7 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
     setDraft(config)
     setApiKeyInput('')
     setNaiTokenInput('')
+    setDanbooruKeyInput('')
     setNumericText(numericTextFrom(config))
     dismissSaveError()
     // 只在「打开且已载入」这一刻取快照；config 若进依赖数组，编辑期间
@@ -189,13 +192,19 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
     if (hasErrors || saving) return
     setSaving(true)
     // 留空传 undefined：主进程拿 undefined 当「不改动已存的 Key」，传 '' 会把它清空
-    await save(draft, apiKeyInput === '' ? undefined : apiKeyInput, naiTokenInput === '' ? undefined : naiTokenInput)
+    await save(
+      draft,
+      apiKeyInput === '' ? undefined : apiKeyInput,
+      naiTokenInput === '' ? undefined : naiTokenInput,
+      danbooruKeyInput === '' ? undefined : danbooruKeyInput,
+    )
     setSaving(false)
     // 只在成功时清空并关闭：失败多半是磁盘之类与输入无关的原因，
     // 用户接下来大概率要重试，把刚输入的 Key 清掉等于逼他重新输一遍
     if (useConfig.getState().saveError === null) {
       setApiKeyInput('')
       setNaiTokenInput('')
+      setDanbooruKeyInput('')
       onClose()
     }
   }
@@ -413,6 +422,21 @@ export default function SettingsDrawer({ open, onClose }: Props): JSX.Element | 
                   宽高比换算宽高时的总像素上限。选预设即写入右边的值；手改成不等于任何预设的值时，下拉回到「手动设置」
                 </span>
                 {errorOf('naiMaxPixels')}
+              </label>
+            </Group>
+
+            <Group title="Danbooru">
+              {textField('danbooruLogin', '用户名')}
+              <label className="field">
+                <span>API Key</span>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={danbooruKeyInput}
+                  placeholder={hasDanbooruApiKey ? '已保存（留空则不修改）' : '可不填'}
+                  onChange={(e) => setDanbooruKeyInput(e.target.value)}
+                />
+                <span className="field-hint">可不填：匿名也能查；填了翻页上限更高、限流更宽</span>
               </label>
             </Group>
 

@@ -1,4 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type {
+  DanbooruArtistResult,
+  DanbooruArtistSearchInput,
+  DanbooruArtistSearchResult,
+  DanbooruPostsInput,
+  DanbooruPostsResult,
+  DanbooruTagInfoResult,
+  DanbooruTagsInput,
+  DanbooruTagsResult,
+  DanbooruWikiResult,
+} from '@shared/danbooru'
 import {
   IPC,
   type ConfigLoadResult,
@@ -6,6 +17,7 @@ import {
   type TagdbCompleteInput,
   type TagdbCompleteResult,
   type TagdbStatus,
+  type TagLookup,
 } from '@shared/ipc'
 import type { GenImageEvent, GenStartInput, ImageMeta, ReadImageInput, RoundRecord, RunProgress } from '@shared/gen'
 import type { LlmEvent, LlmRunInput, LlmRunResult } from '@shared/llm'
@@ -99,6 +111,22 @@ const api = {
 
   /** 复制视口坐标处已渲染的那张图到剪贴板（查看器的「复制」） */
   copyImageAt: (x: number, y: number): Promise<boolean> => ipcRenderer.invoke(IPC.copyImageAt, { x, y }),
+
+  /** 本地库精确查找；没收录或库没载入返回 null */
+  tagdbLookup: (tag: string): Promise<TagLookup | null> => ipcRenderer.invoke(IPC.tagdbLookup, tag),
+
+  writeClipboardText: (text: string): Promise<void> => ipcRenderer.invoke(IPC.clipboardWriteText, text),
+
+  // Danbooru：失败一律返回 { ok: false }，从不 reject
+  danbooruTags: (input: DanbooruTagsInput): Promise<DanbooruTagsResult> => ipcRenderer.invoke(IPC.danbooruTags, input),
+  danbooruTagInfo: (tag: string): Promise<DanbooruTagInfoResult> => ipcRenderer.invoke(IPC.danbooruTagInfo, tag),
+  danbooruWiki: (tag: string): Promise<DanbooruWikiResult> => ipcRenderer.invoke(IPC.danbooruWiki, tag),
+  danbooruArtist: (tag: string): Promise<DanbooruArtistResult> => ipcRenderer.invoke(IPC.danbooruArtist, tag),
+  danbooruPosts: (input: DanbooruPostsInput): Promise<DanbooruPostsResult> => ipcRenderer.invoke(IPC.danbooruPosts, input),
+  danbooruSearchArtistsByOtherName: (input: DanbooruArtistSearchInput): Promise<DanbooruArtistSearchResult> =>
+    ipcRenderer.invoke(IPC.danbooruSearchByOtherName, input),
+  danbooruSearchArtistsByUrl: (input: DanbooruArtistSearchInput): Promise<DanbooruArtistSearchResult> =>
+    ipcRenderer.invoke(IPC.danbooruSearchByUrl, input),
 }
 
 contextBridge.exposeInMainWorld('api', api)

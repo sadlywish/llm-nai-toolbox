@@ -124,6 +124,10 @@ export interface AppConfig {
   tagQuerySeriesWiki: boolean
   tagQueryWikiLength: number
 
+  // ── Danbooru ──
+  /** Danbooru 用户名；与 API Key 同时填了才以登录身份请求（翻页上限、限流更宽），否则匿名 */
+  danbooruLogin: string
+
   // ── 网络 ──
   proxy: string
 }
@@ -187,6 +191,8 @@ export function defaultAppConfig(): AppConfig {
     tagQuerySeriesAliases: true,
     tagQuerySeriesWiki: false,
     tagQueryWikiLength: 300,
+
+    danbooruLogin: '',
 
     proxy: '',
   }
