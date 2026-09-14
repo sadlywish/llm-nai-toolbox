@@ -138,6 +138,11 @@ describe('GenRunner', () => {
     await new GenRunner(h1).start({ workspace: workspace(), count: 3 }, config(), 'pst')
     expect(h1.seeds).toEqual([1003])
 
+    // 回填的是最后一张实际用的 seed（接口回报的），不是请求时分配的
+    const h0 = harness(async (_b, nth) => ok(500 + nth))
+    await new GenRunner(h0).start({ workspace: workspace(), count: 3 }, config(), 'pst')
+    expect(h0.seeds).toEqual([503])
+
     const ws = workspace()
     ws.params.seedMode = 'fixed'
     ws.params.seed = 42

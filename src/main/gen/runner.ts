@@ -109,6 +109,9 @@ export class GenRunner {
       }
       index.startRound(round)
 
+      /** 每张实际用的 seed（按 index）：跑完回填参数区时取最后一张的，接口回报的值可能与请求时分配的不同 */
+      const usedSeeds = new Map<number, number>()
+
       const runTask = async (task: GenTask): Promise<void> => {
         const body = buildPayload({
           assembled,
@@ -149,6 +152,7 @@ export class GenRunner {
           const saved = saveImage(config.saveDir, bytes, image.mimeType, seed, startedAt)
           rec = { index: task.index, file: saved.fileName, seed, status: 'ok', error: null }
           index.putImage(roundId, rec)
+          usedSeeds.set(task.index, seed)
         } catch (e) {
           const failed = failedRecord(task, e instanceof Error ? e.message : String(e))
           index.putImage(roundId, failed)
@@ -173,8 +177,12 @@ export class GenRunner {
 
       const final = await this.queue.start(roundId, tasks)
 
-      // 每张随机模式只在跑完后回填最后一张的 seed。取消或中止时后面的根本没跑，回填没用过的值是撒谎
-      if (final.status === 'done' && !fixed && tasks.length > 0) this.notifySeed(tasks[tasks.length - 1].seed)
+      // 每张随机模式只在跑完后回填最后一张实际用的 seed（那张失败了就用请求时分配的）。
+      // 取消或中止时后面的根本没跑，回填没用过的值是撒谎
+      if (final.status === 'done' && !fixed && tasks.length > 0) {
+        const last = tasks[tasks.length - 1]
+        this.notifySeed(usedSeeds.get(last.index) ?? last.seed)
+      }
 
       index.finishRound(roundId, this.deps.now().toISOString(), toRoundStatus(final.status))
       return final
