@@ -2,6 +2,7 @@
 appId: com.lyf.llm-nai-toolbox
 productName: llm-nai-toolbox
 directories:
+  buildResources: build
   output: release/${version}
 
 # 只装打包产物本身，不装 node_modules（同工具箱）：electron-vite 把渲染层、preload 全量打包，
@@ -24,6 +25,8 @@ asar: true
 electronDist: node_modules/electron/dist
 
 win:
+  # 1024×1024 PNG，electron-builder 自动转成 exe 与安装包用的 ico
+  icon: build/icon.png
   target:
     - target: nsis
       arch: [x64]
