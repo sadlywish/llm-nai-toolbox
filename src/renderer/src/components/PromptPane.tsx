@@ -1,7 +1,6 @@
-import { longestBlock, totalTokens } from '@shared/blockMetrics'
 import type { FieldSpec } from '@shared/fields'
 import type { Workspace } from '@shared/workspace'
-import { tokenLimitFor } from '@renderer/prompt/t5'
+import { tokenBudget } from '@renderer/prompt/tokenBudget'
 import PromptEditor from '../editor/PromptEditor'
 import TagTextEditor from '../editor/TagTextEditor'
 import CharacterPanel from './CharacterPanel'
@@ -18,28 +17,6 @@ interface Props {
   update: (fn: (draft: Workspace) => void) => void
 }
 
-interface Longest {
-  where: string
-  tokens: number
-}
-
-/** 整图与全部启用角色里 token 最多的那个块；超限时点名让人知道该砍哪块 */
-function longestAcross(
-  ws: Workspace,
-  mainSpecs: readonly FieldSpec[],
-  charSpecs: readonly FieldSpec[],
-): Longest | null {
-  const candidates: Longest[] = []
-  const main = longestBlock(ws.main, mainSpecs)
-  if (main !== null) candidates.push({ where: main.name, tokens: main.tokens })
-  ws.characters.forEach((c, i) => {
-    if (!c.enabled) return
-    const b = longestBlock(c.fields, charSpecs)
-    if (b !== null) candidates.push({ where: `角色 ${i + 1} · ${b.name}`, tokens: b.tokens })
-  })
-  return candidates.reduce<Longest | null>((a, b) => (a === null || b.tokens > a.tokens ? b : a), null)
-}
-
 /**
  * 提示词面板。布局照画师串工具箱的例图面板：左 2 份提示词、右 1 份参数。
  *
@@ -53,14 +30,7 @@ export default function PromptPane({
   maxCharacters,
   update,
 }: Props): JSX.Element {
-  const total =
-    totalTokens(workspace.main, mainSpecs) +
-    workspace.characters
-      .filter((c) => c.enabled)
-      .reduce((n, c) => n + totalTokens(c.fields, charSpecs), 0)
-  const limit = tokenLimitFor(workspace.params.model)
-  const over = total > limit
-  const longest = over ? longestAcross(workspace, mainSpecs, charSpecs) : null
+  const { total, limit, over, longest } = tokenBudget(workspace, mainSpecs, charSpecs)
 
   return (
     <section className="pane">

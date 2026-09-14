@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { fillSummary } from '@shared/applyFill'
 import type { FillResult, LlmEvent, LlmLogLine, LlmRunInput, LlmRunResult } from '@shared/llm'
+import { ipcErrorMessage } from '../ipcError'
 
 /** 日志区最多留这么多行，更早的丢掉。一轮通常几十到两三百行 */
 export const MAX_LOG_LINES = 2000
@@ -59,12 +60,6 @@ let pendingFill: ((fill: FillResult) => void) | null = null
 function makeLine(line: LlmLogLine, ok = false): ConsoleLine {
   seq += 1
   return ok ? { ...line, seq, ok } : { ...line, seq }
-}
-
-/** invoke 被拒时 Electron 会包一层 "Error invoking remote method 'llm:run': Error: …"，只留原因 */
-function ipcErrorMessage(err: unknown): string {
-  const text = err instanceof Error ? err.message : String(err)
-  return text.replace(/^Error invoking remote method '[^']*': (?:Error: )?/, '')
 }
 
 interface LlmState {

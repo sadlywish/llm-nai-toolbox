@@ -145,6 +145,7 @@ describe('指令区选项', () => {
       transparent: false,
       styleMode: 'none',
       presetId: '',
+      autoGenerate: false,
     })
   })
 
@@ -159,10 +160,25 @@ describe('指令区选项', () => {
       transparent: true,
       styleMode: 'preset',
       presetId: '',
+      autoGenerate: false,
     })
     expect(normalizeWorkspace({ console: { multiCharacter: 'coords', styleMode: 'x' } }).console).toMatchObject({
       multiCharacter: 'coords',
       styleMode: 'none',
     })
+  })
+})
+
+describe('跑图次数与自动生成', () => {
+  it('默认跑 1 张、不自动生成', () => {
+    const ws = emptyWorkspace()
+    expect([ws.runCount, ws.console.autoGenerate]).toEqual([1, false])
+  })
+
+  it('跑图次数只认正整数；自动生成只认布尔', () => {
+    expect(normalizeWorkspace({ runCount: 4 }).runCount).toBe(4)
+    for (const runCount of [0, -2, 1.5, '3', null]) expect(normalizeWorkspace({ runCount }).runCount).toBe(1)
+    expect(normalizeWorkspace({ console: { autoGenerate: true } }).console.autoGenerate).toBe(true)
+    expect(normalizeWorkspace({ console: { autoGenerate: 'yes' } }).console.autoGenerate).toBe(false)
   })
 })

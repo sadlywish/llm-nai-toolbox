@@ -53,6 +53,8 @@ export interface ConsoleOptions {
   styleMode: StyleMode
   /** 选中的画风预设 id；styleMode 不是 preset 时无意义 */
   presetId: string
+  /** 回填后自动生成：LLM 回填成功后直接按跑图次数开始生成 */
+  autoGenerate: boolean
 }
 
 /**
@@ -69,6 +71,8 @@ export interface Workspace {
   characters: CharacterPrompt[]
   /** 角色坐标是否发送给 NAI；关闭时由模型安排位置 */
   useCoords: boolean
+  /** 跑图次数：手动生成与「回填后自动生成」共用 */
+  runCount: number
   console: ConsoleOptions
 }
 
@@ -93,7 +97,7 @@ export function defaultGenParams(): GenParams {
 }
 
 export function defaultConsoleOptions(): ConsoleOptions {
-  return { instruction: '', multiCharacter: 'off', editExisting: false, transparent: false, styleMode: 'none', presetId: '' }
+  return { instruction: '', multiCharacter: 'off', editExisting: false, transparent: false, styleMode: 'none', presetId: '', autoGenerate: false }
 }
 
 export function createCharacter(): CharacterPrompt {
@@ -114,6 +118,7 @@ export function emptyWorkspace(): Workspace {
     params: defaultGenParams(),
     characters: [],
     useCoords: false,
+    runCount: 1,
     console: defaultConsoleOptions(),
   }
 }
@@ -169,6 +174,7 @@ function normalizeConsole(raw: unknown): ConsoleOptions {
     transparent: typeof raw.transparent === 'boolean' ? raw.transparent : base.transparent,
     styleMode: STYLE_MODES.find((m) => m === raw.styleMode) ?? base.styleMode,
     presetId: str(raw.presetId),
+    autoGenerate: typeof raw.autoGenerate === 'boolean' ? raw.autoGenerate : base.autoGenerate,
   }
 }
 
@@ -206,6 +212,7 @@ export function normalizeWorkspace(raw: unknown): Workspace {
     params: normalizeParams(raw.params),
     characters,
     useCoords: typeof raw.useCoords === 'boolean' ? raw.useCoords : base.useCoords,
+    runCount: typeof raw.runCount === 'number' && Number.isInteger(raw.runCount) && raw.runCount >= 1 ? raw.runCount : base.runCount,
     console: normalizeConsole(raw.console),
   }
 }
