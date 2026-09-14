@@ -312,7 +312,7 @@ body {
 
 /* ── 确认弹框 ─────────────────────────────────────────────── */
 .dialog-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); display: flex; align-items: center; justify-content: center; z-index: 20; }
-.dialog { width: 420px; max-width: calc(100% - 32px); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; font-size: 13px; line-height: 1.8; }
+.dialog { position: relative; width: 420px; max-width: calc(100% - 32px); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; font-size: 13px; line-height: 1.8; }
 .dialog-title { font-weight: 600; }
 .dialog-body p { margin: 4px 0; color: var(--ink-dim); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
@@ -606,3 +606,33 @@ body {
   font-size: 12px;
   margin-bottom: 8px;
 }
+
+/* ── 出图弹窗（照工具箱 RunMatrixDialog / RunGrid / RunDialogs） ───────── */
+.dialog-close { position: absolute; top: 8px; right: 10px; background: none; border: none; color: var(--ink-dim); cursor: pointer; font-size: 16px; line-height: 1; }
+.dialog-close:hover { color: var(--ink); }
+.dialog-actions button.primary { background: var(--accent); border-color: var(--accent); color: #0b1b2b; font-weight: 600; }
+.gen-dialog { width: 90vw; max-width: 1400px; height: 85vh; display: flex; flex-direction: column; gap: 10px; }
+.gen-running-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--accent); border-radius: 3px; padding: 6px 10px; font-size: 12px; color: var(--ink); background: #15181c; }
+.gen-running-count { color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.gen-paused-bar { display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: #4a3a1d; border: 1px solid #7a5a2a; border-radius: 3px; color: #f0d9a8; font-size: 12px; }
+.gen-paused-bar button { background: none; border: 1px solid #7a5a2a; border-radius: 3px; color: inherit; cursor: pointer; padding: 2px 10px; font: inherit; }
+.gen-dialog-body { display: flex; gap: 12px; flex: 1 1 0; min-height: 0; }
+.gen-grid { flex: 1; min-width: 0; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; align-content: start; }
+.gen-slot { width: 100%; object-fit: cover; border-radius: 3px; border: 1px solid var(--line); background: #15181c; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--ink-dim); text-align: center; }
+.gen-slot.is-ready { cursor: zoom-in; }
+.gen-slot.is-selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+.gen-slot.is-empty { border-style: dashed; }
+.gen-slot.is-pending { border-style: dashed; color: var(--accent); }
+.gen-slot.is-failed { background: #5a1d1d; border-color: #7a2a2a; color: #ffb4b4; cursor: help; }
+.gen-slot.is-missing { background: #3a3a1d; border-color: #6a6a2a; color: #e5c07b; }
+/* 正在生成的那一格：accent 边框并轻微呼吸，幅度刻意做小 */
+.gen-slot.is-running { border-color: var(--accent); animation: gen-breathe 1.6s ease-in-out infinite; }
+.gen-running-label { font-size: 11px; color: var(--accent); }
+@keyframes gen-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .gen-slot.is-running { animation: none; } }
+/* 溯源信息侧栏：比工具箱宽（420px），要放整套参数 */
+.gen-inspector { flex: 0 0 420px; width: 420px; overflow-y: auto; border-left: 1px solid var(--line); padding-left: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+.gen-inspector-header { display: flex; align-items: center; justify-content: space-between; color: var(--ink-dim); }
+.gen-inspector-close { background: none; border: none; color: var(--ink-dim); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; }
+.gen-inspector-close:hover { color: var(--ink); }
+.gen-inspector-preview { width: 160px; align-self: center; border-radius: 4px; border: 1px solid var(--line); cursor: zoom-in; }

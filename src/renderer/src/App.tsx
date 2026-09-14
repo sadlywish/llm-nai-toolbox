@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CHARACTER_FIELDS, MAIN_FIELDS, orderSpecs } from '@shared/fields'
+import GenDialog from './components/GenDialog'
+import GenRunDialogs from './components/GenRunDialogs'
 import HistoryRail from './components/HistoryRail'
 import LlmConsole from './components/LlmConsole'
 import LlmLogDrawer from './components/LlmLogDrawer'
@@ -8,7 +10,7 @@ import SettingsDrawer from './components/SettingsDrawer'
 import StyleManager from './components/StyleManager'
 import Toolbar from './components/Toolbar'
 import { useConfig } from './state/config'
-import { initGenSubscriptions } from './state/gen'
+import { initGenSubscriptions, useGen } from './state/gen'
 import { initLlmEvents } from './state/llm'
 import { initStylesPersistence, useStyles } from './state/styles'
 import { useTagdb } from './state/tagdb'
@@ -173,6 +175,16 @@ export default function App(): JSX.Element {
           </div>
         </div>
       )}
+
+      {/* 出图弹窗与暂停/中止弹框是全局浮层：切到画风维护视图照样弹 */}
+      <GenDialog mainSpecs={mainSpecs} charSpecs={charSpecs} update={updateWorkspace} />
+      <GenRunDialogs
+        onOpenSettings={() => {
+          // 出图弹窗的层级高于设置抽屉，不关掉它设置抽屉会被挡住
+          useGen.getState().closeDialog()
+          setSettingsOpen(true)
+        }}
+      />
 
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
