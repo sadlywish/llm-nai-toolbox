@@ -128,6 +128,15 @@ export default function ParamsPanel({ params, onChange }: Props): JSX.Element {
       <div className="size-box">
         <div className="size-box-head">
           <span>尺寸</span>
+          {exceedsOpusFree(sentWidth, sentHeight) && (
+            <span
+              className="opus-warn"
+              role="note"
+              title={`总像素 ${sentWidth}×${sentHeight} = ${sentWidth * sentHeight}，超过 1024×1024，每张图都会消耗 Anlas`}
+            >
+              超出 Opus 免费范围
+            </span>
+          )}
           <span className="size-box-note">LLM 回填时会按宽高比与像素上限重算，覆盖这里的宽高</span>
         </div>
         <div className="two-col">
@@ -168,11 +177,6 @@ export default function ParamsPanel({ params, onChange }: Props): JSX.Element {
             }
           />
         </div>
-        {exceedsOpusFree(sentWidth, sentHeight) && (
-          <div className="opus-warn" role="note">
-            总像素 {sentWidth}×{sentHeight} = {sentWidth * sentHeight}，超过 1024×1024，超出 Opus 免费范围，每张图都会消耗 Anlas。
-          </div>
-        )}
       </div>
 
       <label className="field row-start seed-mode">
@@ -203,13 +207,6 @@ export default function ParamsPanel({ params, onChange }: Props): JSX.Element {
           })
         }
       />
-
-      {/* 固定 seed 要醒目：每张都用同一个 seed，最容易出现「怎么出的图都一样」 */}
-      {params.seedMode === 'fixed' && (
-        <div className="seed-fixed-warn" role="note">
-          固定 seed：{params.seed >= 0 ? `每张都用 ${params.seed}` : '开跑时随机一个、每张都用它'}，同一套参数出的图几乎一样。要出不同的图，把 seed 模式改回「每张随机」。
-        </div>
-      )}
 
       <NumberField
         label="步数"
