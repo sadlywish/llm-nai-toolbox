@@ -18,12 +18,14 @@ describe('singleLineText', () => {
 })
 
 describe('DEFAULT_TEXTS', () => {
-  it('三段提示词随包提供（非空），质量词与负面词默认留空', () => {
+  it('三段提示词随包提供（非空）；质量词与负面词用用户定下的默认值', () => {
     expect(DEFAULT_TEXTS.systemPrompt).not.toBe('')
     expect(DEFAULT_TEXTS.naiCharSystemPrompt).not.toBe('')
     expect(DEFAULT_TEXTS.tailInjection).not.toBe('')
-    expect(DEFAULT_TEXTS.quality).toBe('')
-    expect(DEFAULT_TEXTS.negativePrompt).toBe('')
+    expect(DEFAULT_TEXTS.quality).toBe('very aesthetic, masterpiece')
+    expect(DEFAULT_TEXTS.negativePrompt).toBe(
+      'lowres, bad hands, bad anatomy, sepia, white haze,  artistic error, sepia, white haze, worst quality, very displeasing, jpeg artifacts, 0::ai-generated::,',
+    )
   })
 
   it('随包文案都不含 CR', () => {
