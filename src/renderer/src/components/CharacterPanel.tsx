@@ -150,6 +150,7 @@ export default function CharacterPanel({
                   ch.fields = values
                 })
               }
+              editorId={`char:${active.id}`}
             />
             <TagTextEditor
               key={`${active.id}-negative`}

@@ -53,6 +53,7 @@ export default function PromptPane({
                   ws.main = values
                 })
               }
+              editorId="main"
             />
 
             <label className="field text-row">

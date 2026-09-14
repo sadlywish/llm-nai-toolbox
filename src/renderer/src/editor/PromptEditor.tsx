@@ -6,6 +6,8 @@ import { useEffect, useRef } from 'react'
 import { parseDocument, serializeFields, type FieldValues } from '@shared/blockDoc'
 import type { FieldSpec } from '@shared/fields'
 import { blockExtensions, externalSync } from './blockExtension'
+import { cursorBus } from './cursorBus'
+import { noteEditorFocus, registerEditor, unregisterEditor } from './editorRegistry'
 
 interface Props {
   /** 字段集。整图传 MAIN_FIELDS，角色传 CHARACTER_FIELDS —— 组件本身不认识任何一套。
@@ -14,14 +16,18 @@ interface Props {
   specs: readonly FieldSpec[]
   values: FieldValues
   onChange: (values: FieldValues) => void
+  /** WIKI 栏跟随光标与「加入」用的身份（只给正向提示词编辑器传）；不传 = 不参与 */
+  editorId?: string
 }
 
-export default function PromptEditor({ specs, values, onChange }: Props): JSX.Element {
+export default function PromptEditor({ specs, values, onChange, editorId }: Props): JSX.Element {
   const host = useRef<HTMLDivElement | null>(null)
   const view = useRef<EditorView | null>(null)
   // onChange 每次渲染都是新函数，存进 ref 免得重建整个 EditorView
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
+  const editorIdRef = useRef(editorId)
+  editorIdRef.current = editorId
 
   useEffect(() => {
     if (host.current === null) return
@@ -36,6 +42,14 @@ export default function PromptEditor({ specs, values, onChange }: Props): JSX.El
         ...blockExtensions(specs),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.updateListener.of((update) => {
+          const id = editorIdRef.current
+          if (id !== undefined) {
+            if (update.focusChanged && update.view.hasFocus) noteEditorFocus(id)
+            // 先问有没有订阅者：WIKI 栏收起或跟随关闭时这里只是一次布尔判断，不取文档（规格 R2）
+            if ((update.selectionSet || update.docChanged) && update.view.hasFocus && cursorBus.active()) {
+              cursorBus.emit({ editorId: id, doc: update.state.doc.toString(), specs, head: update.state.selection.main.head })
+            }
+          }
           if (!update.docChanged) return
           onChangeRef.current(parseDocument(update.state.doc.toString(), specs))
         }),
@@ -65,7 +79,10 @@ export default function PromptEditor({ specs, values, onChange }: Props): JSX.El
 
     const instance = new EditorView({ state, parent: host.current })
     view.current = instance
+    const id = editorIdRef.current
+    if (id !== undefined) registerEditor(id, instance, specs)
     return () => {
+      if (id !== undefined) unregisterEditor(id, instance)
       instance.destroy()
       view.current = null
     }
