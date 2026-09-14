@@ -25,8 +25,9 @@ asar: true
 electronDist: node_modules/electron/dist
 
 win:
-  # 1024×1024 PNG，electron-builder 自动转成 exe 与安装包用的 ico
-  icon: build/icon.png
+  # 多尺寸 ico（16–256，由 scripts/make-icon.js 从 build/icon.png 生成）。
+  # 不直接给 PNG：electron-builder 转出来的 ico 只有 256 一个尺寸，任务栏、小图标、安装包窗口都显示不完整
+  icon: build/icon.ico
   target:
     - target: nsis
       arch: [x64]
@@ -42,6 +43,9 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
   shortcutName: llm-nai-toolbox
   artifactName: ${productName}-${version}-setup.${ext}
 
