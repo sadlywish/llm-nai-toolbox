@@ -131,7 +131,7 @@ export default function App(): JSX.Element {
       )}
 
       {workbench !== null && (
-        <Toolbar workspace={workbench} mainSpecs={mainSpecs} charSpecs={charSpecs} update={updateWorkspace} />
+        <Toolbar />
       )}
 
       {view === 'styles' ? (

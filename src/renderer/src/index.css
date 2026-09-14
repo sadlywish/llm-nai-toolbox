@@ -483,12 +483,22 @@ body {
 
 /* ── 版面 A（界面稿 2026-09-14-generation-mockup.html 第 4 版） ──────────── */
 /* 工具栏贯穿全宽（照工具箱 .toolbar） */
-.toolbar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--line); background: var(--panel); font-size: 13px; flex-shrink: 0; }
-.toolbar-runcount { flex-direction: row; align-items: center; gap: 6px; }
-.toolbar-runcount input { width: 4em; }
+/* 生成按钮挪到参数区后工具栏常常是空的，min-height 保住版面高度不跳 */
+.toolbar { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 12px; border-bottom: 1px solid var(--line); background: var(--panel); font-size: 13px; flex-shrink: 0; }
 .toolbar-progress { color: var(--ink-dim); font-size: 12px; }
 .toolbar-error { display: flex; align-items: center; gap: 8px; color: #ffb4b4; font-size: 12px; }
-.seed-fixed-chip { padding: 0 6px; border: 1px solid #b8862e; border-radius: 3px; color: #f0d9a8; background: rgba(229, 192, 123, .14); font-size: 12px; }
+
+/* ── 大按钮（界面稿 2026-09-14-generate-button-mockup）：配色照 WebUI 默认 Gradio 主题的 primary / secondary ── */
+.big-btn { height: 36px; min-width: 96px; padding: 0 18px; border-radius: 7px; font: inherit; font-size: 14px; font-weight: 600; letter-spacing: .08em; color: #fff; cursor: pointer; }
+.big-btn.is-generate { border: 1px solid #ea580c; background: linear-gradient(to bottom right, #ea580c, #c2410c); }
+.big-btn.is-generate:hover { background: linear-gradient(to bottom right, #f97316, #ea580c); }
+.big-btn.is-cancel { border: 1px solid #52525b; background: linear-gradient(to bottom right, #52525b, #3f3f46); }
+.big-btn.is-cancel:hover:not(:disabled) { background: linear-gradient(to bottom right, #71717a, #52525b); }
+.big-btn:disabled { opacity: .55; cursor: default; }
+.params-column { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.gen-cta { display: flex; gap: 8px; align-items: flex-end; }
+.gen-cta-runcount { width: 7em; flex-shrink: 0; }
+.gen-cta .big-btn { flex: 1; height: 42px; font-size: 15px; }
 /* 下面三列：左历史竖栏 ｜ 中间一列 ｜（计划 6 的 WIKI 竖栏） */
 .body { flex: 1; min-height: 0; display: flex; }
 .center { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -619,10 +629,10 @@ body {
 .dialog-close:hover { color: var(--ink); }
 .dialog-actions button.primary { background: var(--accent); border-color: var(--accent); color: #0b1b2b; font-weight: 600; }
 .gen-dialog { width: 90vw; max-width: 1400px; height: 85vh; display: flex; flex-direction: column; gap: 10px; }
-.gen-running-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--accent); border-radius: 3px; padding: 6px 10px; font-size: 12px; color: var(--ink); background: #15181c; }
-.gen-running-count { color: var(--ink-dim); font-variant-numeric: tabular-nums; }
-.gen-paused-bar { display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: #4a3a1d; border: 1px solid #7a5a2a; border-radius: 3px; color: #f0d9a8; font-size: 12px; }
-.gen-paused-bar button { background: none; border: 1px solid #7a5a2a; border-radius: 3px; color: inherit; cursor: pointer; padding: 2px 10px; font: inherit; }
+.gen-running-bar { display: flex; align-items: center; gap: 10px; border: 1px solid var(--accent); border-radius: 3px; padding: 6px 6px 6px 10px; font-size: 13px; color: var(--ink); background: #15181c; }
+.gen-running-count { margin-left: auto; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.gen-paused-bar { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 10px; background: #4a3a1d; border: 1px solid #7a5a2a; border-radius: 3px; color: #f0d9a8; font-size: 13px; }
+.gen-bar-actions { display: flex; gap: 8px; margin-left: auto; }
 .gen-dialog-body { display: flex; gap: 12px; flex: 1 1 0; min-height: 0; }
 .gen-grid { flex: 1; min-width: 0; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; align-content: start; }
 .gen-slot { width: 100%; object-fit: cover; border-radius: 3px; border: 1px solid var(--line); background: #15181c; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--ink-dim); text-align: center; }

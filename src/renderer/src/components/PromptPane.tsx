@@ -4,6 +4,7 @@ import { tokenBudget } from '@renderer/prompt/tokenBudget'
 import PromptEditor from '../editor/PromptEditor'
 import TagTextEditor from '../editor/TagTextEditor'
 import CharacterPanel from './CharacterPanel'
+import GenerateBar from './GenerateBar'
 import ParamsPanel from './ParamsPanel'
 
 interface Props {
@@ -93,7 +94,10 @@ export default function PromptPane({
             )}
           </div>
 
-          <ParamsPanel params={workspace.params} onChange={(mutate) => update((ws) => mutate(ws.params))} />
+          <div className="params-column">
+            <GenerateBar workspace={workspace} mainSpecs={mainSpecs} charSpecs={charSpecs} update={update} />
+            <ParamsPanel params={workspace.params} onChange={(mutate) => update((ws) => mutate(ws.params))} />
+          </div>
         </div>
 
         <CharacterPanel

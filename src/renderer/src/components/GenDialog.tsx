@@ -3,6 +3,7 @@ import type { FieldSpec } from '@shared/fields'
 import type { ImageRecord } from '@shared/gen'
 import type { Workspace } from '@shared/workspace'
 import { formatRoundTime } from '../formatTime'
+import { galleryLayout } from '../galleryLayout'
 import { useRoundImages } from '../hooks/useRoundImages'
 import { mergeHistoryWithProgress, useGen } from '../state/gen'
 import ImageViewer from '../viewer/ImageViewer'
@@ -36,9 +37,24 @@ export default function GenDialog({ mainSpecs, charSpecs, update }: Props): JSX.
   const starting = useGen((s) => s.starting)
   const liveImages = useGen((s) => s.images)
   const resume = useGen((s) => s.resume)
+  const cancel = useGen((s) => s.cancel)
 
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const [viewer, setViewer] = useState<{ url: string; alt: string } | null>(null)
+
+  // 格子区域的实际尺寸：排版按它试算列数。用回调 ref——网格要等弹窗打开、轮次就绪才挂上，
+  // 挂载时就取 ref 的写法会错过它；打开/关闭溯源侧栏改变宽度时 ResizeObserver 会再报一次
+  const [gridEl, setGridEl] = useState<HTMLDivElement | null>(null)
+  const [gridSize, setGridSize] = useState({ width: 0, height: 0 })
+  useEffect(() => {
+    if (!gridEl) return
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (entry) setGridSize({ width: entry.contentRect.width, height: entry.contentRect.height })
+    })
+    observer.observe(gridEl)
+    return () => observer.disconnect()
+  }, [gridEl])
 
   // viewingRoundId 为 null 表示「看当前活跃的那一轮」
   const effectiveRoundId = viewingRoundId ?? progress?.roundId ?? null
@@ -79,6 +95,18 @@ export default function GenDialog({ mainSpecs, charSpecs, update }: Props): JSX.
 
   const params = round?.snapshot.params
   const slotStyle = params ? { aspectRatio: `${params.width} / ${params.height}` } : undefined
+  const layout =
+    round !== null && params
+      ? galleryLayout({ count: round.count, aspect: params.width / params.height, width: gridSize.width, height: gridSize.height })
+      : null
+  const gridStyle = layout
+    ? {
+        gridTemplateColumns: `repeat(${layout.columns}, ${layout.slotWidth}px)`,
+        justifyContent: 'center',
+        // 装得下才垂直居中：装不下时居中会让顶上几行滚不回去
+        alignContent: layout.fits ? 'center' : 'start',
+      }
+    : undefined
   const selectedSlot = selectedIndex === null ? null : slotFor(selectedIndex)
   const inspected = round !== null && selectedSlot?.kind === 'ready' ? { round, record: selectedSlot.record, url: selectedSlot.url } : null
 
@@ -98,15 +126,24 @@ export default function GenDialog({ mainSpecs, charSpecs, update }: Props): JSX.
               {progress.done + progress.failed} / {progress.total}
               {progress.failed > 0 && ` · 失败 ${progress.failed}`}
             </span>
+            {/* 点「生成」后弹窗自动打开、盖住参数区的按钮，所以弹窗里也要有一个够大的取消 */}
+            <button type="button" className="big-btn is-cancel" onClick={() => void cancel()}>
+              取消
+            </button>
           </div>
         )}
 
         {isLive && progress?.status === 'paused' && (
           <div className="gen-paused-bar">
             <span>已暂停 · 并发冲突</span>
-            <button type="button" onClick={() => void resume()}>
-              继续
-            </button>
+            <div className="gen-bar-actions">
+              <button type="button" className="big-btn is-generate" onClick={() => void resume()}>
+                继续
+              </button>
+              <button type="button" className="big-btn is-cancel" onClick={() => void cancel()}>
+                取消
+              </button>
+            </div>
           </div>
         )}
 
@@ -114,7 +151,7 @@ export default function GenDialog({ mainSpecs, charSpecs, update }: Props): JSX.
           {round === null ? (
             <div className="placeholder">准备中…</div>
           ) : (
-            <div className="gen-grid">
+            <div className="gen-grid" ref={setGridEl} style={gridStyle}>
               {Array.from({ length: round.count }, (_, index) => {
                 const slot = slotFor(index)
                 const alt = `第 ${index + 1} 张`
