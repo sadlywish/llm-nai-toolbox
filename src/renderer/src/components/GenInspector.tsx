@@ -17,7 +17,6 @@ interface Props {
   mainSpecs: readonly FieldSpec[]
   charSpecs: readonly FieldSpec[]
   update: (fn: (draft: Workspace) => void) => void
-  onClose: () => void
   onOpenViewer: () => void
   /** 复制信息写进参数区之后 */
   onCopied: () => void
@@ -61,7 +60,7 @@ function prettyJson(text: string): string {
  * 「复制信息」把快照整套覆盖到参数区，seed 以图片元信息里的为准（读不到用记录里的），并改成固定模式。
  * 界面稿：docs/superpowers/specs/2026-09-14-generation-mockup.html 第 3 版状态 3、3b。
  */
-export default function GenInspector({ item, mainSpecs, charSpecs, update, onClose, onOpenViewer, onCopied }: Props): JSX.Element {
+export default function GenInspector({ item, mainSpecs, charSpecs, update, onOpenViewer, onCopied }: Props): JSX.Element {
   const { round, record, url } = item
   const snapshot = round.snapshot
   const [tab, setTab] = useState<'tool' | 'meta'>('tool')
@@ -106,11 +105,9 @@ export default function GenInspector({ item, mainSpecs, charSpecs, update, onClo
 
   return (
     <aside className="gen-inspector">
+      {/* 侧栏常驻（没有关闭按钮）：点格子切换展示哪一张 */}
       <div className="gen-inspector-header">
         <span>溯源信息</span>
-        <button type="button" className="gen-inspector-close" title="关闭详情" onClick={onClose}>
-          ×
-        </button>
       </div>
       <img className="gen-inspector-preview" src={url} alt={`第 ${record.index + 1} 张`} onClick={onOpenViewer} />
 

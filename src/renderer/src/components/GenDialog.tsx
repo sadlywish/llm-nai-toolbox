@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FieldSpec } from '@shared/fields'
 import type { ImageRecord } from '@shared/gen'
 import type { Workspace } from '@shared/workspace'
@@ -41,6 +41,8 @@ export default function GenDialog({ mainSpecs, charSpecs, update }: Props): JSX.
 
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const [viewer, setViewer] = useState<{ url: string; alt: string } | null>(null)
+  // 点遮罩关闭：按下与松开都落在遮罩本身才算（同设置抽屉）。在弹窗里拖选文字、松手落到遮罩上不能误关
+  const downOnBackdrop = useRef(false)
 
   // 格子区域的实际尺寸：排版按它试算列数。用回调 ref——网格要等弹窗打开、轮次就绪才挂上，
   // 挂载时就取 ref 的写法会错过它；打开/关闭溯源侧栏改变宽度时 ResizeObserver 会再报一次
@@ -107,11 +109,33 @@ export default function GenDialog({ mainSpecs, charSpecs, update }: Props): JSX.
         alignContent: layout.fits ? 'center' : 'start',
       }
     : undefined
-  const selectedSlot = selectedIndex === null ? null : slotFor(selectedIndex)
-  const inspected = round !== null && selectedSlot?.kind === 'ready' ? { round, record: selectedSlot.record, url: selectedSlot.url } : null
+  // 溯源侧栏常驻：没点过（或点的那张不可用）时展示第一张出好的图
+  let activeIndex: number | null = null
+  if (round !== null) {
+    if (selectedIndex !== null && slotFor(selectedIndex).kind === 'ready') activeIndex = selectedIndex
+    else {
+      for (let i = 0; i < round.count; i++) {
+        if (slotFor(i).kind === 'ready') {
+          activeIndex = i
+          break
+        }
+      }
+    }
+  }
+  const activeSlot = activeIndex === null ? null : slotFor(activeIndex)
+  const inspected = round !== null && activeSlot?.kind === 'ready' ? { round, record: activeSlot.record, url: activeSlot.url } : null
 
   return (
-    <div className="dialog-backdrop">
+    <div
+      className="dialog-backdrop"
+      onMouseDown={(e) => {
+        downOnBackdrop.current = e.target === e.currentTarget
+      }}
+      onClick={(e) => {
+        // 查看器叠在同一层遮罩里：点查看器冒泡上来时 target 不是遮罩本身，不会连弹窗一起关
+        if (downOnBackdrop.current && e.target === e.currentTarget) closeDialog()
+      }}
+    >
       <div className="dialog gen-dialog">
         <button type="button" className="dialog-close" title="关闭（不中断任务）" onClick={closeDialog}>
           ×
@@ -160,7 +184,7 @@ export default function GenDialog({ mainSpecs, charSpecs, update }: Props): JSX.
                     return (
                       <img
                         key={index}
-                        className={`gen-slot is-ready ${selectedIndex === index ? 'is-selected' : ''}`}
+                        className={`gen-slot is-ready ${activeIndex === index ? 'is-selected' : ''}`}
                         style={slotStyle}
                         src={slot.url}
                         alt={alt}
@@ -196,17 +220,24 @@ export default function GenDialog({ mainSpecs, charSpecs, update }: Props): JSX.
             </div>
           )}
 
-          {inspected !== null && (
+          {inspected !== null ? (
             <GenInspector
               item={inspected}
               mainSpecs={mainSpecs}
               charSpecs={charSpecs}
               update={update}
-              onClose={() => setSelectedIndex(null)}
               onOpenViewer={() => setViewer({ url: inspected.url, alt: `第 ${inspected.record.index + 1} 张` })}
               // 复制完回到参数区（界面稿状态 7 的顺序）：弹窗不关的话，参数区的固定 seed 提示被挡住看不见
               onCopied={closeDialog}
             />
+          ) : (
+            // 还没有出好的图时侧栏照样占位，出图后格子区宽度不跳
+            <aside className="gen-inspector">
+              <div className="gen-inspector-header">
+                <span>溯源信息</span>
+              </div>
+              <div className="placeholder">出图后在此显示</div>
+            </aside>
           )}
         </div>
       </div>

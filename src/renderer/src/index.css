@@ -654,8 +654,6 @@ body {
 /* 溯源信息侧栏：比工具箱宽（420px），要放整套参数 */
 .gen-inspector { flex: 0 0 420px; width: 420px; overflow-y: auto; border-left: 1px solid var(--line); padding-left: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
 .gen-inspector-header { display: flex; align-items: center; justify-content: space-between; color: var(--ink-dim); }
-.gen-inspector-close { background: none; border: none; color: var(--ink-dim); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; }
-.gen-inspector-close:hover { color: var(--ink); }
 .gen-inspector-preview { width: 160px; align-self: center; border-radius: 4px; border: 1px solid var(--line); cursor: zoom-in; }
 
 /* ── 溯源信息（界面稿第 3 版状态 3、3b） ─────────────────────── */
