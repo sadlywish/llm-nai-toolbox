@@ -1,11 +1,15 @@
 :root {
-  --ground: #15171b;
-  --panel: #1d2025;
-  --panel-2: #22262c;
-  --line: #2f343d;
-  --ink: #d8dce3;
-  --ink-dim: #98a1ad;
-  --ink-faint: #6b737f;
+  /* 配色照画师串工具箱的中性灰（VS Code 暗色）。灰阶都走变量，以后加配色方案切换只换这一段 */
+  --ground: #1e1e1e;
+  --panel: #252526;
+  --panel-2: #2d2d2d;
+  --input: #1a1a1a;
+  --sunken: #171717;
+  --sunken-head: #1f1f1f;
+  --line: #3c3c3c;
+  --ink: #d4d4d4;
+  --ink-dim: #9d9d9d;
+  --ink-faint: #707070;
   --accent: #4a9eff;
   --danger: #ff6b63;
   --warn: #e5c07b;
@@ -173,7 +177,7 @@ body {
 /* ── 表单（照画师串工具箱的 .field 皮肤，换成本应用的配色） ───────── */
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--ink-dim); min-width: 0; }
 .field input, .field select, .field textarea {
-  background: #15181c; border: 1px solid var(--line); border-radius: 3px;
+  background: var(--input); border: 1px solid var(--line); border-radius: 3px;
   color: var(--ink); padding: 4px 7px; font: inherit; font-size: 13px; min-width: 0;
 }
 .field textarea { resize: vertical; font-family: var(--mono); font-size: 12.5px; line-height: 1.55; }
@@ -196,7 +200,7 @@ body {
 .prompt-columns { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
 .prompt-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .prompt-left .pane-warn { border-top: none; padding: 0; }
-.prompt-editor { border: 1px solid var(--line); border-radius: 4px; background: #15181c; }
+.prompt-editor { border: 1px solid var(--line); border-radius: 4px; background: var(--input); }
 .prompt-editor:focus-within { border-color: var(--accent); }
 /* 纯文本标签编辑器不沿用分块编辑器那套为徽章对齐调出来的行高与内边距 */
 .prompt-editor.tag-text-editor { min-height: 46px; }
@@ -270,7 +274,7 @@ body {
 .drawer-close { background: none; border: none; color: var(--ink-dim); cursor: pointer; font-size: 18px; line-height: 1; }
 .drawer-close:hover { color: var(--ink); }
 /* 首次启动的说明条。用 accent 而不是错误红：这不是出错，是一次正常的引导 */
-.drawer-firstrun { border: 1px solid var(--accent); border-radius: 4px; padding: 7px 9px; font-size: 12.5px; line-height: 1.7; background: #15181c; }
+.drawer-firstrun { border: 1px solid var(--accent); border-radius: 4px; padding: 7px 9px; font-size: 12.5px; line-height: 1.7; background: var(--input); }
 .drawer-error { background: #5a1d1d; color: #ffd7d7; border: 1px solid #7a2a2a; border-radius: 3px; padding: 6px 8px; font-size: 12.5px; }
 .drawer-group { border: 1px solid var(--line); border-radius: 5px; flex-shrink: 0; }
 .drawer-group-head {
@@ -302,7 +306,7 @@ body {
 
 /* ── 画风维护（照画师串工具箱的画师串编辑器） ──────────────── */
 .style-manager .style-tabs { padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel-2); }
-.tab-rename-input { background: #15181c; border: 1px solid var(--accent); color: var(--ink); font: inherit; font-size: 13px; padding: 0 4px; width: 9em; border-radius: 3px; }
+.tab-rename-input { background: var(--input); border: 1px solid var(--accent); color: var(--ink); font: inherit; font-size: 13px; padding: 0 4px; width: 9em; border-radius: 3px; }
 .tab-rename-input.is-invalid { border-color: var(--danger); }
 .tab-empty-mark { color: var(--warn); font-size: 12px; }
 .style-empty { padding: 50px 0; text-align: center; color: var(--ink-faint); font-size: 13px; }
@@ -348,11 +352,11 @@ body {
 .ask2 { padding: 8px 12px 10px; display: flex; flex-direction: column; gap: 8px; }
 /* 没有光标时固定 4 行（6.4em = 4 × 行高 1.6，14px = 上下内边距 + 边框）；光标进入后 LlmConsole 按内容撑高，
    下限就是这 4 行。最多长到窗口里还放得下顶栏与指令区其余部分，再多就在框内滚动，免得把「发送」挤出窗口 */
-.ask2 textarea { resize: none; height: calc(6.4em + 14px); max-height: calc(100vh - 160px); background: #15181c; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); font: inherit; font-size: 14px; line-height: 1.6; padding: 6px 9px; }
+.ask2 textarea { resize: none; height: calc(6.4em + 14px); max-height: calc(100vh - 160px); background: var(--input); border: 1px solid var(--line); border-radius: 4px; color: var(--ink); font: inherit; font-size: 14px; line-height: 1.6; padding: 6px 9px; }
 .ask2 textarea:focus { outline: none; border-color: var(--accent); }
 .opts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: 13px; color: var(--ink-dim); }
 .opts label { display: flex; align-items: center; gap: 5px; }
-.opts select { background: #15181c; border: 1px solid var(--line); border-radius: 3px; color: var(--ink); font: inherit; font-size: 13px; padding: 2px 4px; }
+.opts select { background: var(--input); border: 1px solid var(--line); border-radius: 3px; color: var(--ink); font: inherit; font-size: 13px; padding: 2px 4px; }
 .opts .grow { flex: 1; }
 .opts .hint { font-size: 12px; color: var(--ink-faint); }
 
@@ -360,11 +364,11 @@ body {
 /* z-index 低于设置抽屉（10）：两个都开着时设置抽屉在上 */
 .log-backdrop { position: absolute; inset: 0; z-index: 9; background: rgba(0, 0, 0, .45); display: flex; flex-direction: column; justify-content: flex-end; }
 .log-drawer { height: 60%; display: flex; flex-direction: column; background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -8px 24px rgba(0, 0, 0, .35); }
-.log-drawer-head { display: flex; align-items: center; gap: 10px; padding: 6px 12px; font-size: 13px; color: var(--ink-dim); background: #1a1d22; border-bottom: 1px solid var(--line); }
+.log-drawer-head { display: flex; align-items: center; gap: 10px; padding: 6px 12px; font-size: 13px; color: var(--ink-dim); background: var(--sunken-head); border-bottom: 1px solid var(--line); }
 .log-drawer-head .grow { flex: 1; }
 .spin { display: inline-block; width: 10px; height: 10px; border: 2px solid var(--accent); border-right-color: transparent; border-radius: 50%; margin-right: 6px; vertical-align: -1px; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.log { flex: 1; min-height: 0; overflow: auto; padding: 6px 12px; background: #121418; font-family: var(--mono); font-size: 13px; line-height: 1.65; }
+.log { flex: 1; min-height: 0; overflow: auto; padding: 6px 12px; background: var(--sunken); font-family: var(--mono); font-size: 13px; line-height: 1.65; }
 /* 悬挂缩进：折行后的续行对齐到正文，不钻到时间戳下面。13.2ch ≈ "12:30:09 [I] " */
 .ln { white-space: pre-wrap; word-break: break-all; padding-left: 13.2ch; text-indent: -13.2ch; color: var(--ink); }
 .ln .t { color: var(--ink-faint); }
@@ -561,7 +565,7 @@ body {
   object-fit: cover;
   border-radius: 3px;
   border: 1px solid var(--line);
-  background: #15181c;
+  background: var(--input);
   flex-shrink: 0;
 }
 
@@ -629,13 +633,13 @@ body {
 .dialog-close:hover { color: var(--ink); }
 .dialog-actions button.primary { background: var(--accent); border-color: var(--accent); color: #0b1b2b; font-weight: 600; }
 .gen-dialog { width: 90vw; max-width: 1400px; height: 85vh; display: flex; flex-direction: column; gap: 10px; }
-.gen-running-bar { display: flex; align-items: center; gap: 10px; border: 1px solid var(--accent); border-radius: 3px; padding: 6px 6px 6px 10px; font-size: 13px; color: var(--ink); background: #15181c; }
+.gen-running-bar { display: flex; align-items: center; gap: 10px; border: 1px solid var(--accent); border-radius: 3px; padding: 6px 6px 6px 10px; font-size: 13px; color: var(--ink); background: var(--input); }
 .gen-running-count { margin-left: auto; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
 .gen-paused-bar { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 10px; background: #4a3a1d; border: 1px solid #7a5a2a; border-radius: 3px; color: #f0d9a8; font-size: 13px; }
 .gen-bar-actions { display: flex; gap: 8px; margin-left: auto; }
 .gen-dialog-body { display: flex; gap: 12px; flex: 1 1 0; min-height: 0; }
 .gen-grid { flex: 1; min-width: 0; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; align-content: start; }
-.gen-slot { width: 100%; object-fit: cover; border-radius: 3px; border: 1px solid var(--line); background: #15181c; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--ink-dim); text-align: center; }
+.gen-slot { width: 100%; object-fit: cover; border-radius: 3px; border: 1px solid var(--line); background: var(--input); display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--ink-dim); text-align: center; }
 .gen-slot.is-ready { cursor: zoom-in; }
 .gen-slot.is-selected { outline: 2px solid var(--accent); outline-offset: 1px; }
 .gen-slot.is-empty { border-style: dashed; }
@@ -664,11 +668,11 @@ body {
 .gen-field-label { color: var(--ink-faint); font-size: 11px; }
 details.gen-field > summary { cursor: pointer; }
 .gen-field-value { font-family: var(--mono); word-break: break-all; color: var(--ink); }
-.gen-blocks { background: #15181c; border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; font-family: var(--mono); line-height: 1.9; }
+.gen-blocks { background: var(--input); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; font-family: var(--mono); line-height: 1.9; }
 /* 块配色与分块编辑器同一套（hsl(var(--h) …)） */
 .gen-block { display: inline-block; border-radius: 3px; padding: 0 5px; margin: 0 4px 3px 0; background: hsl(var(--h) 48% 56% / .14); box-shadow: inset 0 0 0 1px hsl(var(--h) 45% 52% / .42); }
 .gen-block i { font-style: normal; font-size: 10.5px; background: hsl(var(--h) 48% 58%); color: #0f1115; border-radius: 2px; padding: 0 3px; margin-right: 4px; }
-.gen-pre { margin: 0; background: #15181c; border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; font-family: var(--mono); font-size: 11.5px; white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow: auto; color: var(--ink); }
+.gen-pre { margin: 0; background: var(--input); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; font-family: var(--mono); font-size: 11.5px; white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow: auto; color: var(--ink); }
 .gen-copy-btn { margin-top: auto; background: var(--accent); border: none; border-radius: 3px; color: #0b1b2b; cursor: pointer; padding: 6px 10px; font: inherit; font-weight: 600; }
 .gen-copy-btn:disabled { opacity: .45; cursor: default; }
 .gen-copy-hint { color: var(--ink-faint); font-size: 11.5px; line-height: 1.6; }
