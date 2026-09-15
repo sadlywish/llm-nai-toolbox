@@ -202,6 +202,8 @@ llm:event finished { LlmRunResult：filled（带 FillResult）/ noParams / faile
 
 实测跨进程延迟（中位数）：单字符 `s` 查画师 17898 条 / 1037KB / 86ms；`bl` 1158 条 / 78KB / 5ms；`初音` 72 条 / 6KB / 1ms。加载完成后第一次查询约 609ms（V8 冷），之后稳定。**候选全量返回、不设条数上限**，渲染量由 CodeMirror 的 `maxRenderedOptions` 兜住——结果集大小与渲染成本是两件事。
 
+**魔法书**复用 `TagExtrasLoader` 缓存的 `tag_browse.json` 与 `tag_gloss.json`（标签索引就绪后后台预热）。纯函数在 `main/tagdb/magicbook.ts`：分类树、整类列表、检索（匹配面同 browse_tags 的 `m`，多词同时命中；排序按标签名 › 释义 › 别名三档再按帖子数；传分类时先筛再截 500 条）、中文说明（带所属分类）、释义补充（只在查询含中文、补全偏好是 general 时，只匹配释义文字）。经 `magicbook:tree / list / search` 与 `tagdb:gloss` 暴露；`tagdb:complete` 的结果带 `gloss`，`glossMax` 控制追加多少条 `byGloss` 补充行（传了 `limit` 时封顶到剩余名额）。渲染进程的 D 站词条加载在 `state/wikiEntryLoad.ts`，WIKI 竖栏与魔法书各持请求代次。
+
 ---
 
 ## 出图与落盘
