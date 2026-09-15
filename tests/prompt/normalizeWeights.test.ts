@@ -69,11 +69,50 @@ describe('normalizeWeights：@ 标记', () => {
   })
 })
 
+describe('normalizeWeights：webui 转义的圆括号', () => {
+  it('\\( \\) 还原成普通括号，各算一处', () => {
+    const r = normalizeWeights('saber \\(fate\\), 1girl')
+    expect(r.text).toBe('saber (fate), 1girl')
+    expect(r.escapes).toBe(2)
+    expect(r.weights).toBe(0)
+  })
+
+  it('显式权重里的转义括号：转义不参与配对，权重照转，括号还原', () => {
+    const r = normalizeWeights('(saber \\(fate\\):1.2)')
+    expect(r.text).toBe('1.2::saber (fate)::')
+    expect([r.weights, r.escapes]).toEqual([1, 2])
+  })
+
+  it('裸括号里嵌转义括号：外层配对跳过转义的那对', () => {
+    expect(normalizeWeights('(a \\(b\\))').text).toBe('(a (b))')
+  })
+
+  it('转义的闭括号不会提前结束配对（只有一半转义时也对）', () => {
+    expect(normalizeWeights('(smile \\):1.2)').text).toBe('1.2::smile )::')
+  })
+
+  it('落单的转义也还原', () => {
+    const r = normalizeWeights('smile \\)')
+    expect(r.text).toBe('smile )')
+    expect(r.escapes).toBe(1)
+  })
+
+  it('只还原圆括号：\\{ \\[ 与单独的反斜杠原样留着', () => {
+    const r = normalizeWeights('a \\{b\\}, c\\d')
+    expect(r.escapes).toBe(0)
+    expect(r.text).toContain('c\\d')
+  })
+
+  it('{} 里的转义括号也还原', () => {
+    expect(normalizeWeights('{saber \\(fate\\)}').text).toBe('1.05::saber (fate)::')
+  })
+})
+
 describe('normalizeWeights：计数', () => {
   it('没有可转的东西时计数为 0、文本不变', () => {
     const r = normalizeWeights('1girl, artist:wlop, 0.8::sky::')
     expect(r.text).toBe('1girl, artist:wlop, 0.8::sky::')
-    expect(r).toEqual({ text: '1girl, artist:wlop, 0.8::sky::', weights: 0, artists: 0 })
+    expect(r).toEqual({ text: '1girl, artist:wlop, 0.8::sky::', weights: 0, artists: 0, escapes: 0 })
   })
 
   it('已有的 :: 权重不受影响', () => {

@@ -1,8 +1,9 @@
 import { newId } from './ids'
 
 /**
- * 画风预设：名称 + 一串画风标签。指令区的画风选「用选用的预设覆盖」时从这里挑一条，
- * 收口后覆盖 artist（规格 §8）。存 styles.json，在画风维护视图里改动即保存。
+ * 画风预设：名称 + 一串画风标签。画风维护里「选为预设画风」的那条，在指令区画风档位是
+ * 「用预设画风覆盖」时收口后覆盖 artist（规格 §8）。存 styles.json（数组顺序即列表顺序），
+ * 在画风维护视图里改动即保存。
  */
 export interface StylePreset {
   id: string
@@ -58,7 +59,19 @@ export function nextStyleName(presets: readonly StylePreset[]): string {
   }
 }
 
-/** 能在指令区下拉里选的预设：标签非空 */
+/** 能当预设画风用的：标签非空 */
 export function usableStyles(presets: readonly StylePreset[]): StylePreset[] {
   return presets.filter((p) => p.tags.trim() !== '')
+}
+
+/**
+ * 列表拖动排序：把 from 处那条挪到插入位 to（0..length，按挪动前的下标算，
+ * 即「插在原来第 to 条前面」，length 表示放到最后）。原地改，给 store 的 update 草稿用。
+ * 插回原位（to 等于 from 或 from + 1）不改动。
+ */
+export function moveStyle(presets: StylePreset[], from: number, to: number): void {
+  if (from < 0 || from >= presets.length || to < 0 || to > presets.length) return
+  if (to === from || to === from + 1) return
+  const [item] = presets.splice(from, 1)
+  presets.splice(to > from ? to - 1 : to, 0, item)
 }

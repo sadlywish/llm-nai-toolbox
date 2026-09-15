@@ -49,9 +49,9 @@ export interface ConsoleOptions {
   editExisting: boolean
   /** 透明背景 */
   transparent: boolean
-  /** 画风：不覆盖 / 用选用的预设覆盖 / 用当前 artist 块覆盖 */
+  /** 画风：不覆盖 / 用预设画风覆盖 / 用当前 artist 块覆盖 */
   styleMode: StyleMode
-  /** 选中的画风预设 id；styleMode 不是 preset 时无意义 */
+  /** 当前预设画风的 id（画风维护里「选为预设画风」的那条）；'' = 未选择。和档位各管各的，选预设不动档位 */
   presetId: string
   /** 回填后自动生成：LLM 回填成功后直接按跑图次数开始生成 */
   autoGenerate: boolean

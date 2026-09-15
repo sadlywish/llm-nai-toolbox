@@ -142,7 +142,7 @@ export default function App(): JSX.Element {
 
       {view === 'styles' && (
         <main className="workarea">
-          <StyleManager />
+          <StyleManager onOpenWorkbench={() => setView('workbench')} />
         </main>
       )}
       {view === 'workbench' && (

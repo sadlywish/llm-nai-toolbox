@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { UNNAMED_STYLE, nextStyleName, normalizeStyles, styleNameError, usableStyles, type StylePreset } from '../../src/shared/styles'
+import { UNNAMED_STYLE, moveStyle, nextStyleName, normalizeStyles, styleNameError, usableStyles, type StylePreset } from '../../src/shared/styles'
 
 const p = (id: string, name: string, tags = ''): StylePreset => ({ id, name, tags })
 
@@ -48,5 +48,45 @@ describe('nextStyleName', () => {
 describe('usableStyles', () => {
   it('只留标签非空的预设，保持原顺序', () => {
     expect(usableStyles([p('a', 'x', ' '), p('b', 'y', 'artist:y'), p('c', 'z', 'artist:z')]).map((s) => s.id)).toEqual(['b', 'c'])
+  })
+})
+
+describe('moveStyle', () => {
+  const ids = (list: StylePreset[]): string => list.map((s) => s.id).join('')
+  const abcde = (): StylePreset[] => ['a', 'b', 'c', 'd', 'e'].map((id) => p(id, id))
+
+  it('往前挪：插到第 to 条前面', () => {
+    const list = abcde()
+    moveStyle(list, 3, 1)
+    expect(ids(list)).toBe('adbce')
+  })
+
+  it('往后挪：插位按挪动前的下标算', () => {
+    const list = abcde()
+    moveStyle(list, 1, 4)
+    expect(ids(list)).toBe('acdbe')
+  })
+
+  it('插位 = 长度：放到最后；插位 0：放到最前', () => {
+    const list = abcde()
+    moveStyle(list, 0, 5)
+    expect(ids(list)).toBe('bcdea')
+    moveStyle(list, 4, 0)
+    expect(ids(list)).toBe('abcde')
+  })
+
+  it('插回原位（to = from 或 from + 1）不改动', () => {
+    const list = abcde()
+    moveStyle(list, 2, 2)
+    moveStyle(list, 2, 3)
+    expect(ids(list)).toBe('abcde')
+  })
+
+  it('越界的下标不改动', () => {
+    const list = abcde()
+    moveStyle(list, 5, 0)
+    moveStyle(list, -1, 2)
+    moveStyle(list, 1, 6)
+    expect(ids(list)).toBe('abcde')
   })
 })

@@ -1,10 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { applyFill } from '@shared/applyFill'
 import type { ApiType, AppConfig } from '@shared/config'
-import { buildRunInput, presetSelectionStale, selectStyleMode } from '@shared/consoleRun'
+import { buildRunInput, clearStalePreset, currentPresetOf, presetSelectionStale } from '@shared/consoleRun'
 import type { FieldSpec } from '@shared/fields'
 import { MULTI_CHARACTER_MODES, type MultiCharacterMode } from '@shared/llm'
-import { usableStyles, type StylePreset } from '@shared/styles'
+import type { StylePreset } from '@shared/styles'
 import type { ConsoleOptions, StyleMode, Workspace } from '@shared/workspace'
 import { useGen } from '../state/gen'
 import { statusText, statusTone, useLlm } from '../state/llm'
@@ -19,7 +19,7 @@ interface Props {
   mainSpecs: readonly FieldSpec[]
   charSpecs: readonly FieldSpec[]
   update: (fn: (draft: Workspace) => void) => void
-  /** 预设下拉里的「去维护画风…」 */
+  /** 「选择预设…」：切到画风维护，在那里选预设画风 */
   onOpenStyles: () => void
 }
 
@@ -32,9 +32,6 @@ const MULTI_LABELS: Record<MultiCharacterMode, string> = {
 }
 
 const STYLE_MODES: readonly StyleMode[] = ['none', 'preset', 'current']
-
-/** 预设下拉末尾「去维护画风…」的取值；预设 id 由 newId 生成，不会撞上 */
-const OPEN_STYLES = '__open_styles__'
 
 /**
  * 指令区，固定在窗口底部。日志在 LlmLogDrawer 里，从这里的顶边向上展开。
@@ -51,16 +48,15 @@ export default function LlmConsole({ workspace, config, presets, mainSpecs, char
 
   const opts = workspace.console
   const running = phase.kind === 'running'
-  const usable = useMemo(() => usableStyles(presets ?? []), [presets])
+  const currentPreset = useMemo(() => currentPresetOf(opts, presets ?? []), [opts, presets])
   const tone = statusTone(phase)
   const status = statusText(phase)
 
-  // 选着的预设被删掉或清空时，画风退回「不覆盖」。预设还没载入时不判断，免得启动时误退
+  // 当前预设画风被删掉或清空时，预设变「未选择」、预设档退回「不覆盖」。预设还没载入时不判断，免得启动时误清。
+  // 挂在指令区而不是画风维护：在画风维护里清空标签再重填是常事，切回工作台时才结算
   useEffect(() => {
     if (presets !== null && presetSelectionStale(opts, presets)) {
-      update((ws) => {
-        ws.console.styleMode = 'none'
-      })
+      update((ws) => clearStalePreset(ws.console, presets))
     }
   }, [presets, opts, update])
 
@@ -184,37 +180,31 @@ export default function LlmConsole({ workspace, config, presets, mainSpecs, char
               disabled={running}
               onChange={(e) => {
                 const mode = STYLE_MODES.find((m) => m === e.target.value)
-                if (mode !== undefined) update((ws) => selectStyleMode(ws.console, mode, presets ?? []))
+                if (mode !== undefined) setOption('styleMode', mode)
               }}
             >
               <option value="none">不覆盖</option>
-              <option value="preset" disabled={usable.length === 0}>
-                {usable.length === 0 ? '用选用的预设覆盖（还没有预设）' : '用选用的预设覆盖'}
+              <option value="preset" disabled={currentPreset === null}>
+                {currentPreset === null ? '用预设画风覆盖（未选择预设）' : '用预设画风覆盖'}
               </option>
               <option value="current">用当前 artist 块覆盖</option>
             </select>
           </label>
-          {opts.styleMode === 'preset' && (
-            <label>
-              预设
-              <select
-                value={opts.presetId}
-                disabled={running}
-                onChange={(e) => {
-                  if (e.target.value === OPEN_STYLES) onOpenStyles()
-                  else setOption('presetId', e.target.value)
-                }}
-              >
-                {usable.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-                <option disabled>──────────</option>
-                <option value={OPEN_STYLES}>去维护画风…</option>
-              </select>
-            </label>
-          )}
+          {/* 预设在画风维护里选，这里只显示是哪条；档位不是预设档时名称变灰（界面稿 2026-09-15-style-list-mockup.html 第一节） */}
+          <span className="preset-pick">
+            预设
+            {currentPreset === null ? (
+              <span className="preset-name is-none">未选择</span>
+            ) : (
+              <span className={`preset-name${opts.styleMode === 'preset' ? '' : ' is-dim'}`} title={currentPreset.tags}>
+                <span className="style-dot is-on" />
+                <span className="preset-name-text">{currentPreset.name}</span>
+              </span>
+            )}
+            <button type="button" className="btn btn-sm" disabled={running} onClick={onOpenStyles}>
+              选择预设…
+            </button>
+          </span>
           <label>
             <input
               type="checkbox"
