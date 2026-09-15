@@ -2,9 +2,9 @@
 
 用 LLM 把一句中文需求翻译成 NovelAI 的结构化提示词，人确认后出图。
 
-![状态](https://img.shields.io/badge/状态-0.9.2%20预发布-e0a458) ![平台](https://img.shields.io/badge/platform-Windows%20x64-555)
+![状态](https://img.shields.io/badge/状态-0.9.3%20预发布-e0a458) ![平台](https://img.shields.io/badge/platform-Windows%20x64-555)
 
-> **0.9.2 预发布（内部测试）。** 「一句话 → LLM 查标签并回填 → 出图」整条流程已经能用，界面和配置格式还可能调整。各版本改动见 [更新日志](CHANGELOG.md)。
+> **0.9.3 预发布（内部测试）。** 「一句话 → LLM 查标签并回填 → 出图」整条流程已经能用，界面和配置格式还可能调整。各版本改动见 [更新日志](CHANGELOG.md)。
 
 ---
 

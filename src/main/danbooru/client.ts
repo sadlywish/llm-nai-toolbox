@@ -307,7 +307,7 @@ type HttpOutcome =
  * 一大段 HTML」，界面上显示的是一坨看不懂的东西，而真因（少一个请求头）
  * 完全指不出来。实测：同一个 URL 不带 UA 返回 403，带上返回 200。
  */
-export const DANBOORU_USER_AGENT = 'llm-nai-toolbox/0.9.2 (NovelAI prompt tool)'
+export const DANBOORU_USER_AGENT = 'llm-nai-toolbox/0.9.3 (NovelAI prompt tool)'
 
 async function throttledGet(
   fetchImpl: typeof fetch,
