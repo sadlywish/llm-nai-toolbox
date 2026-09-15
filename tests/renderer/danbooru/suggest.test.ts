@@ -55,4 +55,28 @@ describe('mergeTagSuggestions', () => {
       { tag: 'twin_braids', label: 'twin braids', zh: [], count: 98000, matchedBy: [] },
     ])
   })
+
+  it('释义补充行排在本地结果之后补足名额，不参与帖子数排序，不重复', () => {
+    const gl = (tag: string, count: number, gloss: string): CompletionItem => ({ tag, count, zh: [], series: [], gloss, byGloss: true })
+    const out = mergeTagSuggestions(
+      [
+        [local('looking_down', 123000), gl('from_above', 127000, '俯视视角'), gl('looking_down', 123000, '低头向下看')],
+        [local('miku', 9)],
+        [],
+      ],
+      3,
+    )
+    expect(out.map((s) => [s.tag, s.byGloss ?? false])).toEqual([
+      ['looking_down', false],
+      ['miku', false],
+      ['from_above', true],
+    ])
+    expect(out[2]).toMatchObject({ label: 'from above', gloss: '俯视视角', count: 127000, zh: [], matchedBy: [] })
+  })
+
+  it('本地结果已占满名额时不补释义行', () => {
+    const gl: CompletionItem = { tag: 'from_above', count: 9e9, zh: [], series: [], gloss: 'x', byGloss: true }
+    const out = mergeTagSuggestions([[local('a', 2), local('b', 1), gl]], 2)
+    expect(out.map((s) => s.tag)).toEqual(['a', 'b'])
+  })
 })

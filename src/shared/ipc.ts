@@ -1,5 +1,6 @@
 import type { CompletionPrefer } from './blockCompletion'
 import type { AppConfig } from './config'
+import type { MagicGroup, MagicItem, MagicSearch } from './magicbook'
 
 /** IPC 通道名。主进程与 preload 都从这里取，避免两处各写一份字符串漂移 */
 export const IPC = {
@@ -48,12 +49,25 @@ export const IPC = {
   danbooruPosts: 'danbooru:posts',
   danbooruSearchByOtherName: 'danbooru:search-artists-by-other-name',
   danbooruSearchByUrl: 'danbooru:search-artists-by-url',
+  /** 魔法书：分类树 */
+  magicbookTree: 'magicbook:tree',
+  /** 魔法书：某一类的全部标签 */
+  magicbookList: 'magicbook:list',
+  /** 魔法书：检索 */
+  magicbookSearch: 'magicbook:search',
+  /** 工具附带的中文说明（魔法书详情、WIKI 竖栏） */
+  tagdbGloss: 'tagdb:gloss',
 } as const
 
 export interface TagdbCompleteInput {
   query: string
   prefer: CompletionPrefer
   limit?: number
+  /**
+   * 按中文释义补充最多几条（只在查询含中文、prefer 为 general 时生效）。
+   * 不传 = 0，不补充。传了 limit 时补充再封顶到 limit - 原结果条数。
+   */
+  glossMax?: number
 }
 
 export type TagdbState = 'idle' | 'loading' | 'ready' | 'missing' | 'error'
@@ -77,6 +91,10 @@ export interface CompletionItem {
   count: number
   zh: string[]
   series: string[]
+  /** 工具附带的中文释义（tag_gloss.json）；没有说明的标签不带 */
+  gloss?: string
+  /** 这一条是按中文释义补充进来的，不是本地索引按名字/别名匹配出来的 */
+  byGloss?: true
 }
 
 export type TagdbCompleteResult =
@@ -112,3 +130,7 @@ export interface ConfigSaveInput {
   /** 同 llmApiKey：undefined = 不改动已存的 Key */
   danbooruApiKey?: string
 }
+
+export type MagicTreeResult = { ok: true; groups: MagicGroup[]; total: number } | { ok: false; detail: string }
+export type MagicListResult = { ok: true; items: MagicItem[] } | { ok: false; detail: string }
+export type MagicSearchResult = { ok: true; result: MagicSearch } | { ok: false; detail: string }

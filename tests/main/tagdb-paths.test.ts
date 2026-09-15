@@ -1,3 +1,4 @@
+import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { TAGDB_FILES, resolveTagdbDir, tagdbFilePath } from '../../src/main/tagdb/paths'
 
@@ -27,6 +28,17 @@ describe('resolveTagdbDir', () => {
       appRoot: 'F:/proj',
     })
     expect(dir).not.toContain('electron')
+  })
+
+  const base = { resourcesPath: 'R', appRoot: 'A' }
+
+  it('开发态传了 override 就用它；打包态忽略 override', () => {
+    expect(resolveTagdbDir({ ...base, isPackaged: false, override: 'X' })).toBe('X')
+    expect(resolveTagdbDir({ ...base, isPackaged: true, override: 'X' })).toBe(join('R', 'tagdb'))
+  })
+
+  it('override 为空串等于没传', () => {
+    expect(resolveTagdbDir({ ...base, isPackaged: false, override: '' })).toBe(join('A', 'resources', 'tagdb'))
   })
 })
 

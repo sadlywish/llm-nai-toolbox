@@ -5,6 +5,7 @@ import GenRunDialogs from './components/GenRunDialogs'
 import HistoryRail from './components/HistoryRail'
 import LlmConsole from './components/LlmConsole'
 import LlmLogDrawer from './components/LlmLogDrawer'
+import MagicBook from './components/MagicBook'
 import PromptPane from './components/PromptPane'
 import SettingsPage from './components/SettingsPage'
 import StyleManager from './components/StyleManager'
@@ -35,7 +36,7 @@ export default function App(): JSX.Element {
   const loadStyles = useStyles((s) => s.load)
   const presets = useStyles((s) => s.presets)
   // 顶栏的视图切换。不持久化：每次启动回到工作台（没保存过设置时回到设置，见下）
-  const [view, setView] = useState<'workbench' | 'styles' | 'settings'>('workbench')
+  const [view, setView] = useState<'workbench' | 'styles' | 'magicbook' | 'settings'>('workbench')
   // 设置页有没保存的修改时，「设置」标签挂黄点——切去别的标签也看得见
   const [settingsDirty, setSettingsDirty] = useState(false)
 
@@ -97,6 +98,9 @@ export default function App(): JSX.Element {
           <button type="button" role="tab" className={view === 'styles' ? 'is-on' : ''} onClick={() => setView('styles')}>
             画风维护
           </button>
+          <button type="button" role="tab" className={view === 'magicbook' ? 'is-on' : ''} onClick={() => setView('magicbook')}>
+            魔法书
+          </button>
           <button type="button" role="tab" className={view === 'settings' ? 'is-on' : ''} onClick={() => setView('settings')}>
             设置
             {settingsDirty && (
@@ -145,6 +149,7 @@ export default function App(): JSX.Element {
           <StyleManager onOpenWorkbench={() => setView('workbench')} />
         </main>
       )}
+      {view === 'magicbook' && <MagicBook />}
       {view === 'workbench' && (
         // 版面 A：左历史竖栏 ｜ 中间一列 ｜ 右 WIKI 竖栏（可整体收起）
         <div className="body">

@@ -76,7 +76,12 @@ export default function WikiControls(): JSX.Element {
                 onMouseEnter={() => setActive(i)}
               >
                 {s.label}
-                {s.zh.length > 0 && <span className="zh">{s.zh[0]}</span>}
+                {s.byGloss ? (
+                  <span className="gl">{s.gloss}</span>
+                ) : (
+                  s.zh.length > 0 && <span className="zh">{s.zh[0]}</span>
+                )}
+                {s.byGloss && <span className="by">释义</span>}
                 {s.matchedBy.length > 0 && <span className="by">{s.matchedBy.map((d) => DIM_LABEL[d]).join('·')}</span>}
                 {s.count !== null && <span className="cnt">{formatCount(s.count)}</span>}
               </li>

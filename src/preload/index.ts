@@ -14,6 +14,9 @@ import {
   IPC,
   type ConfigLoadResult,
   type ConfigSaveInput,
+  type MagicListResult,
+  type MagicSearchResult,
+  type MagicTreeResult,
   type TagdbCompleteInput,
   type TagdbCompleteResult,
   type TagdbStatus,
@@ -21,6 +24,7 @@ import {
 } from '@shared/ipc'
 import type { GenImageEvent, GenStartInput, ImageMeta, ReadImageInput, RoundRecord, RunProgress } from '@shared/gen'
 import type { LlmEvent, LlmRunInput, LlmRunResult } from '@shared/llm'
+import type { TagGloss } from '@shared/magicbook'
 import type { StylePreset } from '@shared/styles'
 import type { Workspace } from '@shared/workspace'
 
@@ -114,6 +118,14 @@ const api = {
 
   /** 本地库精确查找；没收录或库没载入返回 null */
   tagdbLookup: (tag: string): Promise<TagLookup | null> => ipcRenderer.invoke(IPC.tagdbLookup, tag),
+
+  /** 工具附带的中文说明；没有说明或数据不可用返回 null */
+  tagdbGloss: (tag: string): Promise<TagGloss | null> => ipcRenderer.invoke(IPC.tagdbGloss, tag),
+
+  // 魔法书：tag_browse.json 不可用时 { ok: false, detail }
+  magicbookTree: (): Promise<MagicTreeResult> => ipcRenderer.invoke(IPC.magicbookTree),
+  magicbookList: (cat: string): Promise<MagicListResult> => ipcRenderer.invoke(IPC.magicbookList, cat),
+  magicbookSearch: (query: string, cat?: string): Promise<MagicSearchResult> => ipcRenderer.invoke(IPC.magicbookSearch, query, cat),
 
   writeClipboardText: (text: string): Promise<void> => ipcRenderer.invoke(IPC.clipboardWriteText, text),
 
