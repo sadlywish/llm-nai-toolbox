@@ -77,6 +77,10 @@ export interface CompletionItem {
   count: number
   zh: string[]
   series: string[]
+  /** 工具附带的中文释义（tag_gloss.json）；没有说明的标签不带 */
+  gloss?: string
+  /** 这一条是按中文释义补充进来的，不是本地索引按名字/别名匹配出来的 */
+  byGloss?: true
 }
 
 export type TagdbCompleteResult =
