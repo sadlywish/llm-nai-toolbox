@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRunInput, presetSelectionStale, selectStyleMode } from '../../src/shared/consoleRun'
+import { buildRunInput, clearStalePreset, currentPresetOf, presetSelectionStale } from '../../src/shared/consoleRun'
 import type { StylePreset } from '../../src/shared/styles'
 import { emptyWorkspace } from '../../src/shared/workspace'
 
@@ -35,46 +35,67 @@ describe('buildRunInput', () => {
   })
 })
 
-describe('presetSelectionStale', () => {
-  it('只有选着预设档、且那条被删掉或标签为空时为真', () => {
+describe('currentPresetOf', () => {
+  it('记着的那条存在且标签非空时返回它；没选、被删、为空时 null', () => {
     const o = emptyWorkspace().console
-    o.presetId = 'gone'
-    expect(presetSelectionStale(o, presets)).toBe(false)
-    o.styleMode = 'preset'
-    expect(presetSelectionStale(o, presets)).toBe(true)
+    expect(currentPresetOf(o, presets)).toBeNull()
+    o.presetId = 'ask'
+    expect(currentPresetOf(o, presets)?.name).toBe('ask 水彩')
     o.presetId = 'blank'
-    expect(presetSelectionStale(o, presets)).toBe(true)
+    expect(currentPresetOf(o, presets)).toBeNull()
+    o.presetId = 'gone'
+    expect(currentPresetOf(o, presets)).toBeNull()
+  })
+
+  it('和档位无关：不覆盖档也照样认出当前预设', () => {
+    const o = emptyWorkspace().console
+    o.styleMode = 'none'
     o.presetId = 'wlop'
-    expect(presetSelectionStale(o, presets)).toBe(false)
+    expect(currentPresetOf(o, presets)?.id).toBe('wlop')
   })
 })
 
-describe('selectStyleMode', () => {
-  it('切到预设档默认选第一条可用预设（跳过标签为空的）', () => {
+describe('presetSelectionStale / clearStalePreset', () => {
+  it('没选预设、档位也不是预设档：不算失效，什么都不动', () => {
     const o = emptyWorkspace().console
-    selectStyleMode(o, 'preset', presets)
+    o.styleMode = 'current'
+    expect(presetSelectionStale(o, presets)).toBe(false)
+    clearStalePreset(o, presets)
+    expect([o.styleMode, o.presetId]).toEqual(['current', ''])
+  })
+
+  it('记着的预设仍可用：不失效，预设档保持', () => {
+    const o = emptyWorkspace().console
+    o.styleMode = 'preset'
+    o.presetId = 'wlop'
+    expect(presetSelectionStale(o, presets)).toBe(false)
+    clearStalePreset(o, presets)
     expect([o.styleMode, o.presetId]).toEqual(['preset', 'wlop'])
   })
 
-  it('原来选着的仍可用就保留', () => {
+  it('记着的预设被删：预设变未选择；不是预设档时档位不动', () => {
     const o = emptyWorkspace().console
-    o.presetId = 'ask'
-    selectStyleMode(o, 'preset', presets)
-    expect(o.presetId).toBe('ask')
+    o.styleMode = 'current'
+    o.presetId = 'gone'
+    expect(presetSelectionStale(o, presets)).toBe(true)
+    clearStalePreset(o, presets)
+    expect([o.styleMode, o.presetId]).toEqual(['current', ''])
   })
 
-  it('切到别的档不动 presetId', () => {
+  it('记着的预设被清空、档位是预设档：预设变未选择，档位退回不覆盖', () => {
     const o = emptyWorkspace().console
     o.styleMode = 'preset'
-    o.presetId = 'ask'
-    selectStyleMode(o, 'current', presets)
-    expect([o.styleMode, o.presetId]).toEqual(['current', 'ask'])
+    o.presetId = 'blank'
+    expect(presetSelectionStale(o, presets)).toBe(true)
+    clearStalePreset(o, presets)
+    expect([o.styleMode, o.presetId]).toEqual(['none', ''])
   })
 
-  it('一条可用预设都没有时 presetId 为空', () => {
+  it('预设档但一条都没选：失效，退回不覆盖', () => {
     const o = emptyWorkspace().console
-    o.presetId = 'blank'
-    selectStyleMode(o, 'preset', [presets[0]])
-    expect(o.presetId).toBe('')
+    o.styleMode = 'preset'
+    expect(presetSelectionStale(o, presets)).toBe(true)
+    clearStalePreset(o, presets)
+    expect(o.styleMode).toBe('none')
   })
 })

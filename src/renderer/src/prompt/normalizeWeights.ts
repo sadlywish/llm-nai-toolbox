@@ -10,6 +10,8 @@ export interface NormalizeResult {
   weights: number
   /** 换成 artist: 前缀的 @ 标记数量 */
   artists: number
+  /** 还原成普通圆括号的 webui 转义（`\(` 与 `\)` 各算一处） */
+  escapes: number
 }
 
 /**
@@ -22,9 +24,12 @@ export interface NormalizeResult {
  *   把它当权重转掉会静默毁掉 tag；而这两种形态在文本上无法可靠区分，
  *   所以宁可少转、让用户自己改那几个 `(masterpiece)`。
  * - `@wlop` → `artist:wlop`
+ * - webui 的转义 `\(` `\)` → 普通 `(` `)`：NAI 的圆括号本来就是普通字符，反斜杠会原样
+ *   进提示词成了污染。转义的括号不当权重语法，也不参与配对。只还原圆括号——
+ *   `{}` `[]` 在 NAI 里是加减权语法，把 `\{` 还原出来反而改了语义。
  */
 export function normalizeWeights(text: string): NormalizeResult {
-  const counters = { weights: 0, artists: 0 }
+  const counters = { weights: 0, artists: 0, escapes: 0 }
   const withArtists = replaceAtMarks(text, counters)
   return { text: convertGroups(withArtists, counters).text, ...counters }
 }
@@ -32,6 +37,7 @@ export function normalizeWeights(text: string): NormalizeResult {
 interface Counters {
   weights: number
   artists: number
+  escapes: number
 }
 
 /** `@wlop` → `artist:wlop`。借 findArtistSpans 认词，不自己再写一套匹配规则 */
@@ -84,6 +90,14 @@ function convertGroups(text: string, counters: Counters): Converted {
 
   while (i < text.length) {
     const ch = text[i]
+
+    if (isEscapedParen(text, i)) {
+      out += text[i + 1]
+      counters.escapes++
+      emittedPlain = true
+      i += 2
+      continue
+    }
 
     if (ch === '{' || ch === '[') {
       const end = matchBracket(text, i)
@@ -140,6 +154,11 @@ function matchBracket(text: string, open: number): number {
   const c = PAIRS[o]
   let depth = 0
   for (let i = open; i < text.length; i++) {
+    // 转义的圆括号是普通字符：连同反斜杠跳过，不计入嵌套
+    if (isEscapedParen(text, i)) {
+      i++
+      continue
+    }
     if (text[i] === o) depth++
     else if (text[i] === c) {
       depth--
@@ -147,4 +166,9 @@ function matchBracket(text: string, open: number): number {
     }
   }
   return -1
+}
+
+/** i 处是不是 webui 转义的圆括号 `\(` 或 `\)` */
+function isEscapedParen(text: string, i: number): boolean {
+  return text[i] === '\\' && (text[i + 1] === '(' || text[i + 1] === ')')
 }
