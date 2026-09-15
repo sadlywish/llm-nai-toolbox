@@ -819,3 +819,45 @@ details.gen-field > summary { cursor: pointer; }
 .gloss-row.is-trap .v { color: var(--warn); }
 .gloss-vs { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: baseline; }
 .gloss-vs + .gloss-vs { margin-top: 4px; }
+
+/* ── TAG 魔法书（界面稿 2026-09-15-magicbook-mockup.html）：左 290px 分类树 · 中列表 · 右 520px 详情 ── */
+.mb-page { flex: 1; min-height: 0; display: flex; margin: 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); overflow: hidden; }
+.mb-tree { width: 290px; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); background: var(--panel-2); }
+.mb-search { padding: 10px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.mb-search input { width: 100%; background: var(--input); border: 1px solid var(--line); border-radius: 3px; color: var(--ink); font: inherit; font-size: 13px; padding: 5px 8px; }
+.mb-search input:focus, .mb-search input.has-q { outline: none; border-color: var(--accent); }
+.mb-search-note { color: var(--ink-faint); font-size: 12px; }
+.mb-tree-items { flex: 1; min-height: 0; overflow: auto; padding: 4px 0 10px; color-scheme: dark; }
+.mb-group, .mb-sub { display: flex; align-items: center; gap: 6px; width: 100%; background: none; border: none; border-left: 2px solid transparent; font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.mb-group { padding: 5px 10px; color: var(--ink); user-select: none; }
+.mb-group.is-static { cursor: default; }
+.mb-group .arrow { width: 10px; color: var(--ink-faint); font-size: 11px; }
+.mb-sub { padding: 4px 10px 4px 30px; color: var(--ink-dim); }
+.mb-sub .name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mb-group .n, .mb-sub .n { margin-left: auto; color: var(--ink-faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.mb-group .n.hit, .mb-sub .n.hit { color: var(--accent); }
+.mb-sub:hover, .mb-group:not(.is-static):hover { background: rgba(255, 255, 255, .04); }
+.mb-sub.is-active, .mb-group.is-active { background: rgba(74, 158, 255, .14); border-left-color: var(--accent); color: var(--ink); }
+.mb-empty { color: var(--ink-faint); font-size: 12.5px; padding: 14px 12px; }
+.mb-list { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.mb-list-head { display: flex; align-items: center; gap: 4px; min-height: 37px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel-2); font-size: 13px; color: var(--ink-dim); }
+.mb-list-head b { color: var(--ink); font-weight: 600; margin: 0 2px; }
+.mb-list-sort { margin-left: auto; color: var(--ink-faint); font-size: 12px; }
+.mb-rows { flex: 1; min-height: 0; overflow: auto; color-scheme: dark; }
+.mb-row { display: grid; grid-template-columns: 210px minmax(0, 1fr) auto 64px 52px; align-items: center; gap: 10px; padding: 5px 12px; border-bottom: 1px solid rgba(255, 255, 255, .04); font-size: 13px; cursor: pointer; }
+.mb-row:hover { background: rgba(255, 255, 255, .04); }
+.mb-row.is-active { background: rgba(74, 158, 255, .14); box-shadow: inset 2px 0 0 var(--accent); }
+.mb-tag { font-family: var(--mono); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mb-gl { color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mb-gl .cat { color: var(--ink-faint); margin-left: 8px; font-size: 12px; }
+.mb-marks { display: flex; gap: 4px; }
+.mb-mark { font-size: 11px; padding: 0 5px; border-radius: 3px; border: 1px solid; line-height: 16px; white-space: nowrap; }
+.mb-mark.trap { color: var(--warn); border-color: #8a6d33; }
+.mb-mark.vs { color: #9ecbff; border-color: #3a5f8a; }
+.mb-cnt { color: var(--ink-faint); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.mb-copy { visibility: hidden; }
+.mb-row:hover .mb-copy, .mb-row.is-active .mb-copy { visibility: visible; }
+.mb-more { padding: 10px 12px; color: var(--ink-faint); font-size: 12.5px; text-align: center; }
+.mb-detail { width: 520px; flex-shrink: 0; border-left: 1px solid var(--line); overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; color-scheme: dark; }
+.mb-divider { display: flex; align-items: center; gap: 8px; color: var(--ink-faint); font-size: 12px; }
+.mb-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
