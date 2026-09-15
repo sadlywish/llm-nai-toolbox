@@ -117,7 +117,7 @@ llm:event finished { LlmRunResult：filled（带 FillResult）/ noParams / faile
 这几条几乎每一条都踩过一个浏览器或 CodeMirror 的具体行为，理由写在 `editor/blockExtension.ts` 与 `index.css` 的注释里。最容易重犯的三个：
 
 - **要粘住的东西不能放进 widget。** CodeMirror 在每个 widget 两侧插零宽 `<img class="cm-widgetBuffer">`，浏览器允许在图片旁折行。拼接逗号与块间空格因此画在 mark 的 `::after` 上。
-- **同一个装饰来源里，范围相同的两个 mark 谁在外没有保证。** 增量更新时会建出不一致的嵌套，把一个框拆成几段，每段各画一个 `::before` 徽章（实机：中文后打空格再打字，徽章重复出现）。所以装饰分四个来源，靠来源优先级固定内外：拼接逗号 > 框 > 标签 > 全角逗号标红。以后再加 mark 装饰，优先级必须高于框那一层。
+- **同一个装饰来源里，范围相同的两个 mark 谁在外没有保证。** 增量更新时会建出不一致的嵌套，把一个框拆成几段，每段各画一个 `::before` 徽章（实机：中文后打空格再打字，徽章重复出现）。所以装饰分四个来源，靠来源优先级固定内外：拼接逗号 > 框 > 标签 > 问题标红（全角逗号、标签末尾数字紧贴 `::`，两者不会重叠，同一层）。以后再加 mark 装饰，优先级必须高于框那一层。
 - **光标坐标不靠 `selection.assoc`。** 分隔符两侧的位置语义是固定的（前一段末尾 / 后一段起点），由分隔符 widget 的 `coordsAt` 直接给坐标。先前靠 assoc 的写法从未生效过：`dispatch({ selection: EditorSelection.cursor(pos, -1) })` 会被 state 用 `EditorSelection.single(anchor, head)` 重建，assoc 当场丢失。
 
 ### 整图与角色是两套字段集

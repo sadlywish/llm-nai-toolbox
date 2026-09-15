@@ -63,6 +63,12 @@ describe('buildBlockLayout', () => {
     expect(doc.slice(commaHits[0].from, commaHits[0].to)).toBe('，')
   })
 
+  it('数字紧贴 :: 的命中带出来，坐标是文档坐标', () => {
+    const doc = serializeFields({ count: '', style: '0.8::void_0::', character: '' }, TRIO)
+    const { digitHits } = buildBlockLayout(doc, TRIO, 1)
+    expect(digitHits.map((h) => doc.slice(h.from, h.to))).toEqual(['0'])
+  })
+
   it('性质：按版面拼出编辑器里看得见的文字，与 buildPrompt 的结果一致', () => {
     // 编辑器里看得见的：非空段的内容；joined 的段后面一个 ` ,`；块与块之间的空格。
     // 徽章与空框没有文字。比较时把空白压成一个，因为块间空格与 trim 掉的空白在屏幕上

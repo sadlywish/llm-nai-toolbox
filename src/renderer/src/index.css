@@ -136,7 +136,8 @@ body {
 .blk-tag { white-space: nowrap; }
 .blk-brk::after { content: "\200b"; white-space: pre-wrap; }
 
-.blk-comma {
+/* 标签末尾数字紧贴 :: 与全角逗号同一套红色（用户 2026-09-15 选定） */
+.blk-comma, .blk-digit {
   color: var(--danger); background: hsl(4 80% 60% / .16);
   border-radius: 2px;
   text-decoration: underline wavy var(--danger) 1px;

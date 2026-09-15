@@ -3,6 +3,7 @@ import { MAIN_FIELDS } from '@shared/fields'
 import { emptyValues, serializeFields } from '@shared/blockDoc'
 import {
   blockCommaHits,
+  blockDigitHits,
   checkTokenLimit,
   longestBlock,
   tokensPerBlock,
@@ -58,6 +59,26 @@ describe('checkTokenLimit', () => {
     const mid = Array.from({ length: 300 }, (_, i) => `tag${i}`).join(', ')
     const hit = checkTokenLimit({ character: mid }, TRIO, '某中转自定义模型')
     expect(hit?.limit).toBe(512)
+  })
+})
+
+describe('blockDigitHits', () => {
+  it('命中位置是文档坐标，并带出字段名', () => {
+    const doc = serializeFields({ count: '1girl', style: '1.2::as109::', character: '' }, TRIO)
+    const hits = blockDigitHits(doc, TRIO)
+    expect(hits).toHaveLength(1)
+    expect(hits[0].field).toBe('style')
+    expect(doc.slice(hits[0].from, hits[0].to)).toBe('109')
+  })
+
+  it('nltags 也查：自然语言里同样会被误读', () => {
+    const doc = serializeFields({ nltags: '1.1::year 2024::' }, NL)
+    expect(blockDigitHits(doc, NL).map((h) => doc.slice(h.from, h.to))).toEqual(['2024'])
+  })
+
+  it('段首的权重数字不因前一段结尾是字母而被误标', () => {
+    const doc = serializeFields({ count: 'solo', style: '1.2::flat color::', character: '' }, TRIO)
+    expect(blockDigitHits(doc, TRIO)).toEqual([])
   })
 })
 
