@@ -92,7 +92,7 @@ export interface DanbooruPost {
 
 export type DanbooruPostsResult = { ok: true; posts: DanbooruPost[] } | { ok: false; error: DanbooruError }
 
-/** 目前只有标签源用「评分最高」 */
+/** 客户端保留排序参数；标签源例图已改为取最新（order:score 对热门标签会让 D 站数据库超时），目前没有调用方传它 */
 export type DanbooruPostsOrder = 'score'
 
 export interface DanbooruPostsInput {

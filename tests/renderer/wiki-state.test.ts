@@ -115,12 +115,13 @@ describe('跟随光标', () => {
 })
 
 describe('show：标签源', () => {
-  it('并发取词条信息、正文、本地库、评分最高 6 张', async () => {
+  it('并发取词条信息、正文、本地库、最新 6 张例图（不按评分排序）', async () => {
     api.tagdbLookup.mockResolvedValueOnce({ tag: 'long_hair', category: 'general', zh: ['长发'], count: 9 })
     const { useWiki } = await freshStore()
     useWiki.getState().show('Long Hair', 'tag')
     await vi.runAllTimersAsync()
-    expect(api.danbooruPosts).toHaveBeenCalledWith({ tag: 'long_hair', limit: 6, page: 1, order: 'score' })
+    expect(api.danbooruPosts).toHaveBeenCalledTimes(1)
+    expect(api.danbooruPosts).toHaveBeenCalledWith({ tag: 'long_hair', limit: 6, page: 1 })
     const e = useWiki.getState().entry!
     expect(e.tag).toBe('long_hair')
     expect(e.local).toEqual({ status: 'ready', value: { tag: 'long_hair', category: 'general', zh: ['长发'], count: 9 } })
@@ -129,13 +130,13 @@ describe('show：标签源', () => {
     expect(e.tagPosts.status).toBe('ready')
   })
 
-  it('带排序的例图请求失败时退回不带排序再取一次', async () => {
-    api.danbooruPosts.mockResolvedValueOnce({ ok: false, error: { kind: 'http', message: 'Danbooru 返回 422' } } as never)
+  it('例图请求失败：只落在例图区块（error），不再重试', async () => {
+    api.danbooruPosts.mockResolvedValueOnce({ ok: false, error: { kind: 'http', message: 'Danbooru 返回 500' } } as never)
     const { useWiki } = await freshStore()
     useWiki.getState().show('x', 'tag')
     await vi.runAllTimersAsync()
-    expect(api.danbooruPosts).toHaveBeenLastCalledWith({ tag: 'x', limit: 6, page: 1 })
-    expect(useWiki.getState().entry?.tagPosts.status).toBe('ready')
+    expect(api.danbooruPosts).toHaveBeenCalledTimes(1)
+    expect(useWiki.getState().entry?.tagPosts).toEqual({ status: 'error', message: 'Danbooru 返回 500' })
   })
 
   it('D 站失败只落在对应区块（error），其余照常', async () => {
