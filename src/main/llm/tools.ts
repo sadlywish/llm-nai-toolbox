@@ -259,7 +259,7 @@ const BROWSE_TAGS_TOOL: ToolDefinition = {
     properties: {
       category: {
         type: 'string',
-        description: '分类名，必须与目录中列出的完全一致，格式为「一级/二级」。如 "身体/face tags"、"画面构成/image composition"',
+        description: '分类名，必须与目录中列出的完全一致，格式为「一级/二级」。如 "身体/面部与表情"、"画面构成/构图与视角"',
       },
       keyword: {
         type: 'string',

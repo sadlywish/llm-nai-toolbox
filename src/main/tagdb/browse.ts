@@ -6,7 +6,7 @@
  * 补别名治标不治本。
  *
  * 换成人的检索方式：先缩小到分类，再在小范围内靠语义挑选。
- * LLM 在「画面构成/image composition」这 200 条里选，几乎不会错。
+ * LLM 在「画面构成/构图与视角」这 200 条里选，几乎不会错。
  *
  * 本模块不读文件：读盘归 extras.ts，这里只收已经 JSON.parse 过的对象，好在 node 环境单测。
  */
@@ -118,7 +118,7 @@ export function formatToc(db: BrowseDb, minSize = 20): string {
     '### 标签分类目录',
     '',
     'search_tags 没查准、或想不出该用哪个标签时，用 browse_tags 浏览对应分类，',
-    '在小范围内看着中文释义自己挑。传参格式「一级/二级」，如 browse_tags(category="身体/face tags")。',
+    '在小范围内看着中文释义自己挑。传参格式「一级/二级」，如 browse_tags(category="身体/面部与表情")。',
     '分类默认整类返回，超长的大类才分页（用 page 翻页）。',
     'keyword 只是把命中项提到最前，不会删掉其余条目，中文英文都能匹配'
       + '（直接用用户原话里的中文词即可，不必先译成英文）。它不替你筛选，仍要通读释义。',
@@ -130,7 +130,7 @@ export function formatToc(db: BrowseDb, minSize = 20): string {
 /**
  * 浏览某个分类。
  *
- * 分类名做宽松匹配：LLM 可能写「face tags」而不是完整的「身体/face tags」，
+ * 分类名做宽松匹配：LLM 可能写「面部与表情」而不是完整的「身体/面部与表情」，
  * 为这种小偏差返回"未找到"纯属浪费一轮调用。
  */
 export function browseCategory(
