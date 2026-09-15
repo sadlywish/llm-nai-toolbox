@@ -47,6 +47,20 @@ describe('buildTree', () => {
     })
     expect(total).toBe(7)
   })
+
+  it('二级排序不依赖数据顺序：条数少的先出现也要排到条数多的后面', () => {
+    const dbOrder = parseBrowseDb({
+      _toc: [],
+      '身体/b': [{ t: 'x1', g: 'g1', c: 1 }],
+      '身体/a': [
+        { t: 'x2', g: 'g2', c: 1 },
+        { t: 'x3', g: 'g3', c: 1 },
+        { t: 'x4', g: 'g4', c: 1 },
+      ],
+    })
+    const { groups } = buildTree(dbOrder)
+    expect(groups[0].subs.map((s) => s.cat)).toEqual(['身体/a', '身体/b'])
+  })
 })
 
 describe('listCategory', () => {
@@ -140,6 +154,15 @@ describe('glossSupplement', () => {
     expect(glossSupplement(db, '俯视', new Set(), 10).map((i) => i.t)).toEqual(['from_above'])
     expect(glossSupplement(db, '发', new Set(), 10).map((i) => i.t)).toEqual(['long_hair', 'short_hair', 'blue_hair', 'hair_focus'])
     expect(glossSupplement(db, '发', new Set(['short_hair']), 2).map((i) => i.t)).toEqual(['long_hair', 'blue_hair'])
+  })
+
+  it('CJK 判断真实拦人：查询词不含中文时，释义里有对应拉丁文字也不补；含中文才补', () => {
+    const dbLatin = parseBrowseDb({
+      _toc: [],
+      '手势/gesture': [{ t: 'v_sign', g: '比出v手势', c: 10 }],
+    })
+    expect(glossSupplement(dbLatin, 'v', new Set(), 10)).toEqual([])
+    expect(glossSupplement(dbLatin, 'v手势', new Set(), 10).map((i) => i.t)).toEqual(['v_sign'])
   })
 })
 
