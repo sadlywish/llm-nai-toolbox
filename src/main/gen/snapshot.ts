@@ -2,10 +2,9 @@ import type { AppConfig } from '@shared/config'
 import { CHARACTER_FIELDS, MAIN_FIELDS, orderSpecs } from '@shared/fields'
 import type { AssembledPrompt, GenSnapshot } from '@shared/gen'
 import { snapshotLlmOf } from '@shared/llmProvenance'
-import { buildPrompt } from '@shared/prompt'
+import { buildPositivePrompt, buildPrompt } from '@shared/prompt'
 import type { Workspace } from '@shared/workspace'
 import { positionToCenter } from '../nai/payload'
-import { applyTextRendering } from '../nai/text'
 
 /**
  * 按下「生成」那一刻的本工具格式快照。全部是副本：生成途中改编辑器不影响这一轮，
@@ -34,7 +33,7 @@ export function assemble(s: GenSnapshot, config: AppConfig): AssembledPrompt {
   const mainSpecs = orderSpecs(MAIN_FIELDS, config.promptOrder)
   const charSpecs = orderSpecs(CHARACTER_FIELDS, config.naiCharPromptOrder)
   return {
-    positive: applyTextRendering(buildPrompt(s.main, mainSpecs), s.text).prompt,
+    positive: buildPositivePrompt(s.main, s.text, mainSpecs),
     negative: s.negative.trim(),
     characters: s.characters.map((c) => ({
       prompt: buildPrompt(c.fields, charSpecs),
