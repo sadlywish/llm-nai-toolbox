@@ -2,7 +2,7 @@
 
 版本号遵循 `主.次.修订`。0.9.x 均为预发布（内部测试），界面与配置格式还可能调整。下载见 [Releases](https://github.com/sadlywish/llm-nai-toolbox/releases)。
 
-## 未发布
+## 0.9.4 — 2026-09-15
 
 ### 新增
 
