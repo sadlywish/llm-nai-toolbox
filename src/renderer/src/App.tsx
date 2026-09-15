@@ -6,7 +6,7 @@ import HistoryRail from './components/HistoryRail'
 import LlmConsole from './components/LlmConsole'
 import LlmLogDrawer from './components/LlmLogDrawer'
 import PromptPane from './components/PromptPane'
-import SettingsDrawer from './components/SettingsDrawer'
+import SettingsPage from './components/SettingsPage'
 import StyleManager from './components/StyleManager'
 import Toolbar from './components/Toolbar'
 import WikiRail from './components/WikiRail'
@@ -30,13 +30,14 @@ export default function App(): JSX.Element {
   const configLoadError = useConfig((s) => s.loadError)
   const loadConfig = useConfig((s) => s.load)
   const configExists = useConfig((s) => s.configExists)
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const tagdbStatus = useTagdb((s) => s.status)
   const initTagdb = useTagdb((s) => s.init)
   const loadStyles = useStyles((s) => s.load)
   const presets = useStyles((s) => s.presets)
-  // 顶栏的视图切换。不持久化：每次启动回到工作台
-  const [view, setView] = useState<'workbench' | 'styles'>('workbench')
+  // 顶栏的视图切换。不持久化：每次启动回到工作台（没保存过设置时回到设置，见下）
+  const [view, setView] = useState<'workbench' | 'styles' | 'settings'>('workbench')
+  // 设置页有没保存的修改时，「设置」标签挂黄点——切去别的标签也看得见
+  const [settingsDirty, setSettingsDirty] = useState(false)
 
   useEffect(() => {
     void window.api.appVersion().then(setVersion)
@@ -60,17 +61,17 @@ export default function App(): JSX.Element {
   useEffect(() => initGenSubscriptions(), [])
 
   /**
-   * 从没保存过设置时，启动后自动弹设置抽屉（规格 §14.3）。
+   * 从没保存过设置时，启动后自动切到设置标签（规格 §14.3）。
    *
    * 判据是 config.json 在不在，不是「配置等于默认值」。firstPromptDone 让这件事
-   * 一辈子只发生一次：不加的话，用户手动关掉抽屉后任何一次 configExists 仍为
-   * false 的重渲染都可能把它再弹出来，变成关不掉。
+   * 一辈子只发生一次：不加的话，用户切去工作台后任何一次 configExists 仍为
+   * false 的重渲染都可能把他拽回设置页，变成走不开。
    */
   const firstPromptDone = useRef(false)
   useEffect(() => {
     if (!configLoaded || configExists || firstPromptDone.current) return
     firstPromptDone.current = true
-    setSettingsOpen(true)
+    setView('settings')
   }, [configLoaded, configExists])
 
   // 必须 memo：PromptEditor 以字段集引用作为重建依据，每次渲染换新数组会让
@@ -96,11 +97,15 @@ export default function App(): JSX.Element {
           <button type="button" role="tab" className={view === 'styles' ? 'is-on' : ''} onClick={() => setView('styles')}>
             画风维护
           </button>
+          <button type="button" role="tab" className={view === 'settings' ? 'is-on' : ''} onClick={() => setView('settings')}>
+            设置
+            {settingsDirty && (
+              <span className="tab-dirty" title="有未保存的修改">
+                ●
+              </span>
+            )}
+          </button>
         </div>
-        <span className="header-spacer" />
-        <button type="button" className="header-button" onClick={() => setSettingsOpen(true)}>
-          设置
-        </button>
       </header>
 
       {tagdbStatus !== null && tagdbStatus.state !== 'ready' && (
@@ -135,11 +140,12 @@ export default function App(): JSX.Element {
         <Toolbar />
       )}
 
-      {view === 'styles' ? (
+      {view === 'styles' && (
         <main className="workarea">
           <StyleManager />
         </main>
-      ) : (
+      )}
+      {view === 'workbench' && (
         // 版面 A：左历史竖栏 ｜ 中间一列 ｜ 右 WIKI 竖栏（可整体收起）
         <div className="body">
           {workbench !== null && <HistoryRail />}
@@ -178,17 +184,18 @@ export default function App(): JSX.Element {
         </div>
       )}
 
-      {/* 出图弹窗与暂停/中止弹框是全局浮层：切到画风维护视图照样弹 */}
+      {/* 常驻挂载、不在设置标签时只隐藏：切走标签草稿与分组展开状态都得留着 */}
+      <SettingsPage active={view === 'settings'} onDirtyChange={setSettingsDirty} />
+
+      {/* 出图弹窗与暂停/中止弹框是全局浮层：切到画风维护、设置视图照样弹 */}
       <GenDialog mainSpecs={mainSpecs} charSpecs={charSpecs} update={updateWorkspace} />
       <GenRunDialogs
         onOpenSettings={() => {
-          // 出图弹窗的层级高于设置抽屉，不关掉它设置抽屉会被挡住
+          // 出图弹窗是盖住整个窗口的浮层，不关掉它就看不见设置页
           useGen.getState().closeDialog()
-          setSettingsOpen(true)
+          setView('settings')
         }}
       />
-
-      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   )
 }

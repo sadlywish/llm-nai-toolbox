@@ -3,6 +3,7 @@ import type { Workspace } from '@shared/workspace'
 import { tokenBudget } from '@renderer/prompt/tokenBudget'
 import PromptEditor from '../editor/PromptEditor'
 import TagTextEditor from '../editor/TagTextEditor'
+import AutoTextarea from './AutoTextarea'
 import CharacterPanel from './CharacterPanel'
 import GenerateBar from './GenerateBar'
 import ParamsPanel from './ParamsPanel'
@@ -58,16 +59,15 @@ export default function PromptPane({
 
             <label className="field text-row">
               <span>画面文字（text）</span>
-              <input
-                type="text"
+              <AutoTextarea
+                singleLine
                 value={workspace.text}
                 placeholder="要画进画面里的文字，留空不加"
-                onChange={(e) => {
-                  const v = e.target.value
+                onChange={(v) =>
                   update((ws) => {
                     ws.text = v
                   })
-                }}
+                }
               />
               <span className="field-hint">
                 提示词排序里没有它的位置：出图时才按规则接到提示词最末尾（text:…），留空则补 no text

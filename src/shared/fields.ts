@@ -156,7 +156,7 @@ export function fieldOrderError(specs: readonly FieldSpec[], order: string): str
 /**
  * 按顺序串重排字段集。
  *
- * 顺序串非法时原样返回字段集。这是兜底而不是降级：设置抽屉保存前
+ * 顺序串非法时原样返回字段集。这是兜底而不是降级：设置页保存前
  * 与 mergeConfig 读配置时都已经把非法顺序串拦下，正常路径走不到这里。
  *
  * 每次调用返回新数组，调用方必须按顺序串 memo（PromptEditor 以字段集

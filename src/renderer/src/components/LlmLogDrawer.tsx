@@ -24,7 +24,7 @@ export default function LlmLogDrawer(): JSX.Element | null {
   const logRef = useRef<HTMLDivElement>(null)
   // 日志贴着底部时跟着新行滚；往上翻着看的时候不打扰。每次打开、每次新发一轮都从底部看起
   const stickToBottom = useRef(true)
-  // 同设置抽屉：按下与松开都在遮罩上才收起，免得在日志里拖选文字、松手落到遮罩上时被误关
+  // 按下与松开都在遮罩上才收起，免得在日志里拖选文字、松手落到遮罩上时被误关
   const downOnBackdrop = useRef(false)
 
   useLayoutEffect(() => {

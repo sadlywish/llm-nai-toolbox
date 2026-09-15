@@ -3,7 +3,7 @@ import { defaultAppConfig, type AppConfig } from '@shared/config'
 
 interface ConfigState {
   config: AppConfig
-  /** 是否存过 LLM API Key。设置抽屉不回显明文，只显示「已保存 / 必填」 */
+  /** 是否存过 LLM API Key。设置页不回显明文，只显示「已保存 / 必填」 */
   hasLlmApiKey: boolean
   /** 是否存过 NovelAI Token，同 hasLlmApiKey */
   hasNaiToken: boolean
@@ -11,7 +11,7 @@ interface ConfigState {
   hasDanbooruApiKey: boolean
   loaded: boolean
   /**
-   * config.json 在不在。false = 用户从没保存过设置，启动时要自动弹设置抽屉。
+   * config.json 在不在。false = 用户从没保存过设置，启动时要自动切到设置页。
    *
    * 与「配置等于默认值」不是一回事：用户完全可能保存了一份与默认值相同的配置，
    * 那种情况不该再打扰他。只有文件本身不在才算没配过。
@@ -31,8 +31,8 @@ export const useConfig = create<ConfigState>((set) => ({
   hasNaiToken: false,
   hasDanbooruApiKey: false,
   loaded: false,
-  // 载入完成前先当作「已存在」：默认 false 会让抽屉在 load() 返回之前
-  // 抢先弹出来一下，配置文件其实好好在那儿
+  // 载入完成前先当作「已存在」：默认 false 会让界面在 load() 返回之前
+  // 抢先切到设置页，配置文件其实好好在那儿
   configExists: true,
   loadError: null,
   saveError: null,
@@ -53,7 +53,7 @@ export const useConfig = create<ConfigState>((set) => ({
       await window.api.saveConfig({ config, llmApiKey, naiToken, danbooruApiKey })
       set((s) => ({
         config,
-        // 保存成功即意味着 config.json 已落盘，下次启动不再自动弹设置
+        // 保存成功即意味着 config.json 已落盘，下次启动不再自动打开设置页
         configExists: true,
         hasLlmApiKey: llmApiKey === undefined ? s.hasLlmApiKey : llmApiKey !== '',
         hasNaiToken: naiToken === undefined ? s.hasNaiToken : naiToken !== '',

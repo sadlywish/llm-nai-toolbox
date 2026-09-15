@@ -24,7 +24,7 @@ llm-nai-toolbox 的架构与关键取舍。使用方法见 [README](../README.md
 |---|---|
 | `main/net.ts` | `appFetch`（`net.fetch`）与代理应用；主进程所有外部请求都走它 |
 | `main/store.ts` · `config-store.ts` · `secret-store.ts` | `workspace.json` / `styles.json` / `config.json` / `secrets.json` 的原子读写；密钥用 `safeStorage` 加密 |
-| `renderer/components/` | 工具栏、历史竖栏、出图弹窗与溯源信息、指令区（固定在中间列底部）与日志抽屉、提示词面板、参数区、角色面板、画风维护、设置抽屉——布局与交互照画师串工具箱与已确认的界面稿 |
+| `renderer/components/` | 工具栏、历史竖栏、出图弹窗与溯源信息、指令区（固定在中间列底部）与日志抽屉、提示词面板、参数区、角色面板、画风维护、设置页（与工作台、画风维护并排的标签）——布局与交互照画师串工具箱与已确认的界面稿 |
 | `main/nai/` | NovelAI 协议：请求体、出图客户端与错误分级、zip 解包、读 PNG 元信息、画面文字处理、落盘与 `_index.json` |
 | `main/danbooru/` | 只服务右侧 WIKI 栏：`client.ts`（令牌桶容量 6、每秒回补 1；10s 超时；内存 LRU + 磁盘 7 天缓存；`tagInfo`、posts 排序；测试用 `LLM_NAI_DANBOORU_BASE_URL` 换桩地址）、`cache.ts`、`cdn.ts`（给 `cdn.donmai.us` 图片请求补 Referer） |
 | `main/tagdb/` | 本地标签库：索引加载与补全、LLM 工具数据的惰性加载、分类浏览、释义与废弃表、角色特征、搜索结果格式化 |
@@ -138,11 +138,11 @@ llm:event finished { LlmRunResult：filled（带 FillResult）/ noParams / faile
 
 **画面文字不是字段**：它在提示词拼接完之后才接到末尾，提示词排序里没有它的位置，所以单独一个输入框。
 
-设置（`config.json`）读写都过 `mergeConfig`：逐项按默认值的类型取用，只补缺不回退——存的是空串就是空串，随包默认文案只在文件不存在时出现一次（设置抽屉的「恢复默认」除外）。枚举、数值规则、字段顺序不合法的项回到默认值。
+设置（`config.json`）读写都过 `mergeConfig`：逐项按默认值的类型取用，只补缺不回退——存的是空串就是空串，随包默认文案只在文件不存在时出现一次（设置页的「恢复默认」除外）。枚举、数值规则、字段顺序不合法的项回到默认值。
 
 **字段顺序串必须恰好包含全部字段。** 它同时决定拼接顺序与编辑器里块的先后；插件允许漏写字段（漏掉的不拼接），这里不允许，否则会有一个看得见却发不出去的块。
 
-设置抽屉的 Danbooru 分组另有一项非密钥配置：`danbooruLogin`（用户名，默认空串，不填也能匿名查询，填了翻页上限更高、限流更宽）。
+设置页的 Danbooru 分组另有一项非密钥配置：`danbooruLogin`（用户名，默认空串，不填也能匿名查询，填了翻页上限更高、限流更宽）。
 
 密钥全部在 `secrets.json`，渲染进程只知道「有没有存过」，明文不进渲染进程；`SecretName` 现有 `llmApiKey`、`naiToken`、`danbooruApiKey` 三项。Danbooru API Key 只走 `Authorization: Basic` 头，绝不进 URL、缓存键或错误文案。
 

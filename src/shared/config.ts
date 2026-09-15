@@ -198,7 +198,7 @@ export function defaultAppConfig(): AppConfig {
   }
 }
 
-/** 设置抽屉里有「恢复默认」按钮的项（规格 §14.2） */
+/** 设置页里有「恢复默认」按钮的项（规格 §14.2） */
 export const RESTORABLE_KEYS = [
   'systemPrompt',
   'naiCharSystemPrompt',
@@ -220,7 +220,7 @@ export interface NumberRule {
 }
 
 /**
- * 数值项的取值规则。设置抽屉保存前按它校验；mergeConfig 读配置时
+ * 数值项的取值规则。设置页保存前按它校验；mergeConfig 读配置时
  * 违反规则的值回到默认值（手改出来的 0 秒超时会让每个请求立刻被自己取消）。
  */
 export const NUMBER_RULES: Record<NumericKey, NumberRule> = {
