@@ -282,10 +282,15 @@ export default function StyleManager({ onOpenWorkbench }: Props): JSX.Element {
                   key={p.id}
                   className={cls.join(' ')}
                   data-style-id={p.id}
-                  title="点击打开；按住拖动调整顺序"
+                  title="点击打开；双击改名；按住拖动调整顺序"
                   onPointerDown={(e) => startPointer(e, index, p.id)}
                   onClick={() => {
                     if (!suppressClick.current) setActiveId(p.id)
+                  }}
+                  // 双击行 = 打开并进入改名：名称框聚焦、全选（沿用原来双击页签改名的习惯）
+                  onDoubleClick={() => {
+                    setActiveId(p.id)
+                    setFocusNameId(p.id)
                   }}
                 >
                   <span className="style-grip">⋮⋮</span>
@@ -491,6 +496,8 @@ function NameInput({
       title={error ?? '画风名称'}
       spellCheck={false}
       onChange={(e) => setDraft(e.target.value)}
+      // 双击名称框全选，而不是浏览器默认的只选中一个词：改名多半是整个换掉
+      onDoubleClick={(e) => e.currentTarget.select()}
       onBlur={commit}
       onKeyDown={(e) => {
         if (e.key === 'Enter') ref.current?.blur()
