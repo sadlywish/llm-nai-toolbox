@@ -8,7 +8,7 @@ import type { PageBucketKind } from '../danbooru/pageBuckets'
  * 请求代次归调用方管：各自的 patch 里判断结果是否过期，两边互不干扰。
  */
 
-/** 标签源：评分最高 6 张（规格 R5） */
+/** 标签源：最新 6 张（原规格 R5 是评分最高，因 D 站排序超时改为最新） */
 export const TAG_POSTS_LIMIT = 6
 
 export type Load<T> = { status: 'loading' } | { status: 'ready'; value: T } | { status: 'error'; message: string }
@@ -65,12 +65,11 @@ export async function loadTagEntry(tag: string, patch: (fn: (e: WikiEntry) => Pa
   await Promise.all([
     window.api.danbooruTagInfo(tag).then((r) => patch(() => ({ tagInfo: r.ok ? readyLoad(r.tag) : errorLoad(r.error.message) }))),
     window.api.danbooruWiki(tag).then((r) => patch(() => ({ wiki: r.ok ? readyLoad(r.wiki) : errorLoad(r.error.message) }))),
-    (async () => {
-      let r = await window.api.danbooruPosts({ tag, limit: TAG_POSTS_LIMIT, page: 1, order: 'score' })
-      // order:score 被拒（例如匿名 tag 数限制）时退回不排序，至少有图
-      if (!r.ok) r = await window.api.danbooruPosts({ tag, limit: TAG_POSTS_LIMIT, page: 1 })
-      patch(() => ({ tagPosts: r.ok ? readyLoad(r.posts) : errorLoad(r.error.message) }))
-    })(),
+    // 取最新 6 张，不按评分排序（用户 2026-09-15 改定）：D 站对热门标签跑 order:score 会数据库超时——
+    // 百万帖级标签必返回 500（等 2–6 秒才报错），几十万帖级也要 2–4 秒；不排序约 0.6 秒。D 站自己的 wiki 页也是最新帖子
+    window.api
+      .danbooruPosts({ tag, limit: TAG_POSTS_LIMIT, page: 1 })
+      .then((r) => patch(() => ({ tagPosts: r.ok ? readyLoad(r.posts) : errorLoad(r.error.message) }))),
     // 中文说明是本地数据，失败（通道异常）按没有说明处理，不占 D 站那几块的错误位
     window.api
       .tagdbGloss(tag)

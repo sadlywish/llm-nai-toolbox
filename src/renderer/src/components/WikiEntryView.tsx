@@ -127,7 +127,7 @@ export function WikiEntryBody(props: {
 
       {!isArtist && (
         <>
-          <div className="wiki-section-title">例图<span className="sub">评分最高 {TAG_POSTS_LIMIT} 张</span></div>
+          <div className="wiki-section-title">例图<span className="sub">最新 {TAG_POSTS_LIMIT} 张</span></div>
           <WikiPosts posts={entry.tagPosts} count={TAG_POSTS_LIMIT} onOpen={onOpenImage} />
         </>
       )}

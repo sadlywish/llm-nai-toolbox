@@ -242,7 +242,7 @@ llm:event finished { LlmRunResult：filled（带 FillResult）/ noParams / faile
 
 **数据流**：`PromptEditor`（整图与各角色的分块编辑器，`editorId` 分别是 `main` 与 `char:<id>`）在 `updateListener` 里对选区变化调 `cursorBus.emit`——但只在**有订阅者**时才取文档（`cursorBus.active()`），WIKI 栏收起或跟随关闭时没有订阅者，编辑器那侧零开销。WIKI 栏展开且跟随开着时订阅 `cursorBus`，用 `completionTargetAt(doc, specs, head)` 取光标处的词，交给 `useWiki.onCursorWord`（清洗掉 `{}`/`[]`/纯数字、同一个词不重复查询、400ms 防抖、`tagdb:lookup` 判定是否画师）→ `show(tag, source)` → 两源并发发请求；每次 `show` 带递增序号，旧序号的结果回来直接丢弃。
 
-**标签源**：并发取 `tagInfo` + `wiki` + `posts`（`order:score`，评分最高 6 张；被拒——例如匿名用户的排序限制——退回不带 `order` 重试一次，至少有图）。**画师源**：并发取 `artist` + `wiki`，再用画师条目给的规范名（查不到就退回输入的规范化写法）查 `tags` 取总帖子数，`computePageBuckets` 算出新/中/旧三档页码（每页 20 张，各显示前 6 张；总页数不够分三档时退化显示现有页数，并提示「作品页数不足以分出新/中/旧三档」）。
+**标签源**：并发取 `tagInfo` + `wiki` + `posts`（最新 6 张，不排序。原先用 `order:score` 取评分最高，但 D 站对热门标签跑评分排序会数据库超时——百万帖级必返回 500、几十万帖级要 2–4 秒——已改为取最新）。wiki 正文里的 `!post #id` 内嵌图按页收集成 `id:1,2,3` 列表批量查询（每批最多 100 个），不逐张请求，免得几十上百个请求挤进全局令牌桶、把之后打开的词条一起堵住。**画师源**：并发取 `artist` + `wiki`，再用画师条目给的规范名（查不到就退回输入的规范化写法）查 `tags` 取总帖子数，`computePageBuckets` 算出新/中/旧三档页码（每页 20 张，各显示前 6 张；总页数不够分三档时退化显示现有页数，并提示「作品页数不足以分出新/中/旧三档」）。
 
 **「加入」**：`editorRegistry.insertIntoLastEditor` 取最后聚焦的正向提示词编辑器与其当前选区，按 `insertTagAt` 规则（光标所在单元非空则插到单元末尾，自动补「, 」分隔）改写该字段并把焦点还回去；插不进去（从没聚焦过、那个框已卸载、改动被分块守卫拒绝）就退回 `clipboard:write-text` 并在词条头下方提示「已复制到剪贴板」。插入文本：画师是 `artist:` + 名字，所有 `_` 换成空格。
 
