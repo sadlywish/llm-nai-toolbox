@@ -1,8 +1,57 @@
-import { autocompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
+import { autocompletion, type Completion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
 import type { Extension } from '@codemirror/state'
 import { completionTargetAt, type CompletionTarget } from '@shared/blockCompletion'
 import type { FieldSpec } from '@shared/fields'
+import type { CompletionItem } from '@shared/ipc'
 import { formatCount } from '../format'
+
+/** 编辑器补全里按中文释义补充的最多条数（界面稿 2026-09-15-magicbook-mockup.html 第六节） */
+export const EDITOR_GLOSS_MAX = 10
+
+export interface TagCompletionOption extends Completion {
+  /** 工具附带的中文释义，渲染在标签名后面 */
+  gloss?: string
+  /** 按释义补充进来的行，行尾标「释义」 */
+  byGloss?: boolean
+}
+
+export function toCompletionOptions(items: CompletionItem[]): TagCompletionOption[] {
+  return items.map((item) => {
+    const option: TagCompletionOption = {
+      label: item.tag,
+      detail: formatCount(item.count),
+      info: [item.zh.join(' / '), item.series.length ? `作品：${item.series.join(', ')}` : '']
+        .filter(Boolean)
+        .join('　') || undefined,
+      apply: item.tag,
+    }
+    if (item.gloss !== undefined) option.gloss = item.gloss
+    if (item.byGloss) option.byGloss = true
+    return option
+  })
+}
+
+/**
+ * 标签名后面的释义与「释义」标记；没有释义的行不加节点。
+ * addToOptions 只收一个节点，所以外面包一层：截断挂在里层释义上，「释义」标记不会被一起截掉。
+ */
+export function renderGloss(completion: Completion): Node | null {
+  const { gloss, byGloss } = completion as TagCompletionOption
+  if (gloss === undefined) return null
+  const wrap = document.createElement('span')
+  wrap.className = 'cm-completionGlossWrap'
+  const text = document.createElement('span')
+  text.className = 'cm-completionGloss'
+  text.textContent = gloss
+  wrap.appendChild(text)
+  if (byGloss) {
+    const by = document.createElement('span')
+    by.className = 'cm-completionBy'
+    by.textContent = '释义'
+    wrap.appendChild(by)
+  }
+  return wrap
+}
 
 /** 规格 §10.4 给的防抖。与「跟随光标」的 400ms 不是一回事 */
 export const COMPLETION_DEBOUNCE_MS = 250
@@ -50,23 +99,17 @@ export function tagCompletion(
     const res = await window.api.tagdbComplete({
       query: target.query,
       prefer: target.prefer,
+      glossMax: EDITOR_GLOSS_MAX,
     })
     if (!res.ok || res.items.length === 0) return null
 
     return {
       from: target.from,
       to: target.to,
-      options: res.items.map((item) => ({
-        label: item.tag,
-        detail: formatCount(item.count),
-        info: [item.zh.join(' / '), item.series.length ? `作品：${item.series.join(', ')}` : '']
-          .filter(Boolean)
-          .join('　') || undefined,
-        apply: item.tag,
-      })),
+      options: toCompletionOptions(res.items),
       // 主进程已按图数排好序，**必须**关掉 CodeMirror 自己的过滤：这是词首
       // 匹配，打的字不一定是 label 的前缀（打 hair 会命中 long_hair），
-      // 默认的模糊过滤会把这类候选直接筛掉或乱序。
+      // 默认的模糊过滤会把这类候选直接筛掉或乱序。释义补充行更是和 label 毫无字面关系
       filter: false,
     }
   }
@@ -80,6 +123,8 @@ export function tagCompletion(
     // 候选集全量返回（单字符查询实测最多约 1.8 万条），但只为可见的这些建
     // DOM —— 结果集大小与渲染量是两件事，压力挡在这里而不是在查询层截断
     maxRenderedOptions: 50,
+    // 释义排在标签名（position 50）之后、帖子数（80）之前
+    addToOptions: [{ render: renderGloss, position: 60 }],
   })
 }
 
