@@ -16,6 +16,7 @@ const api = {
   danbooruPosts: vi.fn(async () => ({ ok: true, posts: [{ id: 1, previewUrl: 'p', largeUrl: null, originalUrl: 'o' }] })),
   danbooruSearchArtistsByOtherName: vi.fn(async () => ({ ok: true, items: [] })),
   danbooruSearchArtistsByUrl: vi.fn(async () => ({ ok: true, items: [] })),
+  tagdbGloss: vi.fn(async (tag: string) => (tag === 'ahoge' ? { g: '头顶翘起的一撮呆毛', trap: '与 ahegao 无关', cat: '头发/hair styles' } : null) as unknown),
 }
 vi.stubGlobal('window', { api })
 
@@ -160,6 +161,20 @@ describe('show：标签源', () => {
     expect(e.tag).toBe('b')
     expect(e.wiki).toEqual({ status: 'ready', value: { title: 'b', body: 'body of b' } })
   })
+
+  it('标签源同时取中文说明；没有说明时是 ready(null)', async () => {
+    const { useWiki } = await freshStore()
+    useWiki.getState().show('ahoge', 'tag')
+    await vi.runAllTimersAsync()
+    expect(api.tagdbGloss).toHaveBeenCalledWith('ahoge')
+    expect(useWiki.getState().entry!.gloss).toEqual({
+      status: 'ready',
+      value: { g: '头顶翘起的一撮呆毛', trap: '与 ahegao 无关', cat: '头发/hair styles' },
+    })
+    useWiki.getState().show('long_hair', 'tag')
+    await vi.runAllTimersAsync()
+    expect(useWiki.getState().entry!.gloss).toEqual({ status: 'ready', value: null })
+  })
 })
 
 describe('show：画师源', () => {
@@ -176,6 +191,14 @@ describe('show：画师源', () => {
     expect(e.artistPostCount).toBe(25)
     expect(e.bucketsCollapsed).toBe(true)
     expect(e.buckets?.map((b) => b.posts.status)).toEqual(['ready', 'ready', 'ready'])
+  })
+
+  it('画师源不取中文说明，gloss 恒为 ready(null)', async () => {
+    const { useWiki } = await freshStore()
+    useWiki.getState().show('wlop', 'artist')
+    expect(useWiki.getState().entry!.gloss).toEqual({ status: 'ready', value: null })
+    await vi.runAllTimersAsync()
+    expect(api.tagdbGloss).not.toHaveBeenCalled()
   })
 })
 
