@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { FieldSpec } from '@shared/fields'
 import type { GenImageEvent, GenStartInput, RoundRecord, RunProgress } from '@shared/gen'
+import { snapshotLlmOf } from '@shared/llmProvenance'
 import { emptyWorkspace, type Workspace } from '@shared/workspace'
 import { ipcErrorMessage } from '../ipcError'
 import { tokenBudget } from '../prompt/tokenBudget'
@@ -167,6 +168,7 @@ export function mergeHistoryWithProgress(
       characters: ws.characters.filter((c) => c.enabled).map((c) => ({ fields: c.fields, negative: c.negative, position: c.position })),
       useCoords: ws.useCoords,
       params: ws.params,
+      llm: snapshotLlmOf(ws),
     },
     assembled: { positive: '', negative: '', characters: [] },
     images: [],

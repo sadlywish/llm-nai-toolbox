@@ -2,6 +2,7 @@ import { emptyValues, sanitizeFieldText, type FieldValues } from './blockDoc'
 import { CHARACTER_FIELDS, MAIN_FIELDS, type FieldSpec } from './fields'
 import { newId } from './ids'
 import type { MultiCharacterMode } from './llm'
+import { normalizeWorkspaceLlm, type WorkspaceLlm } from './llmProvenance'
 import { NOISE_SCHEDULE_OPTIONS, SAMPLER_OPTIONS } from './naiOptions'
 
 /** seed 分配策略：每张随机，或固定用参数区里的 seed */
@@ -74,6 +75,8 @@ export interface Workspace {
   /** 跑图次数：手动生成与「回填后自动生成」共用 */
   runCount: number
   console: ConsoleOptions
+  /** 当前内容出自哪次 LLM 请求；null = 没经过 LLM（或复制信息带来的是纯手工记录）。见 llmProvenance.ts */
+  llm: WorkspaceLlm | null
 }
 
 /**
@@ -120,6 +123,7 @@ export function emptyWorkspace(): Workspace {
     useCoords: false,
     runCount: 1,
     console: defaultConsoleOptions(),
+    llm: null,
   }
 }
 
@@ -214,5 +218,6 @@ export function normalizeWorkspace(raw: unknown): Workspace {
     useCoords: typeof raw.useCoords === 'boolean' ? raw.useCoords : base.useCoords,
     runCount: typeof raw.runCount === 'number' && Number.isInteger(raw.runCount) && raw.runCount >= 1 ? raw.runCount : base.runCount,
     console: normalizeConsole(raw.console),
+    llm: normalizeWorkspaceLlm(raw.llm),
   }
 }

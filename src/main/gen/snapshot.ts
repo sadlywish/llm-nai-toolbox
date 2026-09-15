@@ -1,6 +1,7 @@
 import type { AppConfig } from '@shared/config'
 import { CHARACTER_FIELDS, MAIN_FIELDS, orderSpecs } from '@shared/fields'
 import type { AssembledPrompt, GenSnapshot } from '@shared/gen'
+import { snapshotLlmOf } from '@shared/llmProvenance'
 import { buildPrompt } from '@shared/prompt'
 import type { Workspace } from '@shared/workspace'
 import { positionToCenter } from '../nai/payload'
@@ -20,6 +21,8 @@ export function takeSnapshot(ws: Workspace, resolvedFixedSeed: number | null): G
       .map((c) => ({ fields: { ...c.fields }, negative: c.negative, position: c.position })),
     useCoords: ws.useCoords,
     params: resolvedFixedSeed === null ? { ...ws.params } : { ...ws.params, seed: resolvedFixedSeed },
+    // 手改判断要拿按下生成时的工作区比，不能拿上面换过 seed 的 params
+    llm: snapshotLlmOf(ws),
   }
 }
 
