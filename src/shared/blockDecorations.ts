@@ -1,5 +1,5 @@
 import { blockRanges } from './blockDoc'
-import { blockCommaHits, type DocCommaHit } from './blockMetrics'
+import { blockCommaHits, blockDigitHits, type DocCommaHit, type DocDigitHit } from './blockMetrics'
 import { fieldIndexAt } from './blockNav'
 import type { FieldSpec } from './fields'
 import { joinsPrompt } from './prompt'
@@ -29,6 +29,8 @@ export interface BlockLayout {
   fields: FieldLayout[]
   /** 全角逗号命中，文档坐标 */
   commaHits: DocCommaHit[]
+  /** 标签末尾数字紧贴 :: 的命中，文档坐标 */
+  digitHits: DocDigitHit[]
 }
 
 /**
@@ -64,5 +66,5 @@ export function buildBlockLayout(
           : [],
     }
   })
-  return { fields, commaHits: blockCommaHits(doc, specs) }
+  return { fields, commaHits: blockCommaHits(doc, specs), digitHits: blockDigitHits(doc, specs) }
 }

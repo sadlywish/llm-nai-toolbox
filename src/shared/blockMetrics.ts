@@ -1,3 +1,4 @@
+import { findDigitBeforeClose } from '@renderer/prompt/digitBeforeClose'
 import { findFullWidthCommas } from '@renderer/prompt/fullWidthComma'
 import { estimateT5Tokens, tokenLimitFor } from '@renderer/prompt/t5'
 import type { FieldValues } from './blockDoc'
@@ -99,6 +100,26 @@ export function blockCommaHits(
         char: hit.char,
         field: spec.name,
       })
+    }
+  }
+  return out
+}
+
+export interface DocDigitHit {
+  from: number
+  to: number
+  message: string
+  field: string
+}
+
+/** 标签末尾数字紧贴 `::` 的命中，文档坐标（理由同 blockCommaHits）。所有字段都查，见 digitBeforeClose.ts */
+export function blockDigitHits(doc: string, specs: readonly FieldSpec[]): DocDigitHit[] {
+  const values = parseDocument(doc, specs)
+  const out: DocDigitHit[] = []
+  for (const range of blockRanges(doc, specs)) {
+    const spec = specs[range.index]
+    for (const hit of findDigitBeforeClose(values[spec.name])) {
+      out.push({ from: range.from + hit.from, to: range.from + hit.to, message: hit.message, field: spec.name })
     }
   }
   return out

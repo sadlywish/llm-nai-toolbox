@@ -46,6 +46,7 @@ export const externalSync = Annotation.define<boolean>()
  *     .blk-run      框与徽章，徽章画在 ::before
  *       .blk-tag    一个标签连同它的逗号，nowrap
  *         .blk-comma  全角逗号标红
+ *         .blk-digit  标签末尾数字紧贴 :: 标红，悬停出提示（与 .blk-comma 同一套样式）
  * 空段没有字符可附着 mark，由它前面那个分隔符上的 SeparatorWidget 画空框。
  */
 
@@ -312,9 +313,12 @@ function decorationsFor(specs: readonly FieldSpec[], view: EditorView): Layers {
     )
     tag.push(...tagMarks(f, view, lineWidth))
   }
-  const err = layout.commaHits.map((hit) =>
-    Decoration.mark({ class: 'blk-comma' }).range(hit.from, hit.to),
-  )
+  const err = [
+    ...layout.commaHits.map((hit) => Decoration.mark({ class: 'blk-comma' }).range(hit.from, hit.to)),
+    ...layout.digitHits.map((hit) =>
+      Decoration.mark({ class: 'blk-digit', attributes: { title: hit.message } }).range(hit.from, hit.to),
+    ),
+  ]
   return {
     grp: Decoration.set(grp, true),
     run: Decoration.set(run, true),

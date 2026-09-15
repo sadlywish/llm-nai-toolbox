@@ -1,4 +1,5 @@
 import type { FieldValues } from './blockDoc'
+import type { SnapshotLlm } from './llmProvenance'
 import { normalizeWorkspace, type GenParams, type Workspace } from './workspace'
 
 /**
@@ -66,6 +67,11 @@ export interface GenSnapshot {
   useCoords: boolean
   /** 固定 seed 模式且 seed 为 -1 时，这里记的是开跑时随机出来的那个值 */
   params: GenParams
+  /**
+   * 产出这些提示词的 LLM 请求；null = 没经过 LLM。这项功能之前落盘的记录没有这个键，
+   * 读的时候一律过 readSnapshotLlm
+   */
+  llm?: SnapshotLlm | null
 }
 
 export interface NaiCenter {

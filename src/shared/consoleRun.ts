@@ -1,4 +1,6 @@
+import type { ApiType } from './config'
 import type { LlmRunInput, StyleLock } from './llm'
+import type { LlmRequestInfo } from './llmProvenance'
 import { usableStyles, type StylePreset } from './styles'
 import type { ConsoleOptions, Workspace } from './workspace'
 
@@ -12,6 +14,29 @@ export function buildRunInput(ws: Workspace, presets: readonly StylePreset[]): L
     transparent: o.transparent,
     style: styleLockOf(o, presets),
     workspace: ws,
+  }
+}
+
+/** 回填成功前还不知道轮数与用时的那部分请求记录 */
+export type PendingLlmRequest = Omit<LlmRequestInfo, 'llmRounds' | 'elapsedMs'>
+
+/**
+ * 按下发送那一刻的请求记录，与 buildRunInput 同一时刻取：跑的途中改指令区不影响这一轮的记录。
+ * 预设名只在真按预设覆盖时记（预设已失效、按不覆盖发的也记成不覆盖）。
+ */
+export function pendingRequestOf(ws: Workspace, presets: readonly StylePreset[], api: { apiType: ApiType; model: string }): PendingLlmRequest {
+  const o = ws.console
+  const style = styleLockOf(o, presets)
+  return {
+    apiType: api.apiType,
+    model: api.model,
+    instruction: o.instruction,
+    multiCharacter: o.multiCharacter,
+    editExisting: o.editExisting,
+    transparent: o.transparent,
+    styleMode: style.mode,
+    presetName: style.mode === 'preset' ? (currentPresetOf(o, presets)?.name ?? '') : '',
+    autoGenerate: o.autoGenerate,
   }
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRunInput, clearStalePreset, currentPresetOf, presetSelectionStale } from '../../src/shared/consoleRun'
+import { buildRunInput, clearStalePreset, currentPresetOf, pendingRequestOf, presetSelectionStale } from '../../src/shared/consoleRun'
 import type { StylePreset } from '../../src/shared/styles'
 import { emptyWorkspace } from '../../src/shared/workspace'
 
@@ -97,5 +97,34 @@ describe('presetSelectionStale / clearStalePreset', () => {
     expect(presetSelectionStale(o, presets)).toBe(true)
     clearStalePreset(o, presets)
     expect(o.styleMode).toBe('none')
+  })
+})
+
+describe('pendingRequestOf', () => {
+  const api = { apiType: 'openai' as const, model: 'gpt-x' }
+
+  it('记下指令、五个开关与 API；按预设覆盖时记预设名', () => {
+    const ws = emptyWorkspace()
+    Object.assign(ws.console, { instruction: '海边', multiCharacter: 'coords', editExisting: true, transparent: true, styleMode: 'preset', presetId: 'wlop', autoGenerate: true })
+    expect(pendingRequestOf(ws, presets, api)).toEqual({
+      apiType: 'openai',
+      model: 'gpt-x',
+      instruction: '海边',
+      multiCharacter: 'coords',
+      editExisting: true,
+      transparent: true,
+      styleMode: 'preset',
+      presetName: 'wlop 厚涂',
+      autoGenerate: true,
+    })
+  })
+
+  it('不是预设档时不记预设名；预设已失效按不覆盖记，与实际发出去的一致', () => {
+    const ws = emptyWorkspace()
+    Object.assign(ws.console, { styleMode: 'current', presetId: 'wlop' })
+    expect(pendingRequestOf(ws, presets, api)).toMatchObject({ styleMode: 'current', presetName: '' })
+    Object.assign(ws.console, { styleMode: 'preset', presetId: 'blank' })
+    expect(pendingRequestOf(ws, presets, api)).toMatchObject({ styleMode: 'none', presetName: '' })
+    expect(buildRunInput(ws, presets).style).toEqual({ mode: 'none' })
   })
 })

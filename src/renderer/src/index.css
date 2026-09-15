@@ -136,7 +136,8 @@ body {
 .blk-tag { white-space: nowrap; }
 .blk-brk::after { content: "\200b"; white-space: pre-wrap; }
 
-.blk-comma {
+/* 标签末尾数字紧贴 :: 与全角逗号同一套红色（用户 2026-09-15 选定） */
+.blk-comma, .blk-digit {
   color: var(--danger); background: hsl(4 80% 60% / .16);
   border-radius: 2px;
   text-decoration: underline wavy var(--danger) 1px;
@@ -738,6 +739,12 @@ textarea.auto-textarea {
 .gen-field-label { color: var(--ink-faint); font-size: 11px; }
 details.gen-field > summary { cursor: pointer; }
 .gen-field-value { font-family: var(--mono); word-break: break-all; color: var(--ink); }
+/* 溯源信息里的「LLM 请求」：指令是自然语言，不用等宽；五个开关各自不拆行 */
+.gen-llm-stale { color: var(--warn); font-size: 12px; }
+.gen-llm-instruction { color: var(--ink); white-space: pre-wrap; word-break: break-all; }
+.gen-llm-opts { display: flex; flex-wrap: wrap; column-gap: 12px; color: var(--ink); font-size: 12px; line-height: 1.9; }
+.gen-llm-opts > span { white-space: nowrap; }
+.gen-llm-opts i { font-style: normal; color: var(--ink-faint); margin-right: 4px; }
 .gen-blocks { background: var(--input); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; font-family: var(--mono); line-height: 1.9; }
 /* 块配色与分块编辑器同一套（hsl(var(--h) …)） */
 .gen-block { display: inline-block; border-radius: 3px; padding: 0 5px; margin: 0 4px 3px 0; background: hsl(var(--h) 48% 56% / .14); box-shadow: inset 0 0 0 1px hsl(var(--h) 45% 52% / .42); }

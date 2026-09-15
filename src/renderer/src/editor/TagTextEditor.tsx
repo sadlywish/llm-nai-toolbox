@@ -11,6 +11,7 @@ import {
 } from '@codemirror/view'
 import { useEffect, useRef } from 'react'
 import { completionTargetInText, type CompletionPrefer } from '@shared/blockCompletion'
+import { findDigitBeforeClose } from '@renderer/prompt/digitBeforeClose'
 import { findFullWidthCommas, fullWidthCommaMessage } from '@renderer/prompt/fullWidthComma'
 import { WEIGHT_STEP, adjustWeight } from '@renderer/prompt/weight'
 import { tagCompletion } from './completion'
@@ -41,27 +42,36 @@ function weightCommand(delta: number) {
   }
 }
 
-function commaMarks(view: EditorView): DecorationSet {
+function problemMarks(view: EditorView, flagComma: boolean): DecorationSet {
+  const text = view.state.doc.toString()
   return Decoration.set(
-    findFullWidthCommas(view.state.doc.toString()).map((hit) =>
-      Decoration.mark({ class: 'blk-comma', attributes: { title: fullWidthCommaMessage(hit.char) } }).range(hit.from, hit.to),
-    ),
+    [
+      ...(flagComma ? findFullWidthCommas(text) : []).map((hit) =>
+        Decoration.mark({ class: 'blk-comma', attributes: { title: fullWidthCommaMessage(hit.char) } }).range(hit.from, hit.to),
+      ),
+      ...findDigitBeforeClose(text).map((hit) =>
+        Decoration.mark({ class: 'blk-digit', attributes: { title: hit.message } }).range(hit.from, hit.to),
+      ),
+    ],
+    true,
   )
 }
 
-/** 全角逗号标红，外观与分块编辑器同一个 .blk-comma 样式 */
-const fullWidthCommaPlugin = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet
-    constructor(view: EditorView) {
-      this.decorations = commaMarks(view)
-    }
-    update(update: ViewUpdate): void {
-      if (update.docChanged) this.decorations = commaMarks(update.view)
-    }
-  },
-  { decorations: (v) => v.decorations },
-)
+/** 全角逗号（按需）与标签末尾数字紧贴 ::（始终）标红，外观与分块编辑器同一套样式 */
+function problemPlugin(flagComma: boolean) {
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet
+      constructor(view: EditorView) {
+        this.decorations = problemMarks(view, flagComma)
+      }
+      update(update: ViewUpdate): void {
+        if (update.docChanged) this.decorations = problemMarks(update.view, flagComma)
+      }
+    },
+    { decorations: (v) => v.decorations },
+  )
+}
 
 /**
  * 纯文本的标签编辑器：本地标签补全 + Ctrl+↑/↓ 调权重。
@@ -97,7 +107,7 @@ export default function TagTextEditor({
         tagCompletion((doc, pos) => completionTargetInText(doc, pos, prefer)),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
-        ...(flagFullWidthComma ? [fullWidthCommaPlugin] : []),
+        problemPlugin(flagFullWidthComma),
         cmPlaceholder(placeholder),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) onChangeRef.current(update.state.doc.toString())

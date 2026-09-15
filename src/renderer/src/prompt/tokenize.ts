@@ -67,7 +67,7 @@ export interface ParseResult {
  */
 const DELIMITERS = new Set([',', '，', '{', '[', '(', '|', ':', ' ', '\t', '\n', '\r', '\u001F'])
 
-function isDelimiter(ch: string | undefined): boolean {
+export function isDelimiter(ch: string | undefined): boolean {
   // undefined 表示字符串开头，同样算分隔位
   return ch === undefined || DELIMITERS.has(ch)
 }

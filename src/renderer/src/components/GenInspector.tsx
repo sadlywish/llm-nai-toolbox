@@ -3,7 +3,9 @@ import type { FieldValues } from '@shared/blockDoc'
 import { applyRoundToWorkspace } from '@shared/copyInfo'
 import type { FieldSpec } from '@shared/fields'
 import type { ImageMeta, ImageRecord, RoundRecord } from '@shared/gen'
+import { readSnapshotLlm, type SnapshotLlm } from '@shared/llmProvenance'
 import type { GenParams, Workspace } from '@shared/workspace'
+import { API_LABELS, MULTI_LABELS, STYLE_MODE_LABELS } from '../llmLabels'
 
 export interface InspectedImage {
   round: RoundRecord
@@ -43,6 +45,43 @@ function Blocks({ values, specs }: { values: FieldValues; specs: readonly FieldS
 /** 尺寸不在这一行：它和 Seed 一起单独放在最前面 */
 function paramsLine(p: GenParams): string {
   return `${p.model} · steps ${p.steps} · CFG ${p.scale} · CFG Rescale ${p.cfgRescale} · ${p.sampler} · ${p.noiseSchedule} · 透明背景 ${p.transparentBackground ? '开' : '关'}`
+}
+
+const onOff = (v: boolean): string => (v ? '开' : '关')
+
+/**
+ * 产出这些提示词的 LLM 请求（界面稿 2026-09-15-llm-provenance-mockup.html 位置 B）。
+ * undefined 是这项功能之前的旧记录，说不清有没有经过 LLM，与「确定没经过」分开写。
+ */
+function LlmRequest({ llm }: { llm: SnapshotLlm | null | undefined }): JSX.Element {
+  if (llm == null) {
+    return (
+      <div className="gen-field gen-llm">
+        <span className="gen-field-label">LLM 请求</span>
+        <span className="gen-field-value">
+          {llm === null ? '（无：这一轮的提示词没有经过 LLM 回填）' : '（旧记录，没有保存 LLM 请求信息）'}
+        </span>
+      </div>
+    )
+  }
+  const r = llm.request
+  const style = r.styleMode === 'preset' ? `${STYLE_MODE_LABELS.preset}「${r.presetName}」` : STYLE_MODE_LABELS[r.styleMode]
+  return (
+    <div className="gen-field gen-llm">
+      <span className="gen-field-label">
+        LLM 请求 · {API_LABELS[r.apiType]} · {r.model} · {r.llmRounds} 轮 · 用时 {Math.round(r.elapsedMs / 1000)}s
+      </span>
+      {llm.stale && <span className="gen-llm-stale">回填之后提示词或参数又被手工改过，这张图和这次请求不完全对应</span>}
+      <span className="gen-llm-instruction">{r.instruction}</span>
+      <span className="gen-llm-opts">
+        <span><i>多角色</i>{MULTI_LABELS[r.multiCharacter]}</span>
+        <span><i>在现有内容上修改</i>{onOff(r.editExisting)}</span>
+        <span><i>透明背景</i>{onOff(r.transparent)}</span>
+        <span><i>画风</i>{style}</span>
+        <span><i>回填后自动生成</i>{onOff(r.autoGenerate)}</span>
+      </span>
+    </div>
+  )
 }
 
 /** Comment 里是 JSON：排版后显示；不是 JSON 就原样 */
@@ -135,6 +174,7 @@ export default function GenInspector({ item, mainSpecs, charSpecs, update, onOpe
               <span className="gen-field-value">{record.seed}</span>
             </div>
           </div>
+          <LlmRequest llm={readSnapshotLlm(snapshot.llm)} />
           <div className="gen-field">
             <span className="gen-field-label">整图</span>
             <Blocks values={snapshot.main} specs={mainSpecs} />

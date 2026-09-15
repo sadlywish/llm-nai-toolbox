@@ -112,7 +112,7 @@ describe('useLlm', () => {
     expect(state().lines[1].seq).toBeGreaterThan(state().lines[0].seq)
   })
 
-  it('finished(filled)：先回填，再追加绿色的「已回填」行', () => {
+  it('finished(filled)：先回填（带上轮数与用时），再追加绿色的「已回填」行', () => {
     const onFilled = vi.fn(() => {
       // 回填发生时「已回填」行还没追加
       expect(state().lines.some((l) => l.ok === true)).toBe(false)
@@ -120,7 +120,7 @@ describe('useLlm', () => {
     void state().run(input, onFilled)
     state().handleEvent(log('LLM 全部轮次完成'))
     state().handleEvent({ kind: 'finished', result: filled })
-    expect(onFilled).toHaveBeenCalledWith(fill)
+    expect(onFilled).toHaveBeenCalledWith(fill, { rounds: filled.rounds, elapsedMs: filled.elapsedMs })
     expect(state().phase).toEqual({ kind: 'done', result: filled })
     const last = state().lines[state().lines.length - 1]
     expect(last).toMatchObject({ level: 'I', ok: true, text: fillSummary(fill) })

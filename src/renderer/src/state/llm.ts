@@ -55,7 +55,13 @@ export function statusTone(phase: ConsolePhase): StatusTone | null {
 
 let seq = 0
 /** 本窗口发起、还没结束的那一轮的回填回调 */
-let pendingFill: ((fill: FillResult) => void) | null = null
+let pendingFill: ((fill: FillResult, stats: FillStats) => void) | null = null
+
+/** 回填成功那一轮 LLM 的轮数与用时，记进「LLM 请求」来源 */
+export interface FillStats {
+  rounds: number
+  elapsedMs: number
+}
 
 function makeLine(line: LlmLogLine, ok = false): ConsoleLine {
   seq += 1
@@ -67,7 +73,7 @@ interface LlmState {
   lines: ConsoleLine[]
   /** 日志抽屉（从指令区顶边向上展开）是否打开。界面稿第 4 版 */
   logOpen: boolean
-  run: (input: LlmRunInput, onFilled: (fill: FillResult) => void) => Promise<void>
+  run: (input: LlmRunInput, onFilled: (fill: FillResult, stats: FillStats) => void) => Promise<void>
   handleEvent: (e: LlmEvent) => void
   abort: () => void
   clear: () => void
@@ -117,7 +123,7 @@ export const useLlm = create<LlmState>((set, get) => ({
     pendingFill = null
     set({ phase: { kind: 'done', result: e.result } })
     if (e.result.status === 'filled' && onFilled !== null) {
-      onFilled(e.result.fill)
+      onFilled(e.result.fill, { rounds: e.result.rounds, elapsedMs: e.result.elapsedMs })
       const line = makeLine({ time: clockText(new Date()), level: 'I', text: fillSummary(e.result.fill) }, true)
       // 回填成功就收起抽屉：接下来要去操作参数区。没有回填的结束不动抽屉——原因在日志里
       set((s) => ({ lines: appendCapped(s.lines, line), logOpen: false }))

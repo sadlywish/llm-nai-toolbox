@@ -1,11 +1,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { applyFill } from '@shared/applyFill'
-import type { ApiType, AppConfig } from '@shared/config'
-import { buildRunInput, clearStalePreset, currentPresetOf, presetSelectionStale } from '@shared/consoleRun'
+import type { AppConfig } from '@shared/config'
+import { buildRunInput, clearStalePreset, currentPresetOf, pendingRequestOf, presetSelectionStale } from '@shared/consoleRun'
 import type { FieldSpec } from '@shared/fields'
-import { MULTI_CHARACTER_MODES, type MultiCharacterMode } from '@shared/llm'
+import { attachLlm } from '@shared/llmProvenance'
+import { MULTI_CHARACTER_MODES } from '@shared/llm'
 import type { StylePreset } from '@shared/styles'
 import type { ConsoleOptions, StyleMode, Workspace } from '@shared/workspace'
+import { API_LABELS, MULTI_LABELS, STYLE_MODE_LABELS } from '../llmLabels'
 import { useGen } from '../state/gen'
 import { statusText, statusTone, useLlm } from '../state/llm'
 import { useWorkspace } from '../state/workspace'
@@ -21,14 +23,6 @@ interface Props {
   update: (fn: (draft: Workspace) => void) => void
   /** 「选择预设…」：切到画风维护，在那里选预设画风 */
   onOpenStyles: () => void
-}
-
-const API_LABELS: Record<ApiType, string> = { claude: 'Claude', openai: 'OpenAI 兼容' }
-
-const MULTI_LABELS: Record<MultiCharacterMode, string> = {
-  off: '关闭',
-  auto: '位置由模型安排',
-  coords: '手动指定坐标',
 }
 
 const STYLE_MODES: readonly StyleMode[] = ['none', 'preset', 'current']
@@ -88,8 +82,13 @@ export default function LlmConsole({ workspace, config, presets, mainSpecs, char
   function send(): void {
     if (running) return
     // update 是 store 的稳定引用：这一轮跑完时即使切到了画风维护视图，回填照样写进工作区
-    void run(buildRunInput(workspace, presets ?? []), (fill) => {
-      update((ws) => applyFill(ws, fill))
+    const request = pendingRequestOf(workspace, presets ?? [], config)
+    void run(buildRunInput(workspace, presets ?? []), (fill, stats) => {
+      // 回填与记来源在同一笔更新里：指纹取回填之后的内容，紧接着的自动生成不会被误判为手改过
+      update((ws) => {
+        applyFill(ws, fill)
+        attachLlm(ws, { ...request, llmRounds: stats.rounds, elapsedMs: stats.elapsedMs }, false)
+      })
       // 回填后自动生成：用回填之后的工作区（update 同步写 store），跑图次数照工具栏
       const ws = useWorkspace.getState().workspace
       if (ws !== null && ws.console.autoGenerate) void useGen.getState().generate(ws, mainSpecs, charSpecs)
@@ -183,11 +182,11 @@ export default function LlmConsole({ workspace, config, presets, mainSpecs, char
                 if (mode !== undefined) setOption('styleMode', mode)
               }}
             >
-              <option value="none">不覆盖</option>
+              <option value="none">{STYLE_MODE_LABELS.none}</option>
               <option value="preset" disabled={currentPreset === null}>
-                {currentPreset === null ? '用预设画风覆盖（未选择预设）' : '用预设画风覆盖'}
+                {currentPreset === null ? `${STYLE_MODE_LABELS.preset}（未选择预设）` : STYLE_MODE_LABELS.preset}
               </option>
-              <option value="current">用当前 artist 块覆盖</option>
+              <option value="current">{STYLE_MODE_LABELS.current}</option>
             </select>
           </label>
           {/* 预设在画风维护里选，这里只显示是哪条；档位不是预设档时名称变灰（界面稿 2026-09-15-style-list-mockup.html 第一节） */}
