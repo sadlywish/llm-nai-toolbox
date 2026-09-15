@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { DanbooruPost } from '@shared/danbooru'
 import { parseDText, type DBlock, type DInline } from '@shared/dtext'
+import { POST_BATCH_SIZE, chunkIds, collectPostIds, idsTag } from '../danbooru/postBatch'
 
 interface Props {
   body: string
@@ -9,32 +11,26 @@ interface Props {
   onOpenImage: (url: string, alt: string) => void
 }
 
-/** !post #123：按 id 取一张帖子的缩略图 */
-function PostImage({ postId, onOpen }: { postId: number; onOpen: (url: string, alt: string) => void }): JSX.Element {
-  const [urls, setUrls] = useState<{ preview: string; open: string } | null | 'missing'>(null)
-  useEffect(() => {
-    let cancelled = false
-    void window.api.danbooruPosts({ tag: `id:${postId}`, limit: 1, page: 1 }).then((r) => {
-      if (cancelled) return
-      const p = r.ok ? r.posts[0] : undefined
-      const preview = p ? (p.previewUrl ?? p.largeUrl) : null
-      const open = p ? (p.originalUrl ?? p.largeUrl ?? p.previewUrl) : null
-      setUrls(preview && open ? { preview, open } : 'missing')
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [postId])
-  if (urls === 'missing') return <span className="dtext-missing">!post #{postId}</span>
-  if (urls === null) return <span className="dtext-img is-loading" />
+/** 渲染时往下传的上下文：整页内嵌图的批量查询结果，null = 还在查 */
+interface RenderCtx extends Props {
+  posts: Map<number, DanbooruPost> | null
+}
+
+/** !post #123：缩略图地址来自整页的批量查询（见 danbooru/postBatch.ts），这里不再各自请求 */
+function PostImage({ postId, posts, onOpen }: { postId: number; posts: Map<number, DanbooruPost> | null; onOpen: (url: string, alt: string) => void }): JSX.Element {
+  if (posts === null) return <span className="dtext-img is-loading" />
+  const p = posts.get(postId)
+  const preview = p ? (p.previewUrl ?? p.largeUrl) : null
+  const open = p ? (p.originalUrl ?? p.largeUrl ?? p.previewUrl) : null
+  if (!preview || !open) return <span className="dtext-missing">!post #{postId}</span>
   return (
-    <button type="button" className="dtext-img" onClick={() => onOpen(urls.open, `post ${postId}`)}>
-      <img src={urls.preview} alt={`post ${postId}`} loading="lazy" />
+    <button type="button" className="dtext-img" onClick={() => onOpen(open, `post ${postId}`)}>
+      <img src={preview} alt={`post ${postId}`} loading="lazy" />
     </button>
   )
 }
 
-function renderInline(nodes: DInline[], p: Props): ReactNode[] {
+function renderInline(nodes: DInline[], p: RenderCtx): ReactNode[] {
   return nodes.map((n, i) => {
     switch (n.type) {
       case 'text':
@@ -59,12 +55,12 @@ function renderInline(nodes: DInline[], p: Props): ReactNode[] {
         return <Tag key={i}>{renderInline(n.children, p)}</Tag>
       }
       case 'postImage':
-        return <PostImage key={i} postId={n.postId} onOpen={p.onOpenImage} />
+        return <PostImage key={i} postId={n.postId} posts={p.posts} onOpen={p.onOpenImage} />
     }
   })
 }
 
-function renderBlock(b: DBlock, i: number, p: Props): ReactNode {
+function renderBlock(b: DBlock, i: number, p: RenderCtx): ReactNode {
   switch (b.type) {
     case 'heading':
       // 统一降两级：wiki 的 h4 显示成比词条名小的小标题
@@ -89,7 +85,31 @@ function renderBlock(b: DBlock, i: number, p: Props): ReactNode {
 /** wiki 正文。See also 由调用方另外渲染成芯片（parseDText 已从正文里去掉那一节） */
 export default function DText(props: Props): JSX.Element {
   const doc = useMemo(() => parseDText(props.body), [props.body])
-  return <div className="wiki-text">{doc.blocks.map((b, i) => renderBlock(b, i, props))}</div>
+  const postIds = useMemo(() => collectPostIds(doc), [doc])
+  const [posts, setPosts] = useState<Map<number, DanbooruPost> | null>(null)
+
+  // 整页内嵌图一次查完（每批最多 POST_BATCH_SIZE 个 id）。查不到或请求失败的 id 显示成「!post #id」文字
+  useEffect(() => {
+    if (postIds.length === 0) {
+      setPosts(new Map())
+      return
+    }
+    let cancelled = false
+    setPosts(null)
+    void Promise.all(
+      chunkIds(postIds, POST_BATCH_SIZE).map((chunk) =>
+        window.api.danbooruPosts({ tag: idsTag(chunk), limit: chunk.length, page: 1 }).then((r) => (r.ok ? r.posts : [])),
+      ),
+    ).then((groups) => {
+      if (!cancelled) setPosts(new Map(groups.flat().map((post) => [post.id, post])))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [postIds])
+
+  const ctx: RenderCtx = { ...props, posts }
+  return <div className="wiki-text">{doc.blocks.map((b, i) => renderBlock(b, i, ctx))}</div>
 }
 
 export function seeAlsoOf(body: string): string[] {
