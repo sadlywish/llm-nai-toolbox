@@ -220,6 +220,8 @@ describe('切换数据源与搜索联想', () => {
     await vi.runAllTimersAsync()
     const prefers = api.tagdbComplete.mock.calls.map((c) => (c as unknown as [{ prefer: string }])[0].prefer).sort()
     expect(prefers).toEqual(['character', 'general', 'series'])
+    expect(api.tagdbComplete).toHaveBeenCalledWith({ query: 'twin', prefer: 'general', limit: 20, glossMax: 20 })
+    expect(api.tagdbComplete).toHaveBeenCalledWith({ query: 'twin', prefer: 'character', limit: 20 })
 
     api.tagdbComplete.mockClear()
     useWiki.getState().setSource('artist')

@@ -89,9 +89,10 @@ async function safeLookup(tag: string): Promise<TagLookup | null> {
   }
 }
 
-async function safeComplete(query: string, prefer: CompletionPrefer): Promise<CompletionItem[]> {
+async function safeComplete(query: string, prefer: CompletionPrefer, glossMax?: number): Promise<CompletionItem[]> {
   try {
-    const r = await window.api.tagdbComplete({ query, prefer, limit: SEARCH_LIMIT })
+    const input = glossMax === undefined ? { query, prefer, limit: SEARCH_LIMIT } : { query, prefer, limit: SEARCH_LIMIT, glossMax }
+    const r = await window.api.tagdbComplete(input)
     return r.ok ? r.items : []
   } catch {
     return []
@@ -219,7 +220,7 @@ export const useWiki = create<WikiState>((set, get) => {
         const source = get().source
         const task =
           source === 'tag'
-            ? Promise.all([safeComplete(q, 'general'), safeComplete(q, 'character'), safeComplete(q, 'series')]).then((groups) =>
+            ? Promise.all([safeComplete(q, 'general', SEARCH_LIMIT), safeComplete(q, 'character'), safeComplete(q, 'series')]).then((groups) =>
                 mergeTagSuggestions(groups, SEARCH_LIMIT),
               )
             : Promise.all([

@@ -760,6 +760,9 @@ details.gen-field > summary { cursor: pointer; }
 .wiki-suggest li.is-active { background: hsl(212 55% 45% / .45); }
 .wiki-suggest .zh { color: var(--ink-dim); }
 .wiki-suggest .by { color: var(--ink-faint); font-size: 11.5px; }
+/* 释义补充行：释义可能很长，省略号截断，别把「释义」与帖子数挤到第二行 */
+.wiki-suggest .gl { color: var(--ink-dim); min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: "Microsoft YaHei", system-ui, sans-serif; }
+.wiki-suggest .by { white-space: nowrap; }
 .wiki-suggest .cnt { margin-left: auto; color: var(--ink-faint); font-size: 11.5px; }
 .wiki-body { flex: 1; min-height: 0; overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
 .wiki-entry-head { display: flex; flex-direction: column; gap: 4px; }

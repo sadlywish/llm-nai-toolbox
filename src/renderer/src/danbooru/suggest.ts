@@ -25,6 +25,10 @@ export interface WikiSuggestion {
   count: number | null
   /** 画师源才有：命中的是名称/别名/链接；标签源恒为空 */
   matchedBy: ArtistMatchDimension[]
+  /** 工具附带的中文释义；只有释义补充行带（显示在标签名后面） */
+  gloss?: string
+  /** 按中文释义补充进来的行，行尾标「释义」 */
+  byGloss?: boolean
 }
 
 const keyOf = (tag: string): string => normalizeTag(tag).toLowerCase()
@@ -54,14 +58,29 @@ export function mergeArtistSuggestions(
 
 export function mergeTagSuggestions(groups: CompletionItem[][], limit: number): WikiSuggestion[] {
   const byKey = new Map<string, CompletionItem>()
+  const glossRows: CompletionItem[] = []
   for (const group of groups) {
     for (const it of group) {
+      if (it.byGloss) {
+        glossRows.push(it)
+        continue
+      }
       const key = keyOf(it.tag)
       if (!byKey.has(key)) byKey.set(key, it)
     }
   }
-  return [...byKey.values()]
+  const out: WikiSuggestion[] = [...byKey.values()]
     .sort((a, b) => b.count - a.count)
     .slice(0, limit)
     .map((it) => ({ tag: it.tag, label: labelOf(it.tag), zh: it.zh, count: it.count, matchedBy: [] }))
+  // 释义行只补剩余名额：它们是名字与别名都没命中时的兜底，不该挤掉本地结果
+  const seen = new Set(out.map((s) => keyOf(s.tag)))
+  for (const it of glossRows) {
+    if (out.length >= limit) break
+    const key = keyOf(it.tag)
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ tag: it.tag, label: labelOf(it.tag), zh: [], count: it.count, matchedBy: [], gloss: it.gloss, byGloss: true })
+  }
+  return out
 }
