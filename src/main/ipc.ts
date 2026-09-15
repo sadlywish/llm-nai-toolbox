@@ -6,6 +6,9 @@ import {
   IPC,
   type ConfigLoadResult,
   type ConfigSaveInput,
+  type MagicListResult,
+  type MagicSearchResult,
+  type MagicTreeResult,
   type TagdbCompleteInput,
 } from '@shared/ipc'
 import { parseGenStartInput, type ReadImageInput } from '@shared/gen'
@@ -29,6 +32,7 @@ import { COMPLETION_PREFERS, completeFrom } from './tagdb/complete'
 import { TagExtrasLoader } from './tagdb/extras'
 import { TagdbLoader } from './tagdb/loader'
 import { lookupTag } from './tagdb/lookup'
+import { buildTree, glossOf, listCategory, searchMagic, withGloss } from './tagdb/magicbook'
 import { resolveTagdbDir } from './tagdb/paths'
 
 /**
@@ -225,7 +229,13 @@ export function registerIpc(
     }
   })
 
-  const dir = resolveTagdbDir(appInfo)
+  const dir = resolveTagdbDir({
+    ...appInfo,
+    // 只给集成测试模拟缺文件；打包态 resolveTagdbDir 不认它
+    override: process.env['LLM_NAI_TAGDB_DIR'] || undefined,
+  })
+
+  const extras = new TagExtrasLoader(dir)
 
   const loader = new TagdbLoader(dir, (status) => {
     // 广播给当前所有窗口。`isDestroyed` 只是省一次无用调用，真正的兜底在
@@ -233,9 +243,15 @@ export function registerIpc(
     for (const w of BrowserWindow.getAllWindows()) {
       if (!w.isDestroyed()) w.webContents.send(IPC.tagdbStatus, status)
     }
+    // 索引就绪后顺手把魔法书与补全释义要用的两份数据读进来：
+    // 放到第一次打开魔法书或第一次补全时再读，会让那一下卡住解析 JSON 的时间
+    if (status.state === 'ready') {
+      void extras.browse()
+      void extras.gloss()
+    }
   })
 
-  ipcMain.handle(IPC.tagdbComplete, (_e, input: TagdbCompleteInput) => {
+  ipcMain.handle(IPC.tagdbComplete, async (_e, input: TagdbCompleteInput) => {
     // 这是主进程唯一对外暴露的入口——渲染进程 contextIsolation，理论上只有
     // 我们自己写的 preload 会调它，但入口就是入口，不能假定调用方一定守规矩。
     if (typeof input?.query !== 'string' || !COMPLETION_PREFERS.includes(input.prefer)) {
@@ -243,9 +259,20 @@ export function registerIpc(
     }
     const cats = loader.categories
     if (cats === null) return { ok: false as const, status: loader.status }
+    const items = completeFrom(cats, input.query, input.prefer, input.limit)
+    const [gloss, browse] = await Promise.all([extras.gloss(), extras.browse()])
+    // 释义补充是 browse 里的一般标签；角色、作品、画师段补一般标签属于跨类，不补（同 complete.ts 的约定）
+    const glossMax = input.prefer === 'general' && typeof input.glossMax === 'number' ? input.glossMax : 0
     return {
       ok: true as const,
-      items: completeFrom(cats, input.query, input.prefer, input.limit),
+      items: withGloss(
+        items,
+        gloss.ok ? gloss.value : null,
+        browse.ok ? browse.value : null,
+        input.query,
+        glossMax,
+        input.limit,
+      ),
     }
   })
 
@@ -257,7 +284,40 @@ export function registerIpc(
     return typeof tag === 'string' && cats !== null ? lookupTag(cats, tag) : null
   })
 
-  const extras = new TagExtrasLoader(dir)
+  ipcMain.handle(IPC.tagdbGloss, async (_e, tag: unknown) => {
+    if (typeof tag !== 'string') return null
+    const [gloss, browse] = await Promise.all([extras.gloss(), extras.browse()])
+    return glossOf(gloss.ok ? gloss.value : null, browse.ok ? browse.value : null, tag)
+  })
+
+  ipcMain.handle(IPC.magicbookTree, async (): Promise<MagicTreeResult> => {
+    const browse = await extras.browse()
+    if (!browse.ok) return { ok: false, detail: browse.detail }
+    return { ok: true, ...buildTree(browse.value) }
+  })
+
+  ipcMain.handle(IPC.magicbookList, async (_e, cat: unknown): Promise<MagicListResult> => {
+    const [browse, gloss] = await Promise.all([extras.browse(), extras.gloss()])
+    if (!browse.ok) return { ok: false, detail: browse.detail }
+    const items = typeof cat === 'string' ? listCategory(browse.value, gloss.ok ? gloss.value : null, cat) : null
+    return { ok: true, items: items ?? [] }
+  })
+
+  ipcMain.handle(IPC.magicbookSearch, async (_e, query: unknown, cat: unknown): Promise<MagicSearchResult> => {
+    const [browse, gloss] = await Promise.all([extras.browse(), extras.gloss()])
+    if (!browse.ok) return { ok: false, detail: browse.detail }
+    return {
+      ok: true,
+      result: searchMagic(
+        browse.value,
+        gloss.ok ? gloss.value : null,
+        typeof query === 'string' ? query : '',
+        undefined,
+        typeof cat === 'string' ? cat : undefined,
+      ),
+    }
+  })
+
   /** 正在跑的那一轮。同一时刻只允许一轮：两轮并发写同一份工作区，回填结果谁先谁后说不清 */
   let currentRun: AbortController | null = null
 

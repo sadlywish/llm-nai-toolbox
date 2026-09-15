@@ -29,10 +29,12 @@ export function resolveTagdbDir(opts: {
   isPackaged: boolean
   resourcesPath: string
   appRoot: string
+  /** 只给开发态集成测试用（环境变量 LLM_NAI_TAGDB_DIR）：模拟缺文件。打包态不认 */
+  override?: string
 }): string {
-  return opts.isPackaged
-    ? join(opts.resourcesPath, 'tagdb')
-    : join(opts.appRoot, 'resources', 'tagdb')
+  if (opts.isPackaged) return join(opts.resourcesPath, 'tagdb')
+  if (opts.override) return opts.override
+  return join(opts.appRoot, 'resources', 'tagdb')
 }
 
 export function tagdbFilePath(dir: string, file: string): string {
