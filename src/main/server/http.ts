@@ -216,9 +216,9 @@ export function createRequestHandler(
         hub.attach(res)
         return
       }
-      // 只读接口先接上（Task 5）；写接口、LLM 与出图接口是 Task 7–9 的事。
+      // hub 一并交给路由层：LLM（Task 8）与出图（Task 9）开跑后立刻回话，进度与结果都从这里推出去。
       // handleApi 认不出的路径（或方法）统一落到下面这条 404
-      if (await handleApi(req, res, { ...deps, device })) return
+      if (await handleApi(req, res, { ...deps, device, hub })) return
       sendError(res, 404, 'not-found', '这个接口还没有实现')
     } catch (err) {
       // 服务跑在主进程里：任何一条路径上漏出来的异常都会变成未捕获异常，绝不能让它带走整个应用

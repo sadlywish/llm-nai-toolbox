@@ -1,24 +1,32 @@
-// 手机端只读接口：meta / styles / history / usage（计划 Task 5）。
+// 手机端业务接口：meta / styles / history / usage（Task 5）、图片（Task 6）、
+// 画风写接口（Task 7）、LLM 与 SSE（Task 8）。
 //
 // 不 import electron：同 http.ts、devices.ts，服务层要能在 node 下单独跑测试。
-// 这里只读、不碰任何写盘路径——画风与工作区的写接口是 Task 7 起的事。
 import type { IncomingMessage, ServerResponse } from 'http'
 import { basename } from 'path'
 import pkgJson from '../../../package.json'
 import { CHARACTER_FIELDS, MAIN_FIELDS, orderSpecs } from '../../shared/fields'
 import { newId } from '../../shared/ids'
-import { MOBILE_API_VERSION, type MobileMeta, type MobileStylesResult } from '../../shared/mobileApi'
+import { parseLlmRunInput, type LlmEvent, type LlmRunInput } from '../../shared/llm'
+import { MOBILE_API_VERSION, type MobileEvent, type MobileMeta, type MobileStylesResult } from '../../shared/mobileApi'
 import { MODEL_OPTIONS, NOISE_SCHEDULE_OPTIONS, SAMPLER_OPTIONS } from '../../shared/naiOptions'
 import type { NaiSubscriptionResult } from '../../shared/naiUser'
 import { normalizeStyles, type StylePreset } from '../../shared/styles'
 import { normalizeWorkspace } from '../../shared/workspace'
+import { errorMessage } from '../llm/http'
 import { loadRecentRounds } from '../nai/index-store'
 import type { PairedDevice } from './devices'
 import { readJsonBody, sendError, sendJson, type ServerDeps } from './http'
 import { handleImage } from './image'
+import type { SseHub } from './sse'
 
-/** 只读与写接口共用的上下文：ServerDeps 加上已经验过令牌的那台设备 */
-export type ApiContext = ServerDeps & { device: PairedDevice }
+/**
+ * 各路由共用的上下文：ServerDeps 加上已经验过令牌的那台设备，再加事件出口。
+ *
+ * hub 从 http.ts 传进来而不是路由层自己建：一个服务只有一个 hub，所有 SSE 连接都挂在它上面，
+ * 谁发起的这一轮，事件就推给当时连着的所有手机。
+ */
+export type ApiContext = ServerDeps & { device: PairedDevice; hub: SseHub }
 
 function buildMeta(ctx: ApiContext): MobileMeta {
   const config = ctx.services.configStore.read()
@@ -184,8 +192,71 @@ async function fetchUsageCached(ctx: ApiContext): Promise<NaiSubscriptionResult>
   return result
 }
 
+/** 电脑正在跑一轮时给手机的回话。这句会被原样显示，所以得是完整的中文一句话（Global Constraints） */
+const LLM_BUSY_MESSAGE = '电脑正在跑一轮 LLM，等它结束再试'
+
 /**
- * 手机端只读接口的分发。返回 false 表示这条路径（或这个方法）不是这里认识的 API，
+ * `LlmEvent` → `MobileEvent`。两套类型没有合并是有意的：SSE 这条通道只走手机端用得上的字段，
+ * 主进程内部的事件将来加了什么，不该自动漏到局域网上去。
+ */
+function toMobileEvent(e: LlmEvent): MobileEvent {
+  if (e.kind === 'log') return { kind: 'llm-log', line: e.line }
+  if (e.kind === 'round') return { kind: 'llm-round', round: e.round, maxRounds: e.maxRounds }
+  return { kind: 'llm-finished', result: e.result }
+}
+
+/**
+ * 开跑并把这一轮的事件转推给所有 SSE 连接。不返回 Promise：调用方那时已经回过话了，
+ * 这一轮的成败只经 SSE 送达。
+ *
+ * 回填结果也只经 `llm-finished` 给手机，服务端绝不写 workspace.json（Global Constraints）——
+ * 桌面端那份工作区是桌面端的，手机自己应用自己那一份。
+ */
+function startLlmRun(ctx: ApiContext, input: LlmRunInput): void {
+  const startedAt = Date.now()
+  const run = ctx.services.llmSession.run(input, (e) => ctx.hub.push(toMobileEvent(e)))
+  void run.catch((err: unknown) => {
+    // runLlm 自己兜住了所有失败（返回 failed/aborted），能抛到这里的是依赖没接上一类的问题。
+    // 不接住的话：主进程里多一个未处理的 rejection，手机那头还会一直等一条永远不来的收尾事件
+    ctx.hub.push({
+      kind: 'llm-finished',
+      result: { status: 'failed', rounds: 0, elapsedMs: Date.now() - startedAt, message: errorMessage(err) },
+    })
+  })
+}
+
+/**
+ * `POST /api/llm/run`：校验入参 → 开跑 → 立刻回 `{ ok: true }`。
+ *
+ * 不等这一轮跑完：一轮动辄几十秒到几分钟，手机上的 HTTP 请求等不住（浏览器、路由器、
+ * 手机息屏都会把它掐了），进度与结果一律走 SSE。
+ */
+async function handleLlmRun(req: IncomingMessage, res: ServerResponse, ctx: ApiContext): Promise<void> {
+  const input = parseLlmRunInput(await readJsonBody(req))
+  if (typeof input === 'string') {
+    // parseLlmRunInput 给的理由是写给开发者看的（'llm:run 缺少指令文本'），不适合直接显示；
+    // 能发出不合法入参的只有版本对不上的手机端页面，就照这个提示写
+    sendError(res, 400, 'bad-request', '手机发来的指令内容不对，可能是手机上的页面太旧，刷新一下再试')
+    return
+  }
+  // 先问 busy 再开跑：run 在忙时抛的 BusyError 只能从 Promise 里接，而这里必须当场决定回 200 还是 409。
+  // 这两句之间没有 await，中间插不进另一轮
+  if (ctx.services.llmSession.busy) {
+    sendError(res, 409, 'busy', LLM_BUSY_MESSAGE)
+    return
+  }
+  startLlmRun(ctx, input)
+  sendJson(res, 200, { ok: true })
+}
+
+/** `POST /api/llm/abort`：没有在途那一轮时也回 200——手机上重复点「中止」不该看到报错 */
+function handleLlmAbort(res: ServerResponse, ctx: ApiContext): void {
+  ctx.services.llmSession.abort()
+  sendJson(res, 200, { ok: true })
+}
+
+/**
+ * 手机端业务接口的分发。返回 false 表示这条路径（或这个方法）不是这里认识的 API，
  * 调用方（http.ts）据此落到统一的 404。
  */
 export async function handleApi(req: IncomingMessage, res: ServerResponse, ctx: ApiContext): Promise<boolean> {
@@ -234,6 +305,14 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, ctx: 
   }
   if (pathname === '/api/image' && req.method === 'GET') {
     await handleImage(req, res, ctx)
+    return true
+  }
+  if (pathname === '/api/llm/run' && req.method === 'POST') {
+    await handleLlmRun(req, res, ctx)
+    return true
+  }
+  if (pathname === '/api/llm/abort' && req.method === 'POST') {
+    handleLlmAbort(res, ctx)
     return true
   }
 
