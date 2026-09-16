@@ -14,7 +14,13 @@ import { createDeviceStore, type DeviceStore } from '../../../src/main/server/de
 import { createMobileServer, type MobileServer, type ServerDeps } from '../../../src/main/server/http'
 import { JsonStore } from '../../../src/main/store'
 import { defaultAppConfig } from '../../../src/shared/config'
-import type { MobileEvent, MobileMeta } from '../../../src/shared/mobileApi'
+import type {
+  LlmRunStarted,
+  MobileEvent,
+  MobileLastLlmResult,
+  MobileLastLlmRun,
+  MobileMeta,
+} from '../../../src/shared/mobileApi'
 import type { NaiSubscriptionResult } from '../../../src/shared/naiUser'
 import { normalizeWorkspace } from '../../../src/shared/workspace'
 
@@ -131,6 +137,11 @@ function auth(token: string): Record<string, string> {
   return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
 }
 
+async function get<T>(path: string, token: string): Promise<T> {
+  const r = await fetch(`${base}${path}`, { headers: auth(token) })
+  return (await r.json()) as T
+}
+
 async function post(path: string, token: string, body?: unknown): Promise<{ status: number; body: unknown }> {
   const r = await fetch(`${base}${path}`, {
     method: 'POST',
@@ -224,12 +235,12 @@ describe('POST /api/llm/run', () => {
     expect(makeCalls).toBe(0)
   })
 
-  it('开跑就回 { ok: true }，不等这一轮跑完', async () => {
+  it('开跑就回 runId，不等这一轮跑完', async () => {
     runnerApiKey = 'sk-test'
     const token = await pairToken()
     const { status, body } = await post('/api/llm/run', token, VALID_INPUT)
     expect(status).toBe(200)
-    expect(body).toEqual({ ok: true })
+    expect((body as LlmRunStarted).runId).toBeTruthy()
     // 这一轮还停在 prepareData 上，响应却已经回来了
     expect(llmSession.busy).toBe(true)
   })
@@ -345,6 +356,73 @@ describe('POST /api/llm/abort', () => {
     const token = await pairToken()
     const { status } = await post('/api/llm/abort', token)
     expect(status).toBe(200)
+  })
+})
+
+describe('GET /api/llm/last', () => {
+  /** 轮询到 last 换成指定那一轮为止。断线的场景里没有 SSE 可等，只能这么盯 */
+  async function waitForLast(token: string, runId: string): Promise<MobileLastLlmRun> {
+    for (let i = 0; i < 200; i += 1) {
+      const { last } = await get<MobileLastLlmResult>('/api/llm/last', token)
+      if (last !== null && last.runId === runId) return last
+      await new Promise((r) => setTimeout(r, 10))
+    }
+    throw new Error(`没等到 ${runId} 那一轮的结果`)
+  }
+
+  it('还没跑过任何一轮时是 null', async () => {
+    const token = await pairToken()
+    expect(await get<MobileLastLlmResult>('/api/llm/last', token)).toEqual({ last: null })
+  })
+
+  it('跑完一轮后拿得到，runId 与开跑时的回话一致', async () => {
+    const token = await pairToken()
+    const stream = await openEvents(token)
+    const { body } = await post('/api/llm/run', token, VALID_INPUT)
+    const { runId } = body as LlmRunStarted
+    const finished = (await stream.waitFor('llm-finished')) as Extract<MobileEvent, { kind: 'llm-finished' }>
+    stream.close()
+
+    // SSE 那条事件上也带着同一个 runId，手机才能把两条路对上号
+    expect(finished.runId).toBe(runId)
+    const { last } = await get<MobileLastLlmResult>('/api/llm/last', token)
+    expect(last).toEqual({ runId, finishedAt: expect.any(String), result: finished.result })
+    expect(Number.isNaN(Date.parse(last!.finishedAt))).toBe(false)
+  })
+
+  it('断线期间跑完的那一轮也补得回来（没有任何 SSE 连着）', async () => {
+    const token = await pairToken()
+    const { body } = await post('/api/llm/run', token, VALID_INPUT)
+    const { runId } = body as LlmRunStarted
+    const last = await waitForLast(token, runId)
+    expect(last.result).toMatchObject({ status: 'failed', message: '还没有填写 API Key' })
+  })
+
+  it('再跑一轮后换成新那条', async () => {
+    const token = await pairToken()
+    const first = (await post('/api/llm/run', token, VALID_INPUT)).body as LlmRunStarted
+    await waitForLast(token, first.runId)
+
+    const second = (await post('/api/llm/run', token, { ...VALID_INPUT, instruction: '再来一张' })).body as LlmRunStarted
+    expect(second.runId).not.toBe(first.runId)
+    const last = await waitForLast(token, second.runId)
+    expect(last.runId).toBe(second.runId)
+  })
+
+  it('两台服务各记各的，不互相串', async () => {
+    const token = await pairToken()
+    const { body } = await post('/api/llm/run', token, VALID_INPUT)
+    await waitForLast(token, (body as LlmRunStarted).runId)
+
+    // 同一批依赖、另起一台服务：它自己还没跑过，就不该看见上面那一轮
+    const other = createMobileServer(makeDeps())
+    const otherPort = (await other.start(0)).port
+    try {
+      const r = await fetch(`http://127.0.0.1:${otherPort}/api/llm/last`, { headers: auth(token) })
+      expect(await r.json()).toEqual({ last: null })
+    } finally {
+      await other.stop()
+    }
   })
 })
 

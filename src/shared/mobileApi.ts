@@ -66,6 +66,27 @@ export interface MobileStylesResult {
   presetId: string
 }
 
+/** `POST /api/llm/run` 的回话：开跑就回，这一轮的进度与结果走 SSE，靠 runId 对号 */
+export interface LlmRunStarted {
+  runId: string
+}
+
+/**
+ * 最近一次跑完的那一轮。手机锁屏、切后台、走出路由器范围都会把 SSE 断掉，断线期间跑完的话
+ * `llm-finished` 就永远收不到了——`GET /api/llm/last` 把它兜回来，手机对上 runId 就能补应用回填。
+ */
+export interface MobileLastLlmRun {
+  runId: string
+  /** ISO 时间串 */
+  finishedAt: string
+  result: LlmRunResult
+}
+
+/** `GET /api/llm/last`：服务端起来之后还没跑过任何一轮时 last 为 null */
+export interface MobileLastLlmResult {
+  last: MobileLastLlmRun | null
+}
+
 /**
  * SSE 推给手机端的事件。与主进程内部的 `AppEvent`/`LlmEvent`（Task 2）不是同一套类型——
  * 这里只挑手机端用得上的字段，密钥与桌面专属信息不经过这条通道。
@@ -73,7 +94,8 @@ export interface MobileStylesResult {
 export type MobileEvent =
   | { kind: 'llm-log'; line: LlmLogLine }
   | { kind: 'llm-round'; round: number; maxRounds: number }
-  | { kind: 'llm-finished'; result: LlmRunResult }
+  /** runId 与 `POST /api/llm/run` 的回话对得上：手机据此分辨这是不是自己发的那一轮，也用来判断有没有应用过 */
+  | { kind: 'llm-finished'; runId: string; result: LlmRunResult }
   | { kind: 'gen-progress'; progress: RunProgress }
   | { kind: 'gen-image'; image: GenImageEvent }
   | { kind: 'busy'; busy: { llm: boolean; gen: boolean } }

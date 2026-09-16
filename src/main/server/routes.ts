@@ -7,8 +7,16 @@ import { basename } from 'path'
 import pkgJson from '../../../package.json'
 import { CHARACTER_FIELDS, MAIN_FIELDS, orderSpecs } from '../../shared/fields'
 import { newId } from '../../shared/ids'
-import { parseLlmRunInput, type LlmEvent, type LlmRunInput } from '../../shared/llm'
-import { MOBILE_API_VERSION, type MobileEvent, type MobileMeta, type MobileStylesResult } from '../../shared/mobileApi'
+import { parseLlmRunInput, type LlmEvent, type LlmRunInput, type LlmRunResult } from '../../shared/llm'
+import {
+  MOBILE_API_VERSION,
+  type LlmRunStarted,
+  type MobileEvent,
+  type MobileLastLlmResult,
+  type MobileLastLlmRun,
+  type MobileMeta,
+  type MobileStylesResult,
+} from '../../shared/mobileApi'
 import { MODEL_OPTIONS, NOISE_SCHEDULE_OPTIONS, SAMPLER_OPTIONS } from '../../shared/naiOptions'
 import type { NaiSubscriptionResult } from '../../shared/naiUser'
 import { normalizeStyles, type StylePreset } from '../../shared/styles'
@@ -196,33 +204,51 @@ async function fetchUsageCached(ctx: ApiContext): Promise<NaiSubscriptionResult>
 const LLM_BUSY_MESSAGE = '电脑正在跑一轮 LLM，等它结束再试'
 
 /**
- * `LlmEvent` → `MobileEvent`。两套类型没有合并是有意的：SSE 这条通道只走手机端用得上的字段，
- * 主进程内部的事件将来加了什么，不该自动漏到局域网上去。
+ * 最近一次跑完的那一轮，每台服务只留一条，新的覆盖旧的。
+ *
+ * 挂在 hub 上（一个服务实例只有一个 hub，换端口重启也还是同一个）而不是做成模块级单例：
+ * 测试里会同时起好几台服务，单例会让它们互相看见对方的结果。进程重启就没了，可以接受——
+ * 那时手机端页面也早就重新加载过了。
  */
-function toMobileEvent(e: LlmEvent): MobileEvent {
+const lastLlmRuns = new WeakMap<SseHub, MobileLastLlmRun>()
+
+/**
+ * 日志与轮次的 `LlmEvent` → `MobileEvent`。两套类型没有合并是有意的：SSE 这条通道只走手机端
+ * 用得上的字段，主进程内部的事件将来加了什么，不该自动漏到局域网上去。
+ *
+ * 收尾事件不走这里：它要额外带上 runId，而且推出去之前得先记进 `lastLlmRuns`。
+ */
+function toMobileEvent(e: Exclude<LlmEvent, { kind: 'finished' }>): MobileEvent {
   if (e.kind === 'log') return { kind: 'llm-log', line: e.line }
-  if (e.kind === 'round') return { kind: 'llm-round', round: e.round, maxRounds: e.maxRounds }
-  return { kind: 'llm-finished', result: e.result }
+  return { kind: 'llm-round', round: e.round, maxRounds: e.maxRounds }
 }
 
 /**
- * 开跑并把这一轮的事件转推给所有 SSE 连接。不返回 Promise：调用方那时已经回过话了，
- * 这一轮的成败只经 SSE 送达。
+ * 开跑并把这一轮的事件转推给所有 SSE 连接，返回这一轮的 runId。不返回 Promise：调用方那时
+ * 已经回过话了，这一轮的成败只经 SSE（与 `GET /api/llm/last`）送达。
  *
  * 回填结果也只经 `llm-finished` 给手机，服务端绝不写 workspace.json（Global Constraints）——
  * 桌面端那份工作区是桌面端的，手机自己应用自己那一份。
  */
-function startLlmRun(ctx: ApiContext, input: LlmRunInput): void {
+function startLlmRun(ctx: ApiContext, input: LlmRunInput): string {
+  const runId = newId('run')
   const startedAt = Date.now()
-  const run = ctx.services.llmSession.run(input, (e) => ctx.hub.push(toMobileEvent(e)))
+  // 收尾只走这一个口子：先记下来再推。手机锁屏、切后台都会把 SSE 断掉，断线期间跑完的话这条
+  // 事件就永远收不到了；记下来手机重连后查一次 /api/llm/last 就能把回填补上，不必重发一轮
+  const finish = (result: LlmRunResult): void => {
+    lastLlmRuns.set(ctx.hub, { runId, finishedAt: new Date().toISOString(), result })
+    ctx.hub.push({ kind: 'llm-finished', runId, result })
+  }
+  const run = ctx.services.llmSession.run(input, (e) => {
+    if (e.kind === 'finished') finish(e.result)
+    else ctx.hub.push(toMobileEvent(e))
+  })
   void run.catch((err: unknown) => {
     // runLlm 自己兜住了所有失败（返回 failed/aborted），能抛到这里的是依赖没接上一类的问题。
     // 不接住的话：主进程里多一个未处理的 rejection，手机那头还会一直等一条永远不来的收尾事件
-    ctx.hub.push({
-      kind: 'llm-finished',
-      result: { status: 'failed', rounds: 0, elapsedMs: Date.now() - startedAt, message: errorMessage(err) },
-    })
+    finish({ status: 'failed', rounds: 0, elapsedMs: Date.now() - startedAt, message: errorMessage(err) })
   })
+  return runId
 }
 
 /**
@@ -245,8 +271,8 @@ async function handleLlmRun(req: IncomingMessage, res: ServerResponse, ctx: ApiC
     sendError(res, 409, 'busy', LLM_BUSY_MESSAGE)
     return
   }
-  startLlmRun(ctx, input)
-  sendJson(res, 200, { ok: true })
+  const started: LlmRunStarted = { runId: startLlmRun(ctx, input) }
+  sendJson(res, 200, started)
 }
 
 /** `POST /api/llm/abort`：没有在途那一轮时也回 200——手机上重复点「中止」不该看到报错 */
@@ -313,6 +339,11 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, ctx: 
   }
   if (pathname === '/api/llm/abort' && req.method === 'POST') {
     handleLlmAbort(res, ctx)
+    return true
+  }
+  if (pathname === '/api/llm/last' && req.method === 'GET') {
+    const last: MobileLastLlmResult = { last: lastLlmRuns.get(ctx.hub) ?? null }
+    sendJson(res, 200, last)
     return true
   }
 
