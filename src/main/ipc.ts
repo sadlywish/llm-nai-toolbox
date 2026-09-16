@@ -94,8 +94,19 @@ export interface MainServices {
   events: AppEvents
 }
 
+/**
+ * index.ts 往里填的回调。做成「可后填的对象」而不是 registerIpc 的必填参数，是因为
+ * 手机端服务要拿 registerIpc 的返回值才能构造——先有 IPC 才有服务，回调只能晚一步挂上来。
+ * 这样 ipc.ts 不必 import server/http.ts，依赖方向仍是 index.ts → ipc.ts、index.ts → server。
+ */
+export interface IpcHooks {
+  /** 保存设置后开关或端口变了；实现方负责按新配置重启服务 */
+  onMobileServerSettingsChanged?: (settings: { enabled: boolean; port: number }) => void
+}
+
 export function registerIpc(
   appInfo: { isPackaged: boolean; resourcesPath: string; appRoot: string; userDataDir: string },
+  hooks: IpcHooks = {},
 ): MainServices {
   if (registered) {
     throw new Error('registerIpc 只能在整个应用生命周期里调用一次，见函数注释')
@@ -147,12 +158,24 @@ export function registerIpc(
     const config = mergeConfig(input.config)
     const errors = Object.values(validateConfig(config))
     if (errors.length > 0) throw new Error(`配置不合法：${errors.join('；')}`)
+    // 写盘前先读一份旧的：手机端服务只在开关或端口真的变了时才重启，
+    // 每次保存设置都重启会把正在看进度的手机踢下线
+    const before = configStore.read()
     configStore.write(config)
     // 去掉首尾空白：复制粘贴的 Key 常带一个换行，带着它请求会被判 401
     if (typeof input.llmApiKey === 'string') secrets.write('llmApiKey', input.llmApiKey.trim())
     if (typeof input.naiToken === 'string') secrets.write('naiToken', input.naiToken.trim())
     if (typeof input.danbooruApiKey === 'string') secrets.write('danbooruApiKey', input.danbooruApiKey.trim())
     danbooru = buildDanbooru()
+    if (
+      before.mobileServerEnabled !== config.mobileServerEnabled ||
+      before.mobileServerPort !== config.mobileServerPort
+    ) {
+      hooks.onMobileServerSettingsChanged?.({
+        enabled: config.mobileServerEnabled,
+        port: config.mobileServerPort,
+      })
+    }
     // 代理是 session 级设置，改了立刻重新应用，否则就是「填了要重启才生效」
     void applyProxy(config.proxy)
       .then((r) => {
