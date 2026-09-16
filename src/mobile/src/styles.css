@@ -127,3 +127,142 @@ body {
 }
 
 .tabs button.on { color: var(--ink); box-shadow: inset 0 2px 0 var(--accent); }
+
+/* ── 工作台：一行一块（界面稿第二节「方案 A」的 .blk） ── */
+
+.blk {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  width: 100%;
+  /* 手指的最小落点。界面稿里 .blk 只有 padding，照抄出来单行块才 32px，按不准 */
+  min-height: 40px;
+  padding: 8px;
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+}
+
+.blk i {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 3px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  /* 徽章底色由 BlockRow 按 FieldSpec.hue 给，这里只定形状 */
+}
+
+/* 没有对应 FieldSpec 的行（画面文字、负面词、坐标）：中性灰，不冒充提示词字段 */
+.blk i.plain { background: var(--line); color: var(--ink-dim); }
+
+.blk span {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  /* 提示词里多的是超长的连写标签，不 break-all 会把整行撑出屏幕 */
+  word-break: break-all;
+}
+
+.blk span.empty { color: var(--ink-faint); font-family: inherit; }
+
+.tokens { margin: 0; color: var(--ink-faint); font-size: 12px; }
+.tokens.over { color: var(--danger); }
+
+/* 分区标题行（角色） */
+.sect { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.sect-name { font-weight: 600; }
+.sect .grow { flex: 1; }
+
+.btn.sm { min-height: 34px; padding: 6px 10px; font-size: 12.5px; }
+
+/* 角色页签：横着滚，角色多了也不占竖向的位置 */
+.chips { display: flex; gap: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+
+.chip {
+  flex: none;
+  min-height: 40px;
+  padding: 8px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.chip.on { border-color: var(--accent); color: var(--ink); }
+
+/* ── 底部编辑弹层（界面稿第二节的 .m-sheet） ── */
+
+.sheet-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: rgba(0, 0, 0, 0.55);
+  /* 遮罩上滑动不该带着底下的列表一起滚 */
+  overscroll-behavior: contain;
+}
+
+.sheet {
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  border-radius: 12px 12px 0 0;
+  padding: 10px 12px;
+  /* 全面屏底部手势条要让开；软键盘顶起时由 .sheet-mask 的 padding-bottom 再补一段 */
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /*
+   * 不写死高度：红字有几行、说明有多长都不一样，撑不下时弹层自己滚。
+   * 用 100% 而不是 80dvh —— 百分比是照遮罩的内容盒算的，软键盘顶起时遮罩的
+   * padding-bottom 已经把键盘那段扣掉了，dvh 则扣不掉，弹层会从顶上溢出去。
+   */
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sheet-head { display: flex; align-items: center; gap: 8px; }
+.sheet-head b { color: var(--ink); font-family: var(--mono); font-size: 13px; }
+.sheet-head .grow { flex: 1; }
+
+.sheet textarea {
+  background: var(--input);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--ink);
+  padding: 8px;
+  font-family: var(--mono);
+  /* 16px 是 iOS 的红线：比这小的输入框一获得焦点，Safari 就会把整页放大 */
+  font-size: 16px;
+  line-height: 1.5;
+  /* 短内容也给够 4 行的手感，长内容到 32vh 就自己滚，键盘弹起来时不会把「完成」挤出屏幕 */
+  min-height: 96px;
+  max-height: 32vh;
+  resize: none;
+}
+
+.sheet textarea:focus { outline: none; }
+
+/* enum 字段（角色的 count）：一排选项按钮，没有输入框可打 */
+.sheet-opts { display: flex; gap: 8px; flex-wrap: wrap; }
+.sheet-opts .btn { flex: 1; min-width: 72px; }
+.sheet-opts .btn.on { border-color: var(--accent); color: var(--accent); }
+
+/* 问题清单：跟着输入实时刷新，写完再说哪儿不对人已经切走了 */
+.sheet-warn {
+  margin: 0;
+  color: var(--danger);
+  font-size: 12.5px;
+  line-height: 1.5;
+}

@@ -1,9 +1,11 @@
 // 手机端的外壳（计划 Task 11）：没连上就是连接页，连上了就是顶栏 + 四个标签。
-// 四个标签里现在只有一句占位，内容由 Task 12–17 往里填。
+// 工作台（Task 12）已经填上，其余三个标签的内容由 Task 13–17 往里填。
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { MobileMeta } from '@shared/mobileApi'
+import type { Workspace } from '@shared/workspace'
 import { ApiFailure, createApiClient, normalizeBaseUrl, type ApiClient } from './api'
-import { flushState, loadState, saveConnection, type Connection } from './state'
+import Workbench from './pages/Workbench'
+import { flushState, loadState, saveConnection, saveWorkspace, type Connection } from './state'
 
 /** 令牌失效时给用户的那句话。桌面端「吊销」与换设备表都会走到这里 */
 const REVOKED_MESSAGE = '这台手机已被吊销或令牌失效，请重新配对'
@@ -128,17 +130,19 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'styles', label: '画风' },
 ]
 
-/** 四个标签的占位。每一块由后续任务替换成真内容，这里只写清楚谁负责填 */
-function TabBody({ tab, meta, fieldsWithContent }: { tab: TabKey; meta: MobileMeta | null; fieldsWithContent: number }): JSX.Element {
-  if (tab === 'workbench') {
-    return (
-      <p className="hint">
-        提示词分块、角色与指令区在这里。
-        {meta !== null && `整图字段 ${meta.mainFields.length} 项，`}
-        本地已存 {fieldsWithContent} 个非空字段。
-      </p>
-    )
-  }
+/** 四个标签的内容。还没做的那几个留一句占位，写清楚谁负责填 */
+function TabBody({
+  tab,
+  meta,
+  workspace,
+  onWorkspaceChange,
+}: {
+  tab: TabKey
+  meta: MobileMeta | null
+  workspace: Workspace
+  onWorkspaceChange: (update: (w: Workspace) => Workspace) => void
+}): JSX.Element {
+  if (tab === 'workbench') return <Workbench workspace={workspace} meta={meta} onChange={onWorkspaceChange} />
   if (tab === 'gen') return <p className="hint">参数、进度与结果网格在这里。</p>
   if (tab === 'history') return <p className="hint">轮次列表与那一轮的图在这里。</p>
   return <p className="hint">画风列表与增删改在这里。</p>
@@ -149,8 +153,14 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
   const [meta, setMeta] = useState<MobileMeta | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [online, setOnline] = useState(false)
-  // 手机自己那一份工作区（规格 §4）。这里先只读出来，改与存由 Task 12 起接手
-  const [workspace] = useState(() => loadState().workspace)
+  // 手机自己那一份工作区（规格 §4）。只存在手机本地，不走任何写桌面端工作区的接口
+  const [workspace, setWorkspace] = useState(() => loadState().workspace)
+
+  // 存盘统一放在这里而不是每个改动点各存一次：saveWorkspace 自带 300ms 防抖，
+  // 打字时连着改也只写一次；漏一个改动点的表现是「这一格改完刷新就没了」
+  useEffect(() => saveWorkspace(workspace), [workspace])
+
+  const updateWorkspace = useCallback((update: (w: Workspace) => Workspace) => setWorkspace(update), [])
 
   const client: ApiClient = useMemo(
     () => createApiClient(connection.baseUrl, connection.token, onRevoked),
@@ -179,8 +189,6 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
   // SSE 只在这里开一条，事件分发给各标签由后续任务接手；现在只用它点亮状态点
   useEffect(() => client.events(() => undefined, setOnline), [client])
 
-  const fieldsWithContent = Object.values(workspace.main).filter((v) => v.trim() !== '').length
-
   return (
     <div className="app">
       <header className="head">
@@ -192,7 +200,7 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
       </header>
       <main className="body">
         {error !== null && <p className="alert">{error}</p>}
-        <TabBody tab={tab} meta={meta} fieldsWithContent={fieldsWithContent} />
+        <TabBody tab={tab} meta={meta} workspace={workspace} onWorkspaceChange={updateWorkspace} />
       </main>
       <nav className="tabs">
         {TABS.map((t) => (
