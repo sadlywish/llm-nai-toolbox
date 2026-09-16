@@ -11,6 +11,7 @@ import type { StylePreset } from '@shared/styles'
 import type { ConsoleOptions, StyleMode, Workspace } from '@shared/workspace'
 import { MULTI_LABELS, STYLE_MODE_LABELS } from '@renderer/llmLabels'
 import { optionsSummary } from '../optionsSummary'
+import NumberField from './NumberField'
 import { useKeyboardInset } from '../useKeyboardInset'
 
 const STYLE_MODES: readonly StyleMode[] = ['none', 'preset', 'current']
@@ -128,17 +129,11 @@ export default function Console({
         </button>
         <label className="run-count">
           跑图
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
+          <NumberField
+            bare
             value={workspace.runCount}
-            onChange={(e) => {
-              const v = e.target.valueAsNumber
-              // 输入过程中的空值会先经过 NaN，不接住会把 NaN 写进工作区
-              if (Number.isNaN(v) || v < 1) return
-              onChange((w) => ({ ...w, runCount: Math.floor(v) }))
-            }}
+            range={{ min: 1, integer: true }}
+            onCommit={(v) => onChange((w) => ({ ...w, runCount: v }))}
           />
         </label>
         <span className="grow" />

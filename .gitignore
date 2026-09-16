@@ -18,3 +18,11 @@ resources/tagdb/*
 # 内部设计规格与实现计划：过程文档，不提交。
 # README 要链接的内容另出公开版本，见 docs/design.md
 docs/superpowers/
+
+# Capacitor 的安卓工程：源码与我们改过的配置要进仓库，构建产物不进
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/build/
+android/local.properties
+android/.idea/

@@ -1,0 +1,12 @@
+{
+  "appId": "com.lyf.llmnaitoolbox.mobile",
+  "appName": "NAI 工具箱",
+  "webDir": "src/mobile-shell",
+  "android": {
+    "allowMixedContent": true
+  },
+  "server": {
+    "cleartext": true,
+    "androidScheme": "http"
+  }
+}

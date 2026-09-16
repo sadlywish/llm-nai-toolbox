@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>llm-nai-toolbox</title>
+<style>
+  /*
+   * APK 壳里的连接页。整个 APK 只有这一页是内置的：填好地址就跳到电脑托管的手机端页面，
+   * 之后所有请求都与那个页面同源——不必给服务端开跨域的口子，电脑端更新了界面手机也不用重装。
+   * 按返回键会回到这一页（WebView 的历史），换台电脑或换端口时用得上。
+   */
+  :root {
+    --ground: #1e1e1e; --panel: #252526; --input: #1a1a1a; --line: #3c3c3c;
+    --ink: #d4d4d4; --ink-dim: #9d9d9d; --ink-faint: #707070; --accent: #4a9eff; --danger: #ff6b63;
+    --mono: "Cascadia Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--ground); color: var(--ink);
+    font: 15px/1.7 "Microsoft YaHei", system-ui, sans-serif;
+    display: flex; flex-direction: column; justify-content: center; gap: 14px;
+    padding: 24px max(16px, env(safe-area-inset-left)) calc(24px + env(safe-area-inset-bottom));
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.hint { color: var(--ink-dim); font-size: 13px; margin: 0; }
+  label { display: flex; flex-direction: column; gap: 6px; color: var(--ink-dim); font-size: 13px; }
+  input {
+    background: var(--input); border: 1px solid var(--line); border-radius: 8px; color: var(--ink);
+    padding: 12px; font: inherit; font-family: var(--mono); font-size: 15px; min-height: 48px;
+  }
+  button {
+    min-height: 48px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent);
+    color: #0b1b2b; font: inherit; font-weight: 600; font-size: 16px;
+  }
+  button.ghost { background: none; color: var(--ink-dim); border-color: var(--line); font-weight: 400; font-size: 14px; min-height: 40px; }
+  .err { color: var(--danger); font-size: 13px; min-height: 20px; margin: 0; }
+  .recent { display: flex; flex-direction: column; gap: 6px; }
+</style>
+</head>
+<body>
+  <div>
+    <h1>连接电脑</h1>
+    <p class="hint">电脑上打开「设置 → 手机端」，把那里显示的地址和配对码填进来。手机要和电脑连同一个 WiFi。</p>
+  </div>
+
+  <label>地址
+    <input id="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="192.168.1.8:7321">
+  </label>
+  <label>配对码（第一次连接才要）
+    <input id="code" inputmode="numeric" maxlength="8" placeholder="4821">
+  </label>
+  <p class="err" id="err"></p>
+  <button id="go">连接</button>
+  <div class="recent" id="recent"></div>
+
+<script>
+  var KEY = 'shell:last-url'
+  var urlBox = document.getElementById('url')
+  var codeBox = document.getElementById('code')
+  var errBox = document.getElementById('err')
+  var recentBox = document.getElementById('recent')
+
+  var last = null
+  try { last = localStorage.getItem(KEY) } catch (e) { last = null }
+  if (last) urlBox.value = last
+
+  // 只写了 ip:port 的写法最常见，补成完整地址；末尾斜杠去掉，免得拼出 //?code=
+  function normalize(raw) {
+    var v = String(raw || '').trim()
+    if (!v) return null
+    if (!/^https?:\/\//i.test(v)) v = 'http://' + v
+    v = v.replace(/\/+$/, '')
+    try {
+      var u = new URL(v)
+      if (!u.hostname) return null
+      return u.origin
+    } catch (e) { return null }
+  }
+
+  function connect() {
+    var origin = normalize(urlBox.value)
+    if (origin === null) {
+      errBox.textContent = '地址填得不对，照电脑上显示的那串填，例如 192.168.1.8:7321'
+      return
+    }
+    try { localStorage.setItem(KEY, origin) } catch (e) {}
+    var code = codeBox.value.trim()
+    // 配对码经查询串带过去，电脑端那边的页面会自动填好并配对
+    location.href = code ? origin + '/?code=' + encodeURIComponent(code) : origin + '/'
+  }
+
+  document.getElementById('go').addEventListener('click', connect)
+  codeBox.addEventListener('keydown', function (e) { if (e.key === 'Enter') connect() })
+  urlBox.addEventListener('keydown', function (e) { if (e.key === 'Enter') connect() })
+
+  if (last) {
+    var b = document.createElement('button')
+    b.className = 'ghost'
+    b.textContent = '上次连的：' + last
+    b.addEventListener('click', function () { urlBox.value = last; connect() })
+    recentBox.appendChild(b)
+  }
+</script>
+</body>
+</html>

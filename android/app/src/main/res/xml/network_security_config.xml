@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  这个壳只连局域网里的电脑，地址是 http://192.168.x.x:7321 这种明文 HTTP。
+  Android 9 起默认禁止明文流量，不放行的话连接页一点「连接」就是一片空白。
+
+  自签 HTTPS 在局域网里更麻烦（证书信任要手动装），而服务端本来就只监听私有网段、
+  只认已配对设备的令牌、随时能在电脑上吊销，所以这里放行明文。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

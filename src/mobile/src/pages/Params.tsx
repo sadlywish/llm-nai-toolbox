@@ -7,6 +7,7 @@ import { MODEL_OPTIONS, NOISE_SCHEDULE_OPTIONS, SAMPLER_OPTIONS } from '@shared/
 import type { MobileMeta } from '@shared/mobileApi'
 import type { GenParams, Workspace } from '@shared/workspace'
 import { clampParams } from '../clampParams'
+import NumberField from '../components/NumberField'
 
 const CUSTOM_MODEL = '__custom__'
 
@@ -21,44 +22,6 @@ interface Props {
 
 function patchParams(w: Workspace, patch: Partial<GenParams>): Workspace {
   return { ...w, params: { ...w.params, ...patch } }
-}
-
-interface NumberFieldProps {
-  label: string
-  value: number
-  step?: number
-  min?: number
-  max?: number
-  disabled?: boolean
-  hint?: string
-  onCommit: (v: number) => void
-  onBlur?: () => void
-}
-
-/** 数字输入：手机上要用数字键盘（inputMode="numeric"），触区照 .field 的 44px 落点 */
-function NumberField({ label, value, step, min, max, disabled = false, hint, onCommit, onBlur }: NumberFieldProps): JSX.Element {
-  return (
-    <label className={`field ${disabled ? 'is-disabled' : ''}`}>
-      <span>{label}</span>
-      <input
-        type="number"
-        inputMode="numeric"
-        value={value}
-        step={step}
-        min={min}
-        max={max}
-        disabled={disabled}
-        onChange={(e) => {
-          const v = e.target.valueAsNumber
-          // 输入过程中出现的空值/半截负号会先经过 NaN，不接住的话会把 NaN 写进工作区
-          if (Number.isNaN(v)) return
-          onCommit(v)
-        }}
-        onBlur={onBlur}
-      />
-      {hint !== undefined && <span className="field-hint">{hint}</span>}
-    </label>
-  )
 }
 
 export default function Params({ workspace, meta, onChange }: Props): JSX.Element {
@@ -110,8 +73,8 @@ export default function Params({ workspace, meta, onChange }: Props): JSX.Elemen
       )}
 
       <div className="two">
-        <NumberField label="宽度" value={params.width} step={64} onCommit={(v) => setParams({ width: v })} onBlur={clampSize} />
-        <NumberField label="高度" value={params.height} step={64} onCommit={(v) => setParams({ height: v })} onBlur={clampSize} />
+        <NumberField label="宽度" value={params.width} step={64} range={{ min: 64, integer: true }} onCommit={(v) => setParams({ width: v })} onSettled={clampSize} />
+        <NumberField label="高度" value={params.height} step={64} range={{ min: 64, integer: true }} onCommit={(v) => setParams({ height: v })} onSettled={clampSize} />
       </div>
       <p className="hint">失焦后自动对齐到 64 的倍数；总像素超过上限（{maxPixels.toLocaleString('en-US')}）会按比例缩小。</p>
 
@@ -140,8 +103,8 @@ export default function Params({ workspace, meta, onChange }: Props): JSX.Elemen
       </div>
 
       <div className="two">
-        <NumberField label="步数" value={params.steps} min={1} onCommit={(v) => setParams({ steps: v })} />
-        <NumberField label="CFG（Scale）" value={params.scale} step={0.5} onCommit={(v) => setParams({ scale: v })} />
+        <NumberField label="步数" value={params.steps} range={{ min: 1, integer: true }} onCommit={(v) => setParams({ steps: v })} />
+        <NumberField label="CFG（Scale）" value={params.scale} step={0.5} range={{ min: 0 }} onCommit={(v) => setParams({ scale: v })} />
       </div>
 
       <div className="two">
@@ -172,11 +135,10 @@ export default function Params({ workspace, meta, onChange }: Props): JSX.Elemen
           label="CFG Rescale"
           value={params.cfgRescale}
           step={0.01}
-          min={0}
-          max={1}
+          range={{ min: 0, max: 1 }}
           onCommit={(v) => setParams({ cfgRescale: v })}
         />
-        <NumberField label="跑图次数" value={workspace.runCount} min={1} onCommit={(v) => onChange((w) => ({ ...w, runCount: v }))} />
+        <NumberField label="跑图次数" value={workspace.runCount} range={{ min: 1, integer: true }} onCommit={(v) => onChange((w) => ({ ...w, runCount: v }))} />
       </div>
 
       <label className="field-check">
