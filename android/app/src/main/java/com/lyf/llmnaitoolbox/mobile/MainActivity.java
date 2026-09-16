@@ -122,6 +122,10 @@ public class MainActivity extends Activity {
             }
         );
 
+        // 页面能调用的那点原生能力（目前只有分享图片）。注入名见 ShellBridge.NAME；
+        // 浏览器里没有这个对象，页面据此自行降级到 Web Share API
+        web.addJavascriptInterface(new ShellBridge(this), ShellBridge.NAME);
+
         // 允许用电脑的 Chrome 远程调试这个 WebView（chrome://inspect）。
         // 这次排查「点了没反应」时手上没有任何日志，太被动
         WebView.setWebContentsDebuggingEnabled(true);
