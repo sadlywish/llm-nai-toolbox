@@ -103,7 +103,7 @@ async function get(path: string, token: string): Promise<{ status: number; body:
 
 describe('GET /api/meta', () => {
   it('给出字段集与上限，且不含任何密钥或完整路径', async () => {
-    configStore.write(mergeConfig({ saveDir: 'C:\\Users\\test\\Pictures\\NAI' }))
+    configStore.write(mergeConfig({ saveDir: 'C:\\Users\\test\\Pictures\\NAI', apiType: 'openai', model: 'gpt-x' }))
     const token = await pairToken()
     const { status, body } = await get('/api/meta', token)
     expect(status).toBe(200)
@@ -116,6 +116,7 @@ describe('GET /api/meta', () => {
       maxPixels: number
       saveDirName: string
       busy: { llm: boolean; gen: boolean }
+      llm: { apiType: string; model: string }
     }
     expect(meta.apiVersion).toBe(1)
     expect(meta.mainFields.map((f) => f.name)).toEqual([
@@ -135,6 +136,8 @@ describe('GET /api/meta', () => {
     expect(meta.maxPixels).toBe(1024 * 1024)
     expect(meta.saveDirName).toBe('NAI')
     expect(meta.busy).toEqual({ llm: false, gen: false })
+    // 手机端把它记进出图溯源的「LLM 请求」：给类型与模型名，不给地址与 Key
+    expect(meta.llm).toEqual({ apiType: 'openai', model: 'gpt-x' })
 
     const raw = JSON.stringify(meta)
     expect(raw).not.toContain('pst-')

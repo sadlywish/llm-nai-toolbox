@@ -55,6 +55,8 @@ function buildMeta(ctx: ApiContext): MobileMeta {
     maxPixels: config.naiMaxPixels,
     usagePercentPerImage: config.naiUsagePercentPerImage,
     // 只给目录名用于展示：完整路径可能带用户名之类的信息，绝不该出现在响应里（Global Constraints）
+    // 只给类型与模型名：手机端把它记进出图溯源的「LLM 请求」。地址与 Key 一概不给
+    llm: { apiType: config.apiType, model: config.model },
     saveDirName: basename(config.saveDir),
     // gen 直接读 GenRunner 自己的在途保护，不经事件反推——反推在「桌面端已经在跑、
     // 手机刚连上还没收到下一条事件」时会显示成闲，而且平白多一份有状态的订阅

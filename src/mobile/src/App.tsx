@@ -206,7 +206,7 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
     setNotice(summary)
   }, [])
 
-  const llm = useLlmRun({ client, update: updateWorkspace, onFilled: handleFilled })
+  const llm = useLlmRun({ client, update: updateWorkspace, onFilled: handleFilled, api: meta?.llm ?? null })
 
   // 订阅整个连接期间只挂一条，所以回调里走 ref 读最新的那份 hook；
   // 把 llm.handleEvent 直接写进依赖会让 SSE 在每次状态变化时重连一次

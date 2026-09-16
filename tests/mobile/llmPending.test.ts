@@ -194,8 +194,11 @@ describe('planRun', () => {
     return w
   }
 
+  // 电脑上的 LLM 类型与模型名，来自 GET /api/meta 的 llm
+  const API = { apiType: 'claude' as const, model: 'claude-opus-4-8' }
+
   it('五个开关一个不少地进了这一轮：四个进入参，回填后自动生成进请求记录', () => {
-    const { input, request } = planRun(ws(), presets)
+    const { input, request } = planRun(ws(), presets, API)
     expect(input.instruction).toBe('海边的少女')
     expect(input.multiCharacter).toBe('coords')
     expect(input.editExisting).toBe(true)
@@ -203,12 +206,14 @@ describe('planRun', () => {
     expect(input.style).toEqual({ mode: 'preset', tags: 'artist:wlop' })
     expect(request.autoGenerate).toBe(true)
     expect(request.presetName).toBe('厚涂光影')
+    // 记进溯源的模型名是电脑那边真实在用的，不是编的
+    expect([request.apiType, request.model]).toEqual(['claude', 'claude-opus-4-8'])
   })
 
   it('发出去的是手机这一份工作区', () => {
     const w = ws()
     w.main.artist = 'artist:ciloranko'
-    expect(planRun(w, presets).input.workspace.main.artist).toBe('artist:ciloranko')
+    expect(planRun(w, presets, API).input.workspace.main.artist).toBe('artist:ciloranko')
   })
 })
 

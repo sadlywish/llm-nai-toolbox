@@ -26,15 +26,16 @@ export interface PendingRun {
 }
 
 /**
- * 手机拿不到电脑上的 LLM 设置：`GET /api/meta` 不给这两项（规格上手机不碰设置），
- * 而溯源里的「LLM 请求」需要一个类型合法的值，否则整条来源在 normalizeWorkspaceLlm 那里会被丢掉。
- * 模型名宁可留空也不编一个——编错的模型名比不写更误导人。
+ * 按下发送那一刻取的全部东西。两者必须同一时刻取：跑的途中改指令区不该影响这一轮的记录。
+ * api 取自 `GET /api/meta` 的 `llm`（只有类型与模型名），记进溯源的「LLM 请求」里——
+ * 编一个假的会在出图历史里显示成错的模型。
  */
-const MOBILE_API: { apiType: ApiType; model: string } = { apiType: 'claude', model: '' }
-
-/** 按下发送那一刻取的全部东西。两者必须同一时刻取：跑的途中改指令区不该影响这一轮的记录 */
-export function planRun(ws: Workspace, presets: readonly StylePreset[]): { input: LlmRunInput; request: PendingLlmRequest } {
-  return { input: buildRunInput(ws, presets), request: pendingRequestOf(ws, presets, MOBILE_API) }
+export function planRun(
+  ws: Workspace,
+  presets: readonly StylePreset[],
+  api: { apiType: ApiType; model: string },
+): { input: LlmRunInput; request: PendingLlmRequest } {
+  return { input: buildRunInput(ws, presets), request: pendingRequestOf(ws, presets, api) }
 }
 
 /**

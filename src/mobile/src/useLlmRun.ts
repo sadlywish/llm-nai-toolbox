@@ -5,6 +5,7 @@
 // 也不需要跨页面共享——外壳只有一个，一个 hook 挂在外壳上就够。
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { fillSummary } from '@shared/applyFill'
+import type { ApiType } from '@shared/config'
 import type { LlmLogLine } from '@shared/llm'
 import type { MobileEvent } from '@shared/mobileApi'
 import type { StylePreset } from '@shared/styles'
@@ -49,9 +50,11 @@ interface Options {
   update: (fn: (w: Workspace) => Workspace) => void
   /** 回填成功、工作区已经写好之后：收起日志、回工作台、显示「已回填: …」 */
   onFilled: (summary: string) => void
+  /** 电脑上的 LLM 类型与模型名（GET /api/meta 的 llm），记进溯源用；meta 还没到手时为 null */
+  api: { apiType: ApiType; model: string } | null
 }
 
-export function useLlmRun({ client, update, onFilled }: Options): LlmRunHandle {
+export function useLlmRun({ client, update, onFilled, api }: Options): LlmRunHandle {
   const [phase, setPhase] = useState<LlmPhase>({ kind: 'idle' })
   const [lines, setLines] = useState<LogLine[]>([])
 
@@ -103,7 +106,8 @@ export function useLlmRun({ client, update, onFilled }: Options): LlmRunHandle {
     (ws: Workspace, presets: readonly StylePreset[]): void => {
       if (phaseRef.current.kind === 'running') return
       // 入参与请求记录同一时刻取：跑的途中改指令区不影响这一轮
-      const plan = planRun(ws, presets)
+      // meta 还没到手时退回一个类型合法的占位：溯源里的 apiType 不合法整条来源会被丢掉
+      const plan = planRun(ws, presets, api ?? { apiType: 'claude', model: '' })
       setPhase({ kind: 'running', round: 0, maxRounds: 0 })
       // 每发一轮清一次日志：手机屏幕就这么大，上一轮的行混在里面分不清是哪一轮的
       setLines([])

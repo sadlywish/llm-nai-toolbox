@@ -1,3 +1,4 @@
+import type { ApiType } from './config'
 import type { FieldSpec } from './fields'
 import type { GenImageEvent, RunProgress } from './gen'
 import type { LlmLogLine, LlmRunResult } from './llm'
@@ -58,6 +59,11 @@ export interface MobileMeta {
   maxPixels: number
   /** 每张消耗的额度百分比（配置 naiUsagePercentPerImage），供手机端把 V5 用量换算成「约还能出几张」；0 = 不估算 */
   usagePercentPerImage: number
+  /**
+   * 电脑上用的 LLM 接口类型与模型名。**只有这两项，没有地址也没有 Key**：
+   * 手机端要把它记进出图溯源的「LLM 请求」里，编一个假的会在历史里显示成错的模型
+   */
+  llm: { apiType: ApiType; model: string }
   /** 只给目录名用于展示，不给完整路径 */
   saveDirName: string
   busy: { llm: boolean; gen: boolean }
