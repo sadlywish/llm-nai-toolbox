@@ -54,7 +54,9 @@ void app.whenReady().then(() => {
   // 必须在 createWindow 之前、且整个应用只调一次。放进 createWindow 会让
   // macOS 的「窗口全关后再激活」走到第二次注册，`ipcMain.handle` 会抛
   // 「Attempted to register a second handler」（实测），窗口建不出来。
-  registerIpc({
+  // 返回的这几样服务先接住：手机端 HTTP 服务（计划 Task 4）要和 IPC 用同一份
+  // GenRunner / LlmSession / 事件总线，各造一份会让在途保护与事件订阅各说各话
+  const services = registerIpc({
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
     // 开发态 app.getAppPath() 就是项目根；打包后是 asar 路径，
@@ -63,6 +65,7 @@ void app.whenReady().then(() => {
     // %APPDATA%\llm-nai-toolbox（名字取自 package.json 的 name），规格 §2.1
     userDataDir: app.getPath('userData'),
   })
+  void services
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
