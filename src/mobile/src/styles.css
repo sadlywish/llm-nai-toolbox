@@ -533,11 +533,39 @@ img.gen-slot { padding: 0; object-fit: cover; }
   gap: 10px;
 }
 
-/* 宽度撑满、高度自己按比例来；上限留给参数行与两个按钮，免得竖图把它们顶到屏幕外 */
-.viewer-img { width: 100%; max-height: 62vh; object-fit: contain; border-radius: 6px; background: var(--panel); }
+/*
+ * 放大用的取景框：图放大后超出的部分裁在这里，不许溢出去顶到参数行与按钮。
+ * touch-action: none 是关键——不写的话双指会先被浏览器当成整页缩放，页面自己一个事件都收不到。
+ */
+.viewer-stage {
+  flex: none;
+  min-width: 0;
+  overflow: hidden;
+  touch-action: none;
+  border-radius: 6px;
+  background: var(--panel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-.viewer-actions { display: flex; gap: 8px; min-width: 0; }
-.viewer-actions .btn { flex: 1; min-width: 0; }
+/* 宽度撑满、高度自己按比例来；上限留给参数行与按钮，免得竖图把它们顶到屏幕外 */
+.viewer-img {
+  width: 100%;
+  max-height: 62vh;
+  object-fit: contain;
+  display: block;
+  /* pinchZoom.ts 的算术是按「中心为原点」推的，这行改了那边全错 */
+  transform-origin: center center;
+  will-change: transform;
+  /* 长按仍要能唤出浏览器自己的「保存图片」（那是第三档分享的退路） */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 三个按钮：390px 宽放得下就平分，放不下整个换行，不许把屏幕撑出横向滚动 */
+.viewer-actions { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.viewer-actions .btn { flex: 1 1 auto; min-width: 0; white-space: nowrap; }
 
 /* 复制不了时摊开让人自己长按选 */
 .viewer-fallback {
