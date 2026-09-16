@@ -160,7 +160,9 @@ export function createApiClient(baseUrl: string, token: string, onUnauthorized?:
     genResume: () => post<void>('/api/gen/resume'),
 
     imageUrl(round, file, size) {
-      const q = new URLSearchParams({ round, file, size })
+      // token 必须进查询串：这个地址是塞进 <img src> 用的，带不了 Authorization 头
+      // （服务端 http.ts 的 TOKEN_QUERY_PATHS 对 /api/image 与 /api/events 这两条放行）
+      const q = new URLSearchParams({ round, file, size, token })
       // URLSearchParams 把空格编成 '+'，而服务端拿 searchParams 解回来是一样的；
       // 这里仍统一成 %20，免得 URL 贴进日志或反馈时看起来像两个参数
       return `${base}/api/image?${q.toString().replace(/\+/g, '%20')}`

@@ -152,9 +152,15 @@ describe('失败', () => {
 })
 
 describe('imageUrl', () => {
-  it('把轮次与文件名转义进查询串', () => {
+  it('把轮次与文件名转义进查询串，并带上令牌', () => {
     const url = createApiClient('http://pc:7321', 'tok').imageUrl('2026-09-16T12:31:02.000Z', 'a b.png', 'thumb')
-    expect(url).toBe('http://pc:7321/api/image?round=2026-09-16T12%3A31%3A02.000Z&file=a%20b.png&size=thumb')
+    // 令牌必须在里面：这个地址进的是 <img src>，带不了 Authorization 头，漏了就是一片 401（实机踩过）
+    expect(url).toBe('http://pc:7321/api/image?round=2026-09-16T12%3A31%3A02.000Z&file=a%20b.png&size=thumb&token=tok')
+  })
+
+  it('令牌里的特殊字符要转义', () => {
+    const url = createApiClient('http://pc:7321', 'tok/1+2').imageUrl('2026-09-16T12:31:02.000Z', 'a.png', 'full')
+    expect(url).toContain('token=tok%2F1%2B2')
   })
 })
 
