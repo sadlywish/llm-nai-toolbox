@@ -106,6 +106,47 @@ describe('请求', () => {
   })
 })
 
+describe('画风写接口', () => {
+  it('新建：POST /api/styles 带 name/tags', async () => {
+    replyOnce(json(200, { id: 'st-1', name: '厚涂光影', tags: 'artist:wlop' }))
+    const r = await createApiClient('http://pc:7321', 'tok').createStyle('厚涂光影', 'artist:wlop')
+    expect(r).toEqual({ id: 'st-1', name: '厚涂光影', tags: 'artist:wlop' })
+    expect(calls[0].url).toBe('http://pc:7321/api/styles')
+    expect(calls[0].init.method).toBe('POST')
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ name: '厚涂光影', tags: 'artist:wlop' })
+  })
+
+  it('改名/改标签：PATCH /api/styles/:id 只带传入的字段', async () => {
+    replyOnce(json(200, { id: 'st-1', name: '新名字', tags: 'artist:wlop' }))
+    await createApiClient('http://pc:7321', 'tok').patchStyle('st-1', { name: '新名字' })
+    expect(calls[0].url).toBe('http://pc:7321/api/styles/st-1')
+    expect(calls[0].init.method).toBe('PATCH')
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ name: '新名字' })
+  })
+
+  it('删除：DELETE /api/styles/:id，id 转义进路径', async () => {
+    replyOnce(json(200, { ok: true }))
+    await createApiClient('http://pc:7321', 'tok').deleteStyle('st/1')
+    expect(calls[0].url).toBe('http://pc:7321/api/styles/st%2F1')
+    expect(calls[0].init.method).toBe('DELETE')
+  })
+
+  it('排序：POST /api/styles/order，返回排好序的列表', async () => {
+    replyOnce(json(200, { styles: [{ id: 'b', name: 'B', tags: '' }, { id: 'a', name: 'A', tags: '' }] }))
+    const r = await createApiClient('http://pc:7321', 'tok').reorderStyles(['b', 'a'])
+    expect(calls[0].url).toBe('http://pc:7321/api/styles/order')
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ ids: ['b', 'a'] })
+    expect(r.map((s) => s.id)).toEqual(['b', 'a'])
+  })
+
+  it('选为预设：POST /api/styles/:id/preset', async () => {
+    replyOnce(json(200, { presetId: 'st-1' }))
+    await createApiClient('http://pc:7321', 'tok').setPresetStyle('st-1')
+    expect(calls[0].url).toBe('http://pc:7321/api/styles/st-1/preset')
+    expect(calls[0].init.method).toBe('POST')
+  })
+})
+
 describe('失败', () => {
   it('服务端返回 { error } 时抛 ApiFailure，中文说明原样带出来', async () => {
     replyOnce(json(409, { error: { kind: 'busy', message: '电脑正在出图，等这一轮结束再试' } }))

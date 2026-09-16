@@ -2,6 +2,7 @@
 // 工作台（Task 12）、参数（Task 13）、指令区与 LLM 日志（Task 14）、出图（Task 15）已经填上，
 // 历史 / 画风两个标签由 Task 16–17 往里填。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { sanitizeFieldText } from '@shared/blockDoc'
 import type { MobileMeta } from '@shared/mobileApi'
 import type { StylePreset } from '@shared/styles'
 import type { Workspace } from '@shared/workspace'
@@ -13,6 +14,7 @@ import Gen from './pages/Gen'
 import History from './pages/History'
 import LlmLog from './pages/LlmLog'
 import Params from './pages/Params'
+import Styles from './pages/Styles'
 import Workbench from './pages/Workbench'
 import { flushState, loadState, saveConnection, saveWorkspace, type Connection } from './state'
 import { useGenRun, type GenRunHandle } from './useGenRun'
@@ -135,7 +137,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'styles', label: '画风' },
 ]
 
-/** 四个标签的内容。还没做的那几个留一句占位，写清楚谁负责填 */
+/** 四个标签的内容 */
 function TabBody({
   tab,
   meta,
@@ -143,6 +145,7 @@ function TabBody({
   gen,
   workspace,
   onWorkspaceChange,
+  onOverrideArtist,
 }: {
   tab: TabKey
   meta: MobileMeta | null
@@ -150,12 +153,14 @@ function TabBody({
   gen: GenRunHandle
   workspace: Workspace
   onWorkspaceChange: (update: (w: Workspace) => Workspace) => void
+  /** 画风页「覆盖到 artist 块」：写进手机工作区的 artist 字段，调用方（Shell）负责切回工作台 */
+  onOverrideArtist: (tags: string) => void
 }): JSX.Element {
   if (tab === 'workbench') return <Workbench workspace={workspace} meta={meta} onChange={onWorkspaceChange} />
   if (tab === 'gen')
     return <Gen gen={gen} meta={meta} client={client} workspace={workspace} onWorkspaceChange={onWorkspaceChange} />
   if (tab === 'history') return <History client={client} meta={meta} onWorkspaceChange={onWorkspaceChange} />
-  return <p className="hint">画风列表与增删改在这里。</p>
+  return <Styles client={client} onOverrideArtist={onOverrideArtist} />
 }
 
 function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: () => void }): JSX.Element {
@@ -186,6 +191,19 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
   useEffect(() => saveWorkspace(workspace), [workspace])
 
   const updateWorkspace = useCallback((update: (w: Workspace) => Workspace) => setWorkspace(update), [])
+
+  /**
+   * 画风页「覆盖到 artist 块」（规格 §6 画风一节）：把选中那条画风的标签写进手机这份工作区的
+   * artist 字段，再切回工作台——人点这个操作就是为了立刻看到它落进提示词里，留在画风页看不出效果。
+   * sanitizeFieldText 同 normalizeWorkspace 里的写法：分块字段必须是单行，换行与分隔符要剥掉。
+   */
+  const overrideArtist = useCallback(
+    (tags: string) => {
+      updateWorkspace((w) => ({ ...w, main: { ...w.main, artist: sanitizeFieldText(tags) } }))
+      setTab('workbench')
+    },
+    [updateWorkspace],
+  )
 
   const client: ApiClient = useMemo(
     () => createApiClient(connection.baseUrl, connection.token, onRevoked),
@@ -357,6 +375,7 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
             gen={gen}
             workspace={workspace}
             onWorkspaceChange={updateWorkspace}
+            onOverrideArtist={overrideArtist}
           />
         )}
       </main>

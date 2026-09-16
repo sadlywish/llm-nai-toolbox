@@ -583,6 +583,39 @@ img.gen-slot { padding: 0; object-fit: cover; }
 .history-title { font-weight: 600; font-size: 13px; }
 .history-sub { color: var(--ink-dim); font-size: 12px; }
 
+/* ── 画风页（计划 Task 17，界面稿第四节中间那张） ── */
+
+.style-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+
+.style-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+/* 固定宽度：只有当前预设那一条画出圆点，其余留白对齐，名字列不因为有没有点而错位 */
+.style-dot { flex: none; width: 12px; text-align: center; color: var(--ok); font-size: 9px; }
+
+.style-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.style-name { font-weight: 600; font-size: 13px; }
+
+.style-tags {
+  color: var(--ink-faint);
+  font-size: 11.5px;
+  font-family: var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.style-tags.is-empty { font-family: inherit; }
+
 /* 回填成功后那句绿字，点一下消掉 */
 .notice {
   margin: 0;

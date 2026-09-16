@@ -16,6 +16,7 @@ import type {
   PairResult,
 } from '@shared/mobileApi'
 import type { NaiSubscriptionResult } from '@shared/naiUser'
+import type { StylePreset } from '@shared/styles'
 
 /**
  * 连不上电脑时自己造的那句话。服务端给的 message 都是能直接显示的中文（Global Constraints），
@@ -47,6 +48,17 @@ export interface ApiClient {
   pair(code: string, deviceName: string): Promise<PairResult>
   meta(): Promise<MobileMeta>
   styles(): Promise<MobileStylesResult>
+  /**
+   * 画风增删改排序（计划 Task 17）：与桌面端共用同一份 styles.json，写操作成功后
+   * 由调用方（Styles 页）自己重新拉一次 `styles()` 刷新列表，这里不维护本地缓存。
+   */
+  createStyle(name: string, tags: string): Promise<StylePreset>
+  patchStyle(id: string, patch: { name?: string; tags?: string }): Promise<StylePreset>
+  deleteStyle(id: string): Promise<void>
+  /** 按给定顺序整体重排；服务端会校验 ids 与现有集合一一对应 */
+  reorderStyles(ids: string[]): Promise<StylePreset[]>
+  /** 选为预设：这是唯一一条会同时改桌面端工作区的手机接口（Global Constraints） */
+  setPresetStyle(id: string): Promise<void>
   history(days?: number): Promise<RoundRecord[]>
   usage(): Promise<NaiSubscriptionResult>
   /** 开跑就回，日志与结果走 SSE；runId 用来认领 `llm-finished` 与 `GET /api/llm/last` */
@@ -150,6 +162,16 @@ export function createApiClient(baseUrl: string, token: string, onUnauthorized?:
     },
     meta: () => request<MobileMeta>('/api/meta'),
     styles: () => request<MobileStylesResult>('/api/styles'),
+
+    createStyle: (name, tags) => post<StylePreset>('/api/styles', { name, tags }),
+    patchStyle: (id, patch) =>
+      request<StylePreset>(`/api/styles/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    // 204/void 接口一样过 request()：204 与空体在这些接口上不会出现（见上面 request 里的注释），
+    // 服务端一律回 JSON（{ ok: true } / { presetId }），这里只是不把那个值透出去
+    deleteStyle: (id) => request<{ ok: true }>(`/api/styles/${encodeURIComponent(id)}`, { method: 'DELETE' }).then(() => undefined),
+    reorderStyles: (ids) => post<{ styles: StylePreset[] }>('/api/styles/order', { ids }).then((r) => r.styles),
+    setPresetStyle: (id) => post<{ presetId: string }>(`/api/styles/${encodeURIComponent(id)}/preset`).then(() => undefined),
+
     history: (days) => request<RoundRecord[]>(`/api/history${days === undefined ? '' : `?days=${days}`}`),
     usage: () => request<NaiSubscriptionResult>('/api/usage'),
     llmRun: (input) => post<LlmRunStarted>('/api/llm/run', input),
