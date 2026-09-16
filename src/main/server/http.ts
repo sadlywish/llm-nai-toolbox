@@ -11,6 +11,7 @@ import { apiError, isPrivateAddress, type ApiErrorKind, type PairResult } from '
 import type { NaiSubscriptionResult } from '../../shared/naiUser'
 import type { MainServices } from '../ipc'
 import type { DeviceStore } from './devices'
+import { handleApi } from './routes'
 import { createSseHub, type SseHub } from './sse'
 
 export interface ServerDeps {
@@ -53,14 +54,16 @@ const CONTENT_TYPES: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8',
 }
 
-function sendJson(res: ServerResponse, status: number, body: unknown): void {
+// 导出给 routes.ts：业务路由的响应形状（no-store、不发 CORS 放行头）必须与配对、
+// 404 这些骨架自带的响应一致，两边各写一遍迟早会走样。
+export function sendJson(res: ServerResponse, status: number, body: unknown): void {
   // 接口响应一律 no-store：额度、历史、在途状态都是会变的，手机上缓存住只会看到旧数据。
   // 这里也是全服务唯一写响应头的地方之一——始终不发 CORS 放行头（Global Constraints）
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
   res.end(JSON.stringify(body))
 }
 
-function sendError(res: ServerResponse, status: number, kind: ApiErrorKind, message: string): void {
+export function sendError(res: ServerResponse, status: number, kind: ApiErrorKind, message: string): void {
   sendJson(res, status, apiError(kind, message))
 }
 
@@ -213,7 +216,9 @@ export function createRequestHandler(
         hub.attach(res)
         return
       }
-      // Task 5–9 会在这里接上 handleApi；在那之前 /api/* 一律 404
+      // 只读接口先接上（Task 5）；写接口、LLM 与出图接口是 Task 7–9 的事。
+      // handleApi 认不出的路径（或方法）统一落到下面这条 404
+      if (await handleApi(req, res, { ...deps, device })) return
       sendError(res, 404, 'not-found', '这个接口还没有实现')
     } catch (err) {
       // 服务跑在主进程里：任何一条路径上漏出来的异常都会变成未捕获异常，绝不能让它带走整个应用

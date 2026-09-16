@@ -174,9 +174,11 @@ describe('鉴权', () => {
     expect(r.status).toBe(401)
   })
 
-  it('配对后带令牌能过鉴权：Task 4 里所有 /api 路径都还是 404 not-found', async () => {
+  it('配对后带令牌能过鉴权：认不出的 /api 路径落到 handleApi 的统一 404', async () => {
+    // 用一个不会被任何任务实现的路径，不依赖 Task 5 起陆续接上的具体接口——
+    // 这条测的是「过了鉴权之后落到路由层的 404」这件事本身
     const token = await pairToken()
-    const r = await fetch(`${base}/api/meta`, { headers: auth(token) })
+    const r = await fetch(`${base}/api/not-a-real-route`, { headers: auth(token) })
     expect(r.status).toBe(404)
     expect(((await r.json()) as { error: { kind: string } }).error.kind).toBe('not-found')
   })
