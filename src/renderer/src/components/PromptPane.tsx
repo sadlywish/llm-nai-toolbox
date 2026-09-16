@@ -1,10 +1,12 @@
 import type { FieldSpec } from '@shared/fields'
+import { buildPositivePrompt, hasPromptContent } from '@shared/prompt'
 import type { Workspace } from '@shared/workspace'
 import { tokenBudget } from '@renderer/prompt/tokenBudget'
 import PromptEditor from '../editor/PromptEditor'
 import TagTextEditor from '../editor/TagTextEditor'
 import AutoTextarea from './AutoTextarea'
 import CharacterPanel from './CharacterPanel'
+import CopyButton from './CopyButton'
 import GenerateBar from './GenerateBar'
 import ParamsPanel from './ParamsPanel'
 
@@ -38,6 +40,20 @@ export default function PromptPane({
     <section className="pane">
       <div className="pane-bar">
         <span className="pane-title">提示词</span>
+        <span className="copy-btns">
+          <CopyButton
+            label="复制正面"
+            title="复制正面提示词：各字段按提示词排序拼接，并按画面文字规则处理，与发给 NovelAI 的一致"
+            disabled={!hasPromptContent(workspace.main, mainSpecs)}
+            getText={() => buildPositivePrompt(workspace.main, workspace.text, mainSpecs)}
+          />
+          <CopyButton
+            label="复制负面"
+            title="复制负面词"
+            disabled={workspace.negative.trim() === ''}
+            getText={() => workspace.negative.trim()}
+          />
+        </span>
         <span className="pane-budget">
           合计 <b>{total}</b> / {limit} token
         </span>

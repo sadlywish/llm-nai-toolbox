@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyTextRendering } from '../../../src/main/nai/text'
+import { applyTextRendering } from '../../src/shared/textRendering'
 
 describe('applyTextRendering', () => {
   it('没有画面文字：补 no text', () => {

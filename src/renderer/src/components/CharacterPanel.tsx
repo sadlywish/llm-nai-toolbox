@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import type { FieldSpec } from '@shared/fields'
+import { buildPrompt, hasPromptContent } from '@shared/prompt'
 import { createCharacter, type CharacterPrompt, type Workspace } from '@shared/workspace'
 import PromptEditor from '../editor/PromptEditor'
 import TagTextEditor from '../editor/TagTextEditor'
+import CopyButton from './CopyButton'
 
 interface Props {
   characters: CharacterPrompt[]
@@ -134,6 +136,21 @@ export default function CharacterPanel({
                 }}
               />
             </label>
+            {/* 复制的是当前打开的这个角色，不看是否勾选参与 */}
+            <span className="copy-btns">
+              <CopyButton
+                label="复制角色正面"
+                title="复制这个角色的正面提示词：各字段按角色提示词排序拼接，与发给 NovelAI 的一致"
+                disabled={!hasPromptContent(active.fields, charSpecs)}
+                getText={() => buildPrompt(active.fields, charSpecs)}
+              />
+              <CopyButton
+                label="复制角色负面"
+                title="复制这个角色的负面词"
+                disabled={active.negative.trim() === ''}
+                getText={() => active.negative.trim()}
+              />
+            </span>
           </div>
 
           {/* key 必须同时带 id 与 -prompt/-negative 后缀：带 id 是为了切角色时换掉

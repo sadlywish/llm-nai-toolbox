@@ -52,6 +52,11 @@ body {
 }
 .pane-budget { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .pane-budget b { color: var(--ink); font-weight: 500; }
+/* 复制按钮组（界面稿 2026-09-16-copy-prompt-mockup.html 位置 B）：提示词标题栏里紧跟标题，角色坐标行里靠右 */
+.copy-btns { display: inline-flex; gap: 6px; }
+.pane-bar .copy-btns { margin-left: 12px; margin-right: auto; }
+.character-toolbar .copy-btns { margin-left: auto; }
+.btn.copy-btn.is-copied { border-color: #2f7d44; color: #9be9b4; }
 .pane-warn { margin: 0; padding: 9px 12px; color: var(--danger); font-size: 13px; border-top: 1px solid var(--line); }
 
 .prompt-editor .cm-editor { background: transparent; }
@@ -257,7 +262,8 @@ body {
 .tab-close:hover, .tab-add:hover:not(:disabled) { color: var(--ink); }
 .tab-add:disabled { cursor: not-allowed; opacity: .4; }
 .character-empty { color: var(--ink-faint); padding: 12px; font-size: 13px; }
-/* 坐标输入单独一行，label 在左的横排 */
+/* 坐标输入单独一行，label 在左的横排；右边是复制按钮 */
+.character-toolbar { display: flex; align-items: center; }
 .character-toolbar .field { flex-direction: row; align-items: center; gap: 6px; }
 .character-toolbar .field input { width: 12em; }
 /* 角色负面通常很短，左右并排、宽度 3:2（工具箱用户反馈改出来的布局）。

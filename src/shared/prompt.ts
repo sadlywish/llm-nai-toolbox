@@ -1,5 +1,6 @@
 import type { FieldValues } from './blockDoc'
 import type { FieldSpec } from './fields'
+import { applyTextRendering } from './textRendering'
 
 /**
  * 提示词拼接。与 koishi-plugin-reforge 的 `buildPrompt`（src/utils.ts）逐条一致：
@@ -19,6 +20,19 @@ export function buildPrompt(values: FieldValues, specs: readonly FieldSpec[]): s
     .filter(joinsPrompt)
     .map((value) => value.trim())
   return parts.length === 0 ? '' : `${parts.join(' , ')} ,`
+}
+
+/**
+ * 真正发给 NovelAI 的整图正面提示词：按字段顺序拼接，再按画面文字规则接 `text: …` 或补 `no text`。
+ * 出图（main/gen/snapshot 的 assemble）与参数区「复制正面」共用，两边不会各拼各的。
+ */
+export function buildPositivePrompt(values: FieldValues, text: string, specs: readonly FieldSpec[]): string {
+  return applyTextRendering(buildPrompt(values, specs), text).prompt
+}
+
+/** 有没有任何一个字段会进拼接结果。都空时「复制正面」置灰 */
+export function hasPromptContent(values: FieldValues, specs: readonly FieldSpec[]): boolean {
+  return specs.some((spec) => joinsPrompt(values[spec.name] ?? ''))
 }
 
 /**
