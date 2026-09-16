@@ -56,7 +56,6 @@ export interface MobileMeta {
   noiseSchedules: readonly string[]
   maxCharacters: number
   maxPixels: number
-  tokenLimit: number
   /** 只给目录名用于展示，不给完整路径 */
   saveDirName: string
   busy: { llm: boolean; gen: boolean }

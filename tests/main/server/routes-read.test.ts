@@ -35,6 +35,8 @@ let stylesStore: JsonStore<unknown>
 let workspaceStore: JsonStore<unknown>
 let events: AppEvents
 let llmSession: LlmSession
+/** GenRunner 只用到它的 busy 访问器（一行只读转发），造一个假的没必要拖 electron 进来 */
+let genRunnerBusy: boolean
 let fetchUsageCalls: number
 let fetchUsageResult: NaiSubscriptionResult
 let server: MobileServer
@@ -46,7 +48,7 @@ function makeDeps(): ServerDeps {
     secrets: {} as unknown as SecretStore,
     stylesStore,
     workspaceStore,
-    genRunner: {} as unknown as GenRunner,
+    genRunner: { get busy() { return genRunnerBusy } } as unknown as GenRunner,
     llmSession,
     events,
   }
@@ -73,6 +75,7 @@ beforeEach(async () => {
   llmSession = new LlmSession(() => {
     throw new Error('routes-read 测试不会真的跑一轮 LLM')
   })
+  genRunnerBusy = false
   fetchUsageCalls = 0
   fetchUsageResult = { ok: false, error: { kind: 'no-token', message: '未配置 Token' } }
 
@@ -111,7 +114,6 @@ describe('GET /api/meta', () => {
       charFields: unknown[]
       maxCharacters: number
       maxPixels: number
-      tokenLimit: number
       saveDirName: string
       busy: { llm: boolean; gen: boolean }
     }
@@ -131,8 +133,6 @@ describe('GET /api/meta', () => {
     expect(meta.charFields).toHaveLength(5)
     expect(meta.maxCharacters).toBe(22)
     expect(meta.maxPixels).toBe(1024 * 1024)
-    // 默认模型是 nai-diffusion-5-full，V5 的上限是 1471
-    expect(meta.tokenLimit).toBe(1471)
     expect(meta.saveDirName).toBe('NAI')
     expect(meta.busy).toEqual({ llm: false, gen: false })
 
@@ -141,6 +141,13 @@ describe('GET /api/meta', () => {
     // 不含盘符路径：既不能有 "C:\" 这种前缀，也不能有目录里的用户名片段
     expect(raw).not.toMatch(/[A-Za-z]:[\\/]/)
     expect(raw).not.toContain('Users')
+  })
+
+  it('busy.gen 直接读 GenRunner 的在途状态，不是经事件反推的旧值', async () => {
+    genRunnerBusy = true
+    const token = await pairToken()
+    const { body } = await get('/api/meta', token)
+    expect((body as { busy: { gen: boolean } }).busy.gen).toBe(true)
   })
 })
 

@@ -11,46 +11,15 @@ import { MODEL_OPTIONS, NOISE_SCHEDULE_OPTIONS, SAMPLER_OPTIONS } from '../../sh
 import type { NaiSubscriptionResult } from '../../shared/naiUser'
 import { normalizeStyles } from '../../shared/styles'
 import { normalizeWorkspace } from '../../shared/workspace'
-import type { AppEvents } from '../appEvents'
 import { loadRecentRounds } from '../nai/index-store'
-// t5.ts 在 renderer 目录下，但只用到与 DOM/React 无关的纯函数；shared/blockMetrics 已经这样
-// 跨目录 import（见 electron.vite.config.ts 里 @renderer 别名的注释），这里是同一条路子。
-import { tokenLimitFor } from '../../renderer/src/prompt/t5'
 import type { PairedDevice } from './devices'
 import { sendJson, type ServerDeps } from './http'
 
 /** 只读与写接口共用的上下文：ServerDeps 加上已经验过令牌的那台设备 */
 export type ApiContext = ServerDeps & { device: PairedDevice }
 
-/**
- * 出图是否在途。GenRunner 的在途保护是它自己的私有字段，没有对外暴露的 busy
- * 访问器（见 gen/runner.ts 的 `running`），只能从它经 AppEvents 广播出来的进度
- * 反推：running/paused 算在跑，done/cancelled/aborted 算收尾。
- *
- * 按 AppEvents 实例缓存：不管一个服务实例上来多少次 /api/meta 请求，事件订阅
- * 只挂一次，不会越挂越多。
- */
-const genBusyState = new WeakMap<AppEvents, { busy: boolean }>()
-
-function subscribeGenBusy(events: AppEvents): { busy: boolean } {
-  const state = { busy: false }
-  events.on((e) => {
-    if (e.kind === 'gen-progress') state.busy = e.progress.status === 'running' || e.progress.status === 'paused'
-  })
-  genBusyState.set(events, state)
-  return state
-}
-
-function isGenBusy(events: AppEvents): boolean {
-  return (genBusyState.get(events) ?? subscribeGenBusy(events)).busy
-}
-
 function buildMeta(ctx: ApiContext): MobileMeta {
   const config = ctx.services.configStore.read()
-  // AppConfig.model 是 LLM 聊天模型（claude-sonnet-5 这类），不是出图模型——出图模型是
-  // 工作区参数（GenParams.model），跟随「当前用的是哪个 NAI 模型」走。token 上限要按后者算，
-  // 按 LLM 模型算的话 V5 出图配 legacy 上限（或反过来）会把警戒线定错
-  const naiModel = normalizeWorkspace(ctx.services.workspaceStore.read()).params.model
   return {
     apiVersion: MOBILE_API_VERSION,
     appVersion: pkgJson.version,
@@ -63,10 +32,11 @@ function buildMeta(ctx: ApiContext): MobileMeta {
     noiseSchedules: NOISE_SCHEDULE_OPTIONS,
     maxCharacters: config.naiMaxCharacters,
     maxPixels: config.naiMaxPixels,
-    tokenLimit: tokenLimitFor(naiModel),
     // 只给目录名用于展示：完整路径可能带用户名之类的信息，绝不该出现在响应里（Global Constraints）
     saveDirName: basename(config.saveDir),
-    busy: { llm: ctx.services.llmSession.busy, gen: isGenBusy(ctx.services.events) },
+    // gen 直接读 GenRunner 自己的在途保护，不经事件反推——反推在「桌面端已经在跑、
+    // 手机刚连上还没收到下一条事件」时会显示成闲，而且平白多一份有状态的订阅
+    busy: { llm: ctx.services.llmSession.busy, gen: ctx.services.genRunner.busy },
   }
 }
 
