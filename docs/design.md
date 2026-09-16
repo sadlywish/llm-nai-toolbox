@@ -272,6 +272,22 @@ LLM 对话落盘与 llmStale 在计划 5 实现。
 
 ---
 
+## 手机端
+
+手机不是另一套后端，是主进程里多开的一个 HTTP 服务，业务全部转发到桌面端已有的那几样：`registerIpc` 返回的 `MainServices`（`GenRunner`、`LlmSession`、`AppEvents`、`configStore`、`stylesStore`、`workspaceStore`）在 `src/main/index.ts` 里建好之后，同一份引用既接给 IPC 也接给 `createMobileServer`——两条路走的是同一个在途保护、同一条事件总线，不会出现「IPC 说在跑，HTTP 说闲着」的两套真相。
+
+**前端是独立子工程。** `src/mobile/` 用自己的 `vite.mobile.config.ts` 单独构建到 `out/mobile/`（`base: './'`，为以后 Capacitor 打包留的相对路径），由服务的静态托管把这个目录直接发出去；未知路径回落 `index.html` 给前端路由用，带扩展名的路径找不到就是真 404（回落成 HTML 会让浏览器拿着一份网页当 JS 解析，报错比 404 更难查）。它与桌面端渲染进程共用 `src/shared/`（字段定义、拼接、标红规则），不碰 `src/renderer/`——两套界面形态不同，没必要也不能共用 CodeMirror 那一层。
+
+**鉴权与来源校验分两道闸。** 每个请求先看 `req.socket.remoteAddress`（`isPrivateAddress`），公网来源一律 403；绑定 `0.0.0.0` 只是为了让手机连得进来，不代表对外开放。过了这道才看令牌：`POST /api/pair` 用一次性配对码（4 位、5 分钟、用一次即废）换长期令牌，令牌只在 `devices.json` 里存哈希，明文只在配对那一次的响应里出现一次；之后每个请求带 `Authorization: Bearer`。两个例外（`/api/events`、`/api/image`）额外认 `?token=`——`EventSource` 和 `<img src>` 都没法带自定义请求头。响应一律不发 CORS 放行头，局域网里别的站点拿不到数据。
+
+**LLM 与出图不新写一套。** `POST /api/llm/run`、`POST /api/gen/start` 校验入参后立刻回话（一轮动辄几十秒到十几分钟，手机上的 HTTP 请求、手机息屏都撑不住），真正的进度与结果一律走 `GET /api/events`（SSE）：`AppEvents` 上的 `llm`、`gen-progress`、`gen-image` 事件在 `routes.ts` 里转成手机认的 `MobileEvent` 形状再推给所有连接——这条转换故意分两套类型，SSE 是发到局域网上的，主进程内部事件以后加什么字段，不该自动漏出去。`LlmSession`、`GenRunner` 忙着时（不管是桌面端还是另一台手机发起的）新请求一律 409 `{ kind: 'busy' }`，`message` 是能直接显示的中文一句话。
+
+**SSE 断线要能补，不能靠重发一轮。** 手机锁屏、切后台都会把长连接断掉，LLM 一轮跑完的时间点如果正好在断线期间，`llm-finished` 事件就永远收不到。做法是先落一条「最近一次跑完的结果」（挂在这台服务的 `SseHub` 上，一个服务一条，新的覆盖旧的）再推事件，手机重连后主动查一次 `GET /api/llm/last` 就能把回填补上，不需要用户重新发一遍指令。出图没有对应的补偿接口——落盘本身就是最终真相，重连后 `GET /api/history` 能看到跑完的那一轮。
+
+**状态归属靠接口边界卡死，不是约定。** 手机的提示词、参数、指令区开关整包存在手机自己的 `localStorage`（`src/mobile/src/state.ts`），出图与 LLM 请求把这一份整包发过去；服务端处理这两个请求时**不读也不写** `workspace.json`——桌面端工作区是桌面端渲染进程自己防抖落盘的那一份，两边各管各的，免得出现「手机发一次请求，桌面端界面被悄悄改掉」。唯一的例外是 `POST /api/styles/:id/preset`（选为预设）：它读桌面端 `workspace.json`、只改 `console.presetId`、其余字段原样写回，然后 `events.emit({ kind: 'preset-changed', presetId })`——光落盘不够，桌面端渲染进程的工作区是内存态，不知道磁盘被改过，这条事件经 `ipc.ts` 广播给所有窗口，指令区才会跟着换名字。这是全服务唯一被允许写桌面端工作区的路径；画风内容本身（`styles.json`）两边共用、直接读写，不用走事件。
+
+---
+
 ## 不静默降级
 
 | 情形 | 必须让用户看见 |
