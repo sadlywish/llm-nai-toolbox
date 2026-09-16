@@ -183,6 +183,10 @@ function handleSetPresetStyle(res: ServerResponse, ctx: ApiContext, id: string):
   const workspace = isRecord(rawWorkspace) ? rawWorkspace : {}
   const consoleOptions = isRecord(workspace.console) ? workspace.console : {}
   ctx.services.workspaceStore.write({ ...workspace, console: { ...consoleOptions, presetId: id } })
+  // 光落盘不够：桌面端渲染进程的工作区是内存态、按防抖存盘，它不知道磁盘被改了，
+  // 指令区仍显示旧预设名，而且它下一次存盘会把这里写进去的 presetId 整个覆盖回去。
+  // 发一条事件让渲染层把这个值跟过去（由 ipc.ts 广播给窗口）
+  ctx.services.events.emit({ kind: 'preset-changed', presetId: id })
   sendJson(res, 200, { presetId: id })
 }
 

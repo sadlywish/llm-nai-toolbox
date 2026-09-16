@@ -446,6 +446,10 @@ export function registerIpc(
       case 'gen-seed':
         broadcast(IPC.genSeed, e.seed)
         break
+      // 手机端选了预设画风。同出图事件广播给所有窗口：哪个窗口显示着指令区都得跟着换名字
+      case 'preset-changed':
+        broadcast(IPC.workspacePresetChanged, e.presetId)
+        break
       default:
         break
     }

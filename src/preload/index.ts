@@ -111,6 +111,13 @@ const api = {
     return () => ipcRenderer.off(IPC.genSeed, handler)
   },
 
+  /** 手机端改了预设画风；返回取消订阅的函数（同 onTagdbStatus） */
+  onPresetChanged: (cb: (presetId: string) => void): (() => void) => {
+    const handler = (_e: unknown, presetId: string): void => cb(presetId)
+    ipcRenderer.on(IPC.workspacePresetChanged, handler)
+    return () => ipcRenderer.off(IPC.workspacePresetChanged, handler)
+  },
+
   /** 保存目录下最近「历史保留天数」天的轮次，最新的在前 */
   loadHistory: (): Promise<RoundRecord[]> => ipcRenderer.invoke(IPC.historyLoad),
 

@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { AppEvents } from '../../../src/main/appEvents'
+import { AppEvents, type AppEvent } from '../../../src/main/appEvents'
 import { ConfigStore } from '../../../src/main/config-store'
 import type { GenRunner } from '../../../src/main/gen/runner'
 import type { MainServices } from '../../../src/main/ipc'
@@ -248,6 +248,27 @@ describe('POST /api/styles/:id/preset', () => {
     expect(saved.main.count).toBe(before.main.count)
     expect(saved.negative).toBe(before.negative)
     expect(saved.params).toEqual(before.params)
+  })
+
+  it('往 AppEvents 上发一条带新 presetId 的事件，桌面端渲染进程才跟得上', async () => {
+    stylesStore.write([{ id: 'st-1', name: 'A', tags: 'a' }])
+    seedWorkspace()
+    const seen: AppEvent[] = []
+    const off = events.on((e) => seen.push(e))
+    const token = await pairToken()
+    await call('POST', '/api/styles/st-1/preset', token)
+    off()
+    expect(seen).toEqual([{ kind: 'preset-changed', presetId: 'st-1' }])
+  })
+
+  it('id 不存在时不发事件：什么都没改，渲染层不该被惊动', async () => {
+    seedWorkspace()
+    const seen: AppEvent[] = []
+    const off = events.on((e) => seen.push(e))
+    const token = await pairToken()
+    await call('POST', '/api/styles/nope/preset', token)
+    off()
+    expect(seen).toEqual([])
   })
 
   it('id 不存在 404，不碰工作区文件', async () => {

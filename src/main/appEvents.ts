@@ -13,6 +13,10 @@ export type AppEvent =
   | { kind: 'gen-image'; image: GenImageEvent }
   | { kind: 'gen-seed'; seed: number }
   | { kind: 'llm'; event: LlmEvent }
+  // 手机端「选为预设画风」改了 workspace.json 里的 console.presetId。桌面端的工作区是
+  // 内存态 + 防抖存盘，只落盘的话界面既看不到变化，下一次存盘还会把这个值覆盖回旧的，
+  // 所以这件事必须实时告诉渲染进程。只带 presetId：工作区别的字段一概不归这条事件管
+  | { kind: 'preset-changed'; presetId: string }
 
 export class AppEvents {
   private readonly listeners = new Set<(e: AppEvent) => void>()

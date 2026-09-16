@@ -36,6 +36,8 @@ export const IPC = {
   genProgress: 'gen:progress',
   genImage: 'gen:image',
   genSeed: 'gen:seed',
+  /** 主进程 → 渲染进程：手机端改了预设画风，渲染层只把 console.presetId 跟过去 */
+  workspacePresetChanged: 'workspace:preset-changed',
   historyLoad: 'history:load',
   imageRead: 'image:read',
   imageMeta: 'image:meta',
