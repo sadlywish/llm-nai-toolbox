@@ -4,6 +4,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { isPrivateAddress, type MobileEvent } from '../../../src/shared/mobileApi'
+import { AppEvents } from '../../../src/main/appEvents'
 import type { MainServices } from '../../../src/main/ipc'
 import { createDeviceStore, type DeviceStore } from '../../../src/main/server/devices'
 import { createMobileServer, createRequestHandler, type MobileServer, type ServerDeps } from '../../../src/main/server/http'
@@ -23,10 +24,14 @@ let port: number
 let urls: string[]
 let base: string
 
-/** Task 4 还没有路由用到 services：真造一份会把 electron 拖进 node 测试进程 */
+/**
+ * 骨架这几条路径用不到业务服务：真造一份会把 electron 拖进 node 测试进程。
+ * events 是例外——服务一启动就要往总线上挂出图事件的转推（Task 9），
+ * 它必须是真的；AppEvents 本来也不碰 electron。
+ */
 function makeDeps(): ServerDeps {
   return {
-    services: {} as unknown as MainServices,
+    services: { events: new AppEvents() } as unknown as MainServices,
     devices,
     staticDir,
     makeThumbnail: (png) => png,

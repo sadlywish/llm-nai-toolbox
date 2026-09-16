@@ -11,7 +11,7 @@ import { apiError, isPrivateAddress, type ApiErrorKind, type PairResult } from '
 import type { NaiSubscriptionResult } from '../../shared/naiUser'
 import type { MainServices } from '../ipc'
 import type { DeviceStore } from './devices'
-import { handleApi } from './routes'
+import { forwardGenEvents, handleApi } from './routes'
 import { createSseHub, type SseHub } from './sse'
 
 export interface ServerDeps {
@@ -248,6 +248,12 @@ class MobileServerImpl implements MobileServer {
   private readonly hub = createSseHub()
   /** 记下所有连接：SSE 是长连接，close() 会一直等它们自己结束，不掐掉就停不下来 */
   private readonly sockets = new Set<Socket>()
+  /**
+   * 出图事件转推的退订函数（Task 9）。挂在启动、退在停止，与服务同生共死：
+   * 事件总线属于主进程，活得比这台服务久得多——停掉之后还留着订阅的话，
+   * 它会一直往一个已经没人连着的 hub 里推，改端口重启几次就积一串死订阅
+   */
+  private unforwardGen: (() => void) | null = null
 
   constructor(private readonly deps: ServerDeps) {}
 
@@ -291,6 +297,8 @@ class MobileServerImpl implements MobileServer {
       }
       const onListening = (): void => {
         server.removeListener('error', onError)
+        // 监听成功之后才订阅：EADDRINUSE 那条路径上根本没有服务，挂上去就没人退了
+        this.unforwardGen = forwardGenEvents(this.deps.services.events, this.hub)
         // 监听之后才出的错（网卡掉线之类）没有人 await 了，不接住就是未捕获异常
         server.on('error', (e) => console.warn('[mobile] 服务出错：', e))
         const addr = server.address()
@@ -309,6 +317,9 @@ class MobileServerImpl implements MobileServer {
     const server = this.server
     this.server = null
     this.currentPort = null
+    // 退订放在最前面，连没起来过的那种情况也一并收拾掉
+    this.unforwardGen?.()
+    this.unforwardGen = null
     if (server === null) return Promise.resolve()
     return new Promise((done) => {
       server.close(() => done())

@@ -1,11 +1,12 @@
 // 手机端业务接口：meta / styles / history / usage（Task 5）、图片（Task 6）、
-// 画风写接口（Task 7）、LLM 与 SSE（Task 8）。
+// 画风写接口（Task 7）、LLM 与 SSE（Task 8）、出图（Task 9）。
 //
 // 不 import electron：同 http.ts、devices.ts，服务层要能在 node 下单独跑测试。
 import type { IncomingMessage, ServerResponse } from 'http'
 import { basename } from 'path'
 import pkgJson from '../../../package.json'
 import { CHARACTER_FIELDS, MAIN_FIELDS, orderSpecs } from '../../shared/fields'
+import { parseGenStartInput } from '../../shared/gen'
 import { newId } from '../../shared/ids'
 import { parseLlmRunInput, type LlmEvent, type LlmRunInput, type LlmRunResult } from '../../shared/llm'
 import {
@@ -21,6 +22,7 @@ import { MODEL_OPTIONS, NOISE_SCHEDULE_OPTIONS, SAMPLER_OPTIONS } from '../../sh
 import type { NaiSubscriptionResult } from '../../shared/naiUser'
 import { normalizeStyles, type StylePreset } from '../../shared/styles'
 import { normalizeWorkspace } from '../../shared/workspace'
+import type { AppEvents } from '../appEvents'
 import { errorMessage } from '../llm/http'
 import { loadRecentRounds } from '../nai/index-store'
 import type { PairedDevice } from './devices'
@@ -282,6 +284,98 @@ function handleLlmAbort(res: ServerResponse, ctx: ApiContext): void {
 }
 
 /**
+ * 把总线上的出图事件转推给 SSE，返回退订函数。
+ *
+ * 这个订阅由服务的生命周期持有（http.ts 里启动时挂、停止时退），不放在请求处理里：
+ * 每处理一个请求挂一次的话，同一条进度会被推给手机好几遍，而且请求结束也没人退订。
+ *
+ * 出图事件本来就是广播性质的（桌面端也是广播给所有窗口），所以桌面端自己发起的那一轮
+ * 手机同样会看到进度——这是有意的，手机上正好能看见电脑在跑什么。
+ *
+ * `gen-seed` 不转推：那是回填桌面端参数区用的，手机端那份工作区是手机自己的
+ * （Global Constraints：服务端绝不写 workspace.json），它按自己发出去的参数记 seed。
+ */
+export function forwardGenEvents(events: AppEvents, hub: SseHub): () => void {
+  return events.on((e) => {
+    if (e.kind === 'gen-progress') hub.push({ kind: 'gen-progress', progress: e.progress })
+    else if (e.kind === 'gen-image') hub.push({ kind: 'gen-image', image: e.image })
+  })
+}
+
+/** 电脑正在出图时给手机的回话。同 LLM_BUSY_MESSAGE，会被原样显示，得是完整的中文一句话 */
+const GEN_BUSY_MESSAGE = '电脑正在出图，等这一轮结束再试'
+
+/**
+ * `POST /api/gen/start` 的回话。手机拿它把随后 SSE 上的进度对上号——桌面端发起的那一轮
+ * 也会推给手机（见 forwardGenEvents），不对号就分不清哪一轮是自己的。
+ *
+ * 类型落在这里而不是 shared/mobileApi.ts：Task 9 只动 server/。
+ */
+export interface GenRunStarted {
+  roundId: string
+}
+
+/**
+ * `POST /api/gen/start`：校验入参 → 开跑 → 立刻回 `{ roundId }`。
+ *
+ * 同 LLM，不等这一轮跑完：一轮几十张图能跑十几分钟，手机上的 HTTP 请求等不住，
+ * 进度与每张图一律走 SSE。
+ *
+ * 配置与 Token 在开跑那一刻从电脑这边读，手机发来的只有提示词与张数；明文 Token
+ * 不进任何响应与事件（Global Constraints）。出图**只用手机发来的那份参数**，
+ * 服务端绝不写 workspace.json。
+ */
+async function handleGenStart(req: IncomingMessage, res: ServerResponse, ctx: ApiContext): Promise<void> {
+  const input = parseGenStartInput(await readJsonBody(req))
+  if (typeof input === 'string') {
+    // parseGenStartInput 给的理由是写给开发者看的（'gen:start 入参无效'），不适合直接显示；
+    // 同 handleLlmRun，能发出不合法入参的只有版本对不上的手机端页面
+    sendError(res, 400, 'bad-request', '手机发来的出图参数不对，可能是手机上的页面太旧，刷新一下再试')
+    return
+  }
+  // 先问 busy 再开跑：GenRunner 在忙时抛的错只能从 Promise 里接，而这里必须当场决定回 200 还是 409。
+  // 桌面端与手机端共用同一个 GenRunner，所以桌面端在跑时手机也会走到这里。
+  // 这句到 start() 之间没有 await，中间插不进另一轮
+  if (ctx.services.genRunner.busy) {
+    sendError(res, 409, 'busy', GEN_BUSY_MESSAGE)
+    return
+  }
+  const config = ctx.services.configStore.read()
+  const token = ctx.services.secrets.read('naiToken').trim()
+
+  // roundId 是 GenRunner 内部生成的，而 start() 的 Promise 要整轮跑完才 resolve，这里必须立刻回话。
+  // RunQueue 开跑第一件事就是同步发一条 running 进度，所以在 start() 这次调用返回之前
+  // 就能从总线上接到带 roundId 的那一条——临时挂一个订阅把它抓出来，抓完立刻退订
+  let roundId: string | null = null
+  const off = ctx.services.events.on((e) => {
+    if (e.kind === 'gen-progress' && roundId === null) roundId = e.progress.roundId
+  })
+  let run: Promise<unknown>
+  try {
+    run = ctx.services.genRunner.start(input, config, token)
+  } finally {
+    // start() 的同步段里要是抛了（理论上不会，async 函数只会 reject），订阅也不能留下
+    off()
+  }
+  void run.catch((err: unknown) => {
+    // 队列自己兜住了每一张的失败，能抛到这里的是开跑前的预检（没设保存目录、没填 Token）
+    // 与落盘一类的问题。不接住的话主进程里就多一个未处理的 rejection；
+    // 预检失败那条由下面的分支当场回给手机，这里只管已经开跑的那一轮
+    if (roundId !== null) console.warn('[mobile] 这一轮出图出错了：', err)
+  })
+
+  if (roundId === null) {
+    // 一条进度都没发出来，说明这一轮在建队列之前就被预检拦下了，那条 Promise 此刻已经 settle，
+    // await 它只过一个微任务，不会把响应吊在整轮上。预检的话本来就是写给用户看的，原样转给手机
+    const message = await run.then(() => '这一轮出图没能开始', errorMessage)
+    sendError(res, 500, 'server', message)
+    return
+  }
+  const started: GenRunStarted = { roundId }
+  sendJson(res, 200, started)
+}
+
+/**
  * 手机端业务接口的分发。返回 false 表示这条路径（或这个方法）不是这里认识的 API，
  * 调用方（http.ts）据此落到统一的 404。
  */
@@ -344,6 +438,22 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, ctx: 
   if (pathname === '/api/llm/last' && req.method === 'GET') {
     const last: MobileLastLlmResult = { last: lastLlmRuns.get(ctx.hub) ?? null }
     sendJson(res, 200, last)
+    return true
+  }
+  if (pathname === '/api/gen/start' && req.method === 'POST') {
+    await handleGenStart(req, res, ctx)
+    return true
+  }
+  // 取消与继续在没有在途那一轮时都是空操作（GenRunner 里的 queue 为 null），照
+  // /api/llm/abort 一样回 200：手机上重复点、或者电脑那头刚好跑完，都不该看到报错
+  if (pathname === '/api/gen/cancel' && req.method === 'POST') {
+    ctx.services.genRunner.cancel()
+    sendJson(res, 200, { ok: true })
+    return true
+  }
+  if (pathname === '/api/gen/resume' && req.method === 'POST') {
+    ctx.services.genRunner.resume()
+    sendJson(res, 200, { ok: true })
     return true
   }
 

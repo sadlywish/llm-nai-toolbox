@@ -25,7 +25,7 @@ import { defaultGenParams, normalizeWorkspace } from '../../../src/shared/worksp
  *
  * MainServices 里用不到的两样造假的：secrets 真实实现走 electron 的 safeStorage，
  * genRunner 这四个只读接口根本不碰——真造一份只会把 electron 拖进 node 测试进程，
- * 这也是 http.test.ts 里 `services: {} as unknown as MainServices` 同一个理由。
+ * 这也是 http.test.ts 里把 services 整个造假（只留一个真 AppEvents）同一个理由。
  */
 
 let dir: string
