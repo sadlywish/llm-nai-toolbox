@@ -149,6 +149,13 @@ describe('GET /api/meta', () => {
     const { body } = await get('/api/meta', token)
     expect((body as { busy: { gen: boolean } }).busy.gen).toBe(true)
   })
+
+  it('带上每张消耗百分比，供手机端把用量换算成张数（Task 13）', async () => {
+    configStore.write(mergeConfig({ naiUsagePercentPerImage: 0.125 }))
+    const token = await pairToken()
+    const { body } = await get('/api/meta', token)
+    expect((body as { usagePercentPerImage: number }).usagePercentPerImage).toBe(0.125)
+  })
 })
 
 describe('GET /api/styles', () => {

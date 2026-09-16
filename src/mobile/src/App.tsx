@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { MobileMeta } from '@shared/mobileApi'
 import type { Workspace } from '@shared/workspace'
 import { ApiFailure, createApiClient, normalizeBaseUrl, type ApiClient } from './api'
+import UsageLine from './components/UsageLine'
+import Params from './pages/Params'
 import Workbench from './pages/Workbench'
 import { flushState, loadState, saveConnection, saveWorkspace, type Connection } from './state'
 
@@ -153,6 +155,9 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
   const [meta, setMeta] = useState<MobileMeta | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [online, setOnline] = useState(false)
+  // 参数页盖在标签内容上而不是新开一个标签：它不是「看什么」的第五个分类，是随时可能要改的
+  // 一份设置，从哪个标签进都该能开、关了还回到原来那个标签（界面稿：工作台右上角进入）
+  const [paramsOpen, setParamsOpen] = useState(false)
   // 手机自己那一份工作区（规格 §4）。只存在手机本地，不走任何写桌面端工作区的接口
   const [workspace, setWorkspace] = useState(() => loadState().workspace)
 
@@ -193,21 +198,39 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
     <div className="app">
       <header className="head">
         <span className={online ? 'dot' : 'dot off'} title={online ? '已连上电脑' : '和电脑断开了'} />
-        <span className="title">{TABS.find((t) => t.key === tab)?.label}</span>
+        <span className="title">{paramsOpen ? '参数' : TABS.find((t) => t.key === tab)?.label}</span>
         <span className="grow" />
-        {/* 额度位：由 Task 13 的 UsageLine 填上点数与 V5 用量 */}
-        <span className="sec">额度 —</span>
+        <button type="button" className="btn sm" disabled={paramsOpen} onClick={() => setParamsOpen(true)}>
+          参数
+        </button>
       </header>
+      {/* 独立一行而不是塞进 .head：额度那句话（点数 · V5 用量 · 恢复速率）在窄屏上和
+          标题、按钮挤在同一行放不下，换行的话标题会被顶飞 */}
+      <div className="usage-bar">
+        {/* refreshSignal 先不传：出图结束后刷新是 Task 15 接出图页时的事，那时候
+            只需给这里加一个「每次出图完成就变一次」的值，这个组件不用再改 */}
+        <UsageLine client={client} percentPerImage={meta?.usagePercentPerImage ?? 0} />
+      </div>
       <main className="body">
         {error !== null && <p className="alert">{error}</p>}
-        <TabBody tab={tab} meta={meta} workspace={workspace} onWorkspaceChange={updateWorkspace} />
+        {paramsOpen ? (
+          <Params workspace={workspace} meta={meta} onChange={updateWorkspace} />
+        ) : (
+          <TabBody tab={tab} meta={meta} workspace={workspace} onWorkspaceChange={updateWorkspace} />
+        )}
       </main>
       <nav className="tabs">
-        {TABS.map((t) => (
-          <button type="button" key={t.key} className={t.key === tab ? 'on' : ''} onClick={() => setTab(t.key)}>
-            {t.label}
+        {paramsOpen ? (
+          <button type="button" className="on" onClick={() => setParamsOpen(false)}>
+            ‹ 返回{TABS.find((t) => t.key === tab)?.label}
           </button>
-        ))}
+        ) : (
+          TABS.map((t) => (
+            <button type="button" key={t.key} className={t.key === tab ? 'on' : ''} onClick={() => setTab(t.key)}>
+              {t.label}
+            </button>
+          ))
+        )}
       </nav>
     </div>
   )

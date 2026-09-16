@@ -53,6 +53,7 @@ function buildMeta(ctx: ApiContext): MobileMeta {
     noiseSchedules: NOISE_SCHEDULE_OPTIONS,
     maxCharacters: config.naiMaxCharacters,
     maxPixels: config.naiMaxPixels,
+    usagePercentPerImage: config.naiUsagePercentPerImage,
     // 只给目录名用于展示：完整路径可能带用户名之类的信息，绝不该出现在响应里（Global Constraints）
     saveDirName: basename(config.saveDir),
     // gen 直接读 GenRunner 自己的在途保护，不经事件反推——反推在「桌面端已经在跑、

@@ -56,6 +56,8 @@ export interface MobileMeta {
   noiseSchedules: readonly string[]
   maxCharacters: number
   maxPixels: number
+  /** 每张消耗的额度百分比（配置 naiUsagePercentPerImage），供手机端把 V5 用量换算成「约还能出几张」；0 = 不估算 */
+  usagePercentPerImage: number
   /** 只给目录名用于展示，不给完整路径 */
   saveDirName: string
   busy: { llm: boolean; gen: boolean }

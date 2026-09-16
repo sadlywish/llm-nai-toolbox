@@ -91,7 +91,53 @@ body {
   font-size: 16px;
 }
 
-.field input:focus { outline: none; border-color: var(--accent); }
+.field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+
+.field select {
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  padding: 10px;
+  font: inherit;
+  /* 16px 同 .field input：比这小的下拉一获得焦点，iOS Safari 会把整页放大 */
+  font-size: 16px;
+}
+
+.field.is-disabled { opacity: 0.6; }
+.field-hint { color: var(--ink-faint); font-size: 12px; }
+
+/* ── 顶部额度行（UsageLine，计划 Task 13） ── */
+.usage-bar {
+  padding: 4px 12px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--ink-dim);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+}
+
+.usage-bar .low { color: var(--warn); }
+.usage-bar .dim { color: var(--ink-faint); }
+
+/* ── 参数页（计划 Task 13） ── */
+.params-page { display: flex; flex-direction: column; gap: 10px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.field-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  color: var(--ink-dim);
+  font-size: 12.5px;
+}
+
+/* checkbox 原生默认太小，手指按不准；18px 是能兼顾观感与落点的折中，外面那圈 min-height 补足 40px */
+.field-check input { width: 18px; height: 18px; }
 
 .btn {
   background: none;
