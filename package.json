@@ -1,6 +1,6 @@
 {
   "name": "llm-nai-toolbox",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "description": "LLM 驱动的 NovelAI 提示词工作台",
   "author": "lyf",
   "private": true,
