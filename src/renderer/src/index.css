@@ -151,7 +151,8 @@ body {
 
 /* 标签库载入/缺文件提示。缺文件不静默降级 —— 界面必须说清是哪个文件 */
 /* 顶栏的 NovelAI 额度（界面稿 2026-09-16-nai-usage-mockup.html 位置 B） */
-.nai-usage { display: flex; align-items: center; gap: 8px; margin-left: 16px; font-size: 12.5px; color: var(--ink-dim); }
+/* 顶栏右上角：margin-left:auto 顶到最右；顶栏是 baseline 对齐，这里自己居中（同 .view-switch） */
+.nai-usage { display: flex; align-items: center; gap: 8px; margin-left: auto; align-self: center; font-size: 12.5px; color: var(--ink-dim); }
 .nai-usage .v { font-family: var(--mono); color: var(--ink); font-variant-numeric: tabular-nums; }
 .nai-usage .sep { color: var(--ink-faint); }
 .nai-usage .low { color: var(--warn); }
