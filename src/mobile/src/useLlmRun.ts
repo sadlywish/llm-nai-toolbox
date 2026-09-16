@@ -65,6 +65,10 @@ export function useLlmRun({ client, update, onFilled, api }: Options): LlmRunHan
   updateRef.current = update
   const filledRef = useRef(onFilled)
   filledRef.current = onFilled
+  // meta 是连上之后才拉回来的：send 的 useCallback 依赖里放它会让回调反复重建，
+  // 不放又会把首次渲染时的 null 永久闭包进去（实机踩过：溯源里的模型名一直是空的）
+  const apiRef = useRef(api)
+  apiRef.current = api
   const seq = useRef(0)
 
   const append = useCallback((line: LlmLogLine, ok = false): void => {
@@ -107,7 +111,7 @@ export function useLlmRun({ client, update, onFilled, api }: Options): LlmRunHan
       if (phaseRef.current.kind === 'running') return
       // 入参与请求记录同一时刻取：跑的途中改指令区不影响这一轮
       // meta 还没到手时退回一个类型合法的占位：溯源里的 apiType 不合法整条来源会被丢掉
-      const plan = planRun(ws, presets, api ?? { apiType: 'claude', model: '' })
+      const plan = planRun(ws, presets, apiRef.current ?? { apiType: 'claude', model: '' })
       setPhase({ kind: 'running', round: 0, maxRounds: 0 })
       // 每发一轮清一次日志：手机屏幕就这么大，上一轮的行混在里面分不清是哪一轮的
       setLines([])
