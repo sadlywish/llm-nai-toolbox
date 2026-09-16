@@ -99,6 +99,8 @@ export interface AppConfig {
   naiMaxCharacters: number
   /** 宽高比换算宽高时的总像素上限 */
   naiMaxPixels: number
+  /** 每张图消耗的按时额度百分比，用来估算「还能画几张」；0 = 不估算。官方接口只给百分比，这个值按实测填 */
+  naiUsagePercentPerImage: number
 
   // ── 工具循环 ──
   maxToolRounds: number
@@ -169,6 +171,8 @@ export function defaultAppConfig(): AppConfig {
 
     naiMaxCharacters: 22,
     naiMaxPixels: 1024 * 1024,
+    // 用户按自己账号实测的值（2026-09-16）
+    naiUsagePercentPerImage: 0.058,
 
     maxToolRounds: 10,
     autoSkipSearch: false,
@@ -231,6 +235,8 @@ export const NUMBER_RULES: Record<NumericKey, NumberRule> = {
   openaiReasoningBudget: { min: 0, integer: true },
   naiMaxCharacters: { min: 1, integer: true },
   naiMaxPixels: { min: 64 * 64, integer: true },
+  // 每张只吃千分之几，必须允许小数
+  naiUsagePercentPerImage: { min: 0, max: 100, integer: false },
   naiTimeoutSec: { min: 1, integer: true },
   retryCount: { min: 0, integer: true },
   taskIntervalMs: { min: 0, integer: true },

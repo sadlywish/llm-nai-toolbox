@@ -411,6 +411,7 @@ export default function SettingsPage({ active, onDirtyChange }: Props): JSX.Elem
                   </select>
                 </label>
                 {numberField('naiTimeoutSec', '请求超时（秒）')}
+                {numberField('naiUsagePercentPerImage', '每张消耗额度（%）', { hint: '顶栏「还能画几张」用它换算；官方接口只给百分比，按自己实测填，0 = 不估算' })}
                 {numberField('retryCount', '失败重试次数', { hint: '429 与 Token 问题不重试' })}
                 {numberField('taskIntervalMs', '任务间隔（毫秒）')}
                 {numberField('historyDays', '历史保留天数')}

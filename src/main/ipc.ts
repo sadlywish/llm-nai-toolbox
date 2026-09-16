@@ -25,6 +25,7 @@ import { TAG_MANUALS, TAG_MANUAL_TOC, TAG_SKILL_CORE } from './llm/resources'
 import { runLlm } from './llm/runner'
 import { generateImage } from './nai/client'
 import { loadRecentRounds, readRoundImage, readRoundImageMeta } from './nai/index-store'
+import { fetchSubscription } from './nai/user'
 import { appFetch, applyProxy } from './net'
 import { SecretStore, type SecretCrypto } from './secret-store'
 import { JsonStore } from './store'
@@ -385,6 +386,18 @@ export function registerIpc(
     onSeedResolved: (seed) => broadcast(IPC.genSeed, seed),
     now: () => new Date(),
     randomSeed: () => Math.floor(Math.random() * 4294967295),
+  })
+
+  // 额度查询：Token 与地址都在主进程读，明文不进渲染层
+  ipcMain.handle(IPC.naiSubscription, () => {
+    const config = configStore.read()
+    return fetchSubscription({
+      baseUrl: config.naiBaseUrl,
+      token: secrets.read('naiToken').trim(),
+      // 额度查询卡住不该拖着界面，取的是出图超时的十分之一、下限 10 秒
+      timeoutMs: Math.max(10_000, Math.round((config.naiTimeoutSec * 1000) / 10)),
+      fetchImpl: appFetch,
+    })
   })
 
   ipcMain.handle(IPC.genStart, (_e, raw: unknown) => {
