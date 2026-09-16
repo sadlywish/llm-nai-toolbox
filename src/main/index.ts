@@ -1,5 +1,6 @@
 import { join } from 'path'
 import { app, BrowserWindow, ipcMain, nativeImage, screen, session, shell } from 'electron'
+import type { MobileStatus } from '@shared/ipc'
 import { installContextMenu } from './context-menu'
 import { DANBOORU_CDN_URLS, withDanbooruReferer } from './danbooru/cdn'
 import { registerIpc, type IpcHooks, type MainServices } from './ipc'
@@ -51,9 +52,12 @@ function createWindow(): void {
  * 凡是 electron 才有的东西都在这里注入：页面目录、缩图、额度查询。
  */
 function startMobileServer(services: MainServices, hooks: IpcHooks, userDataDir: string): void {
+  // 设置页「手机端」分组（Task 10）也要读设备表——单独存一个变量，别让它只活在
+  // createMobileServer 的入参里，否则 getMobileStatus/newMobileCode/revokeMobileDevice 够不着它
+  const deviceStore = createDeviceStore(join(userDataDir, 'devices.json'))
   const server = createMobileServer({
     services,
-    devices: createDeviceStore(join(userDataDir, 'devices.json')),
+    devices: deviceStore,
     // 开发态 __dirname 是 out/main，手机端页面构建在 out/mobile；打包后整个 out 都在 app.asar 里
     staticDir: app.isPackaged
       ? join(process.resourcesPath, 'app.asar', 'out', 'mobile')
@@ -77,17 +81,29 @@ function startMobileServer(services: MainServices, hooks: IpcHooks, userDataDir:
     },
   })
 
+  // start() 的返回值（真正监听到的端口与地址）与失败原因，设置页要能读到——
+  // MobileServer 本身只暴露 running/port，所以在这里记一份
+  let lastUrls: string[] = []
+  let lastError: string | null = null
+
   // 启停排成一条队：连着保存两次设置会来两次重启，重叠跑会撞上「服务已经在运行」
   let chain: Promise<void> = Promise.resolve()
   const apply = (enabled: boolean, port: number): void => {
     chain = chain.then(async () => {
       try {
         await server.stop()
-        if (!enabled) return
+        lastUrls = []
+        if (!enabled) {
+          lastError = null // 主动关闭不是错误，设置页不该显示一句陈旧的失败原因
+          return
+        }
         const { port: actual, urls } = await server.start(port)
+        lastUrls = urls
+        lastError = null
         console.log(`[mobile] 手机端服务已启动（端口 ${actual}）：${urls.join('、') || '本机没有可用的局域网地址'}`)
       } catch (e) {
-        // 端口被占用之类的启动失败不能把应用带走，记一条就算；设置页上的显示是 Task 10 的事
+        // 端口被占用之类的启动失败不能把应用带走，记一条就算；设置页读 getMobileStatus().error 显示
+        lastError = e instanceof Error ? e.message : String(e)
         console.warn('[mobile] 手机端服务启动失败：', e)
       }
     })
@@ -96,6 +112,28 @@ function startMobileServer(services: MainServices, hooks: IpcHooks, userDataDir:
   hooks.onMobileServerSettingsChanged = ({ enabled, port }) => apply(enabled, port)
   const config = services.configStore.read()
   apply(config.mobileServerEnabled, config.mobileServerPort)
+
+  const status = (): MobileStatus => {
+    const code = deviceStore.currentCode()
+    return {
+      running: server.running,
+      port: server.port,
+      urls: lastUrls,
+      code: code?.code ?? null,
+      codeExpiresAt: code?.expiresAt ?? null,
+      devices: deviceStore.list(),
+      error: lastError,
+    }
+  }
+  hooks.getMobileStatus = status
+  hooks.newMobileCode = () => {
+    deviceStore.newPairingCode()
+    return status()
+  }
+  hooks.revokeMobileDevice = (deviceId) => {
+    deviceStore.revoke(deviceId)
+    return status()
+  }
 
   // 退出前停掉：SSE 是长连接，不主动掐断的话端口要等进程真正结束才释放
   app.on('before-quit', () => {

@@ -9,6 +9,7 @@ import {
   type MagicListResult,
   type MagicSearchResult,
   type MagicTreeResult,
+  type MobileStatus,
   type TagdbCompleteInput,
 } from '@shared/ipc'
 import { parseGenStartInput, type ReadImageInput } from '@shared/gen'
@@ -102,6 +103,25 @@ export interface MainServices {
 export interface IpcHooks {
   /** 保存设置后开关或端口变了；实现方负责按新配置重启服务 */
   onMobileServerSettingsChanged?: (settings: { enabled: boolean; port: number }) => void
+  /**
+   * 设置页「手机端」分组的三个操作，由 index.ts 在服务与设备表建好之后注入（同
+   * onMobileServerSettingsChanged 的理由：ipc.ts 不能 import server/http.ts）。
+   * 注册 IPC 处理器时钩子可能还没填上（服务还没起），未注入时给一份「未运行」的状态。
+   */
+  getMobileStatus?: () => MobileStatus
+  newMobileCode?: () => MobileStatus
+  revokeMobileDevice?: (deviceId: string) => MobileStatus
+}
+
+/** 钩子还没注入时的兜底状态：不代表真的关闭，只是「还不知道」，界面按未运行处理 */
+const NO_MOBILE_STATUS: MobileStatus = {
+  running: false,
+  port: null,
+  urls: [],
+  code: null,
+  codeExpiresAt: null,
+  devices: [],
+  error: null,
 }
 
 export function registerIpc(
@@ -183,6 +203,14 @@ export function registerIpc(
       })
       .catch((e: unknown) => console.warn('[proxy] 应用代理失败：', e))
   })
+
+  // 设置页「手机端」分组：状态是只读查询，换码与吊销是写操作，三个都直接回最新状态，
+  // 省得设置页再补一次查询才能刷新界面
+  ipcMain.handle(IPC.mobileStatus, (): MobileStatus => hooks.getMobileStatus?.() ?? NO_MOBILE_STATUS)
+  ipcMain.handle(IPC.mobileNewCode, (): MobileStatus => hooks.newMobileCode?.() ?? NO_MOBILE_STATUS)
+  ipcMain.handle(IPC.mobileRevoke, (_e, deviceId: unknown): MobileStatus =>
+    typeof deviceId === 'string' ? (hooks.revokeMobileDevice?.(deviceId) ?? NO_MOBILE_STATUS) : NO_MOBILE_STATUS,
+  )
 
   ipcMain.handle(IPC.pickDirectory, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)

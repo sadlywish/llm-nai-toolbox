@@ -328,6 +328,31 @@ body {
 /* 质量词、负面词留空：黄框提醒（同固定 seed 的黄），不拦保存 */
 .field textarea.is-empty-warn { border-color: #b8862e; background: rgba(229, 192, 123, .12); }
 
+/* ── 设置页「手机端」分组：连接信息（地址/二维码/配对码）+ 已配对设备 ── */
+.mobile-line { color: var(--ink-dim); font-size: 12.5px; }
+.mobile-connect { display: flex; gap: 12px; align-items: flex-start; }
+/* 二维码本身自带白底黑块；深色主题下不补一圈白边扫描器很难对焦 */
+.mobile-qr { flex: 0 0 auto; width: 92px; height: 92px; border-radius: 4px; background: #fff; padding: 5px; }
+.mobile-connect-info { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--ink-dim); min-width: 0; }
+.mobile-urls { display: flex; flex-wrap: wrap; gap: 6px; }
+.mobile-url, .mobile-code {
+  font-family: var(--mono); color: var(--ink); background: var(--input);
+  border: 1px solid var(--line); border-radius: 3px; padding: 1px 6px;
+}
+.mobile-code-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mobile-code-row button, .mobile-device-row button {
+  background: none; border: 1px solid var(--line); border-radius: 3px; color: var(--ink);
+  cursor: pointer; padding: 2px 9px; font: inherit; font-size: 12px; white-space: nowrap;
+}
+.mobile-code-row button:hover, .mobile-device-row button:hover { border-color: var(--accent); color: var(--accent); }
+.mobile-devices { display: flex; flex-direction: column; gap: 6px; }
+.mobile-device-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; flex-wrap: wrap; }
+.mobile-device-name { color: var(--ink); flex: 0 0 auto; }
+.mobile-device-row .field-hint { flex: 1; }
+/* 吊销是破坏性操作，用危险色区分于「换一个配对码」这类普通操作 */
+.mobile-device-row button:last-child { border-color: var(--danger); color: var(--danger); }
+.mobile-device-row button:last-child:hover { background: var(--danger); color: var(--ground); }
+
 /* ── 按内容撑高的文本框（AutoTextarea）：最少 --min-rows 行，最高约一屏，超出在框内滚动 ── */
 /* 选择器带上元素名：要压过前面 .field textarea 的 resize: vertical。10px = 上下内边距 8 + 边框 2 */
 textarea.auto-textarea {

@@ -59,6 +59,12 @@ export const IPC = {
   magicbookSearch: 'magicbook:search',
   /** 工具附带的中文说明（魔法书详情、WIKI 竖栏） */
   tagdbGloss: 'tagdb:gloss',
+  /** 设置页「手机端」分组：服务状态、地址、二维码要用的配对码与剩余时间、已配对设备 */
+  mobileStatus: 'mobile:status',
+  /** 换一个配对码（原来那个立即作废），返回值同 mobileStatus */
+  mobileNewCode: 'mobile:new-code',
+  /** 吊销一个设备（入参 deviceId），返回值同 mobileStatus */
+  mobileRevoke: 'mobile:revoke',
 } as const
 
 export interface TagdbCompleteInput {
@@ -136,3 +142,32 @@ export interface ConfigSaveInput {
 export type MagicTreeResult = { ok: true; groups: MagicGroup[]; total: number } | { ok: false; detail: string }
 export type MagicListResult = { ok: true; items: MagicItem[] } | { ok: false; detail: string }
 export type MagicSearchResult = { ok: true; result: MagicSearch } | { ok: false; detail: string }
+
+/**
+ * 设置页「手机端」分组要展示的一台已配对设备。结构与 `main/server/devices.ts` 的
+ * `PairedDevice` 一致，但不从那边 import——`shared/` 给渲染进程与手机前端共用，
+ * 不该反过来依赖 `main/`（后者可以自由引用 electron）。
+ */
+export interface MobileDeviceInfo {
+  id: string
+  name: string
+  /** ISO 时间串 */
+  pairedAt: string
+  /** ISO 时间串 */
+  lastSeenAt: string
+}
+
+/** mobile:status / mobile:new-code / mobile:revoke 的统一回话（设置页「手机端」分组用） */
+export interface MobileStatus {
+  running: boolean
+  port: number | null
+  /** 各网卡上手机能连的地址；服务没在跑时为空数组 */
+  urls: string[]
+  /** 当前有效的一次性配对码；没有（还没生成过，或已过期未续）时为 null */
+  code: string | null
+  /** code 的过期时间（epoch ms）；code 为 null 时同为 null */
+  codeExpiresAt: number | null
+  devices: MobileDeviceInfo[]
+  /** 服务该开却没跑起来的原因（如端口被占用），可直接显示；服务未开启或正常运行时为 null */
+  error: string | null
+}
