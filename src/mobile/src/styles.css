@@ -328,3 +328,144 @@ body {
   font-size: 12.5px;
   line-height: 1.5;
 }
+
+/* ── 指令区（界面稿第二节方案 A 的 .m-dock，计划 Task 14） ── */
+
+.dock {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 12px;
+  background: var(--panel-2);
+  border-top: 1px solid var(--line);
+}
+
+.dock-sum { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+.dock-sum .sum-text {
+  /* min-width: 0 + 省略号：摘要一长（`多角色 位置由模型安排 · …`）就会把右边的「选项 ▾」挤出屏幕 */
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 11.5px;
+  text-align: left;
+}
+
+.dock-sum .sum-link { flex: none; background: none; border: none; padding: 2px 0; color: var(--accent); font: inherit; font-size: 11.5px; }
+
+.dock .ask {
+  width: 100%;
+  min-width: 0;
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  padding: 8px;
+  font: inherit;
+  /* 16px 是 iOS 的红线：比这小的输入框一获得焦点，Safari 就会把整页放大 */
+  font-size: 16px;
+  line-height: 1.5;
+  /* 四行的手感；再长就自己滚，免得把发送那一行挤出屏幕 */
+  min-height: 62px;
+  max-height: 22dvh;
+  resize: none;
+}
+
+.dock .ask:focus { outline: none; border-color: var(--accent); }
+.dock .ask:disabled { opacity: 0.6; }
+
+.dock-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dock-row .grow { flex: 1; min-width: 0; }
+
+/* 跑图次数：参数页里也有同一个值，这里放一个是因为发之前最常改的就是它 */
+.run-count { display: flex; align-items: center; gap: 6px; flex: none; color: var(--ink-dim); font-size: 12.5px; }
+
+.run-count input {
+  width: 52px;
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  padding: 6px;
+  font: inherit;
+  font-size: 16px;
+  text-align: center;
+}
+
+.run-count input:focus { outline: none; border-color: var(--accent); }
+
+.btn.gen { flex: none; border-color: var(--accent); color: var(--accent); }
+.btn.danger { border-color: var(--danger); color: var(--danger); }
+.btn.on { border-color: var(--accent); color: var(--accent); }
+
+/* 选项面板的一行：左边说明，右边「开 / 关」 */
+.opt-row { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 40px; }
+.opt-label { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.opt-row .btn.sm { flex: none; min-width: 60px; }
+
+.preset-line {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink-dim);
+  font-size: 12.5px;
+}
+
+.ok { color: var(--ok); }
+.dim { color: var(--ink-faint); }
+
+/* ── LLM 日志页（界面稿第三节 .m-log） ── */
+
+.log {
+  /* 自己滚而不是让整页滚：下面那句「回填的是手机上这一份」要一直看得见 */
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* 工具结果里成串的英文标签不断行会撑出屏幕；anywhere 比 break-all 少切断中文词 */
+.log .ln { overflow-wrap: anywhere; }
+.log .ln .t { color: var(--ink-faint); }
+.log .ln .lv { color: var(--ink-dim); }
+.log .ln.ok { color: var(--ok); }
+.log .ln.w { color: var(--warn); }
+.log .ln.e { color: var(--danger); }
+
+/* 回填成功后那句绿字，点一下消掉 */
+.notice {
+  margin: 0;
+  padding: 8px 10px;
+  background: none;
+  border: 1px solid var(--ok);
+  border-radius: 6px;
+  color: var(--ok);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: left;
+  overflow-wrap: anywhere;
+}

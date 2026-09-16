@@ -34,6 +34,15 @@ export class ApiFailure extends Error {
   }
 }
 
+/**
+ * 任何失败翻成一句能直接显示的中文。ApiFailure 里的是服务端原话（Global Constraints：
+ * 错误形状统一，message 可直接显示），原样用——被 409 挡回来时显示的就是电脑那头那句话。
+ */
+export function messageOf(err: unknown): string {
+  if (err instanceof ApiFailure) return err.error.message
+  return err instanceof Error && err.message !== '' ? err.message : '出了点问题，稍后再试'
+}
+
 export interface ApiClient {
   pair(code: string, deviceName: string): Promise<PairResult>
   meta(): Promise<MobileMeta>

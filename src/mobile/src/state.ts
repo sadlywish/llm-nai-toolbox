@@ -41,7 +41,8 @@ function storage(): Storage | null {
   }
 }
 
-function readKey(key: string): unknown {
+/** 读一个键。没存过、存坏了、根本拿不到 localStorage，一律当没存过（llmPending.ts 也用这一对） */
+export function readKey(key: string): unknown {
   const store = storage()
   if (store === null) return null
   try {
@@ -53,7 +54,8 @@ function readKey(key: string): unknown {
   }
 }
 
-function writeKey(key: string, value: unknown): void {
+/** 写一个键，value 为 null 即删掉 */
+export function writeKey(key: string, value: unknown): void {
   const store = storage()
   if (store === null) return
   try {

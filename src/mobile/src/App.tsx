@@ -1,13 +1,19 @@
 // 手机端的外壳（计划 Task 11）：没连上就是连接页，连上了就是顶栏 + 四个标签。
-// 工作台（Task 12）已经填上，其余三个标签的内容由 Task 13–17 往里填。
-import { useCallback, useEffect, useMemo, useState } from 'react'
+// 工作台（Task 12）、参数（Task 13）、指令区与 LLM 日志（Task 14）已经填上，
+// 出图 / 历史 / 画风三个标签由 Task 15–17 往里填。
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MobileMeta } from '@shared/mobileApi'
+import type { StylePreset } from '@shared/styles'
 import type { Workspace } from '@shared/workspace'
-import { ApiFailure, createApiClient, normalizeBaseUrl, type ApiClient } from './api'
+import { createApiClient, messageOf, normalizeBaseUrl, type ApiClient } from './api'
+import Console from './components/Console'
 import UsageLine from './components/UsageLine'
+import { statusTitle } from './llmPending'
+import LlmLog from './pages/LlmLog'
 import Params from './pages/Params'
 import Workbench from './pages/Workbench'
 import { flushState, loadState, saveConnection, saveWorkspace, type Connection } from './state'
+import { useLlmRun } from './useLlmRun'
 
 /** 令牌失效时给用户的那句话。桌面端「吊销」与换设备表都会走到这里 */
 const REVOKED_MESSAGE = '这台手机已被吊销或令牌失效，请重新配对'
@@ -43,12 +49,6 @@ function codeFromUrl(): string {
   } catch {
     return ''
   }
-}
-
-function messageOf(err: unknown): string {
-  // ApiFailure 里的 message 是服务端给的、能直接显示的中文（Global Constraints）
-  if (err instanceof ApiFailure) return err.error.message
-  return err instanceof Error && err.message !== '' ? err.message : '出了点问题，稍后再试'
 }
 
 function ConnectPage({
@@ -158,6 +158,12 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
   // 参数页盖在标签内容上而不是新开一个标签：它不是「看什么」的第五个分类，是随时可能要改的
   // 一份设置，从哪个标签进都该能开、关了还回到原来那个标签（界面稿：工作台右上角进入）
   const [paramsOpen, setParamsOpen] = useState(false)
+  // LLM 日志页同理盖在标签内容上：它只属于「刚发出去的那一轮」，不是第五个标签
+  const [logOpen, setLogOpen] = useState(false)
+  /** 回填成功后那句绿色的「已回填: …」，点一下消掉 */
+  const [notice, setNotice] = useState<string | null>(null)
+  /** 共用的画风列表（`GET /api/styles`）；null = 还没拉到 */
+  const [presets, setPresets] = useState<StylePreset[] | null>(null)
   // 手机自己那一份工作区（规格 §4）。只存在手机本地，不走任何写桌面端工作区的接口
   const [workspace, setWorkspace] = useState(() => loadState().workspace)
 
@@ -191,18 +197,92 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
     }
   }, [client])
 
-  // SSE 只在这里开一条，事件分发给各标签由后续任务接手；现在只用它点亮状态点
-  useEffect(() => client.events(() => undefined, setOnline), [client])
+  const handleFilled = useCallback((summary: string) => {
+    // 回填成功就回工作台：接下来要看的是那十个块，不是日志（同桌面端「回填后收起抽屉」）。
+    // 「回填后自动生成」的接点也在这里：Task 15 接上出图之后，按回填之后的工作区与跑图次数开跑
+    setLogOpen(false)
+    setParamsOpen(false)
+    setTab('workbench')
+    setNotice(summary)
+  }, [])
+
+  const llm = useLlmRun({ client, update: updateWorkspace, onFilled: handleFilled })
+
+  // 订阅整个连接期间只挂一条，所以回调里走 ref 读最新的那份 hook；
+  // 把 llm.handleEvent 直接写进依赖会让 SSE 在每次状态变化时重连一次
+  const llmRef = useRef(llm)
+  llmRef.current = llm
+  const onlineRef = useRef(false)
+
+  // SSE 只在这里开一条：LLM 的日志与结局分给 useLlmRun，顺带点亮状态点
+  useEffect(
+    () =>
+      client.events(
+        (e) => llmRef.current.handleEvent(e),
+        (up) => {
+          setOnline(up)
+          // 断线补偿之二：重连的那一刻查一次断线期间跑完的那一轮（锁屏、切后台都会把 SSE 断掉）
+          if (up && !onlineRef.current) llmRef.current.checkLast()
+          onlineRef.current = up
+        },
+      ),
+    [client],
+  )
+
+  // 画风列表：进工作台时拉一次（指令区的预设档要用），从画风标签改完切回来也会再拉一次。
+  // 预设本身是电脑与手机共用的那一条（Global Constraints：画风共用），以电脑那份为准
+  useEffect(() => {
+    if (tab !== 'workbench') return
+    let alive = true
+    client
+      .styles()
+      .then((r) => {
+        if (!alive) return
+        setPresets(r.styles)
+        // 共用的预设选择同步进手机这份工作区，指令区的 currentPresetOf 才认得出是哪一条
+        updateWorkspace((w) => (w.console.presetId === r.presetId ? w : { ...w, console: { ...w.console, presetId: r.presetId } }))
+      })
+      // 拉不到就先不显示预设名（预设档会退回不覆盖），不打断正在编辑的人
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [client, tab, updateWorkspace])
+
+  const send = (): void => {
+    setNotice(null)
+    setParamsOpen(false)
+    // 发送即进日志页（同桌面端「发送即打开抽屉」）：这一轮要跑几十秒，得让人看见它在动
+    setLogOpen(true)
+    llm.send(workspace, presets ?? [])
+  }
+
+  const openLog = (): void => {
+    setParamsOpen(false)
+    setLogOpen(true)
+  }
+
+  const currentTabLabel = TABS.find((t) => t.key === tab)?.label
+  const overlay = paramsOpen || logOpen
 
   return (
     <div className="app">
       <header className="head">
         <span className={online ? 'dot' : 'dot off'} title={online ? '已连上电脑' : '和电脑断开了'} />
-        <span className="title">{paramsOpen ? '参数' : TABS.find((t) => t.key === tab)?.label}</span>
+        <span className="title">{paramsOpen ? '参数' : logOpen ? statusTitle(llm.phase) || 'LLM 日志' : currentTabLabel}</span>
         <span className="grow" />
-        <button type="button" className="btn sm" disabled={paramsOpen} onClick={() => setParamsOpen(true)}>
-          参数
-        </button>
+        {/* 日志页右上角是「中止」（界面稿第三节），别的时候是参数入口 */}
+        {logOpen ? (
+          llm.running && (
+            <button type="button" className="btn sm danger" onClick={llm.abort}>
+              中止
+            </button>
+          )
+        ) : (
+          <button type="button" className="btn sm" disabled={paramsOpen} onClick={() => setParamsOpen(true)}>
+            参数
+          </button>
+        )}
       </header>
       {/* 独立一行而不是塞进 .head：额度那句话（点数 · V5 用量 · 恢复速率）在窄屏上和
           标题、按钮挤在同一行放不下，换行的话标题会被顶飞 */}
@@ -213,16 +293,36 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
       </div>
       <main className="body">
         {error !== null && <p className="alert">{error}</p>}
-        {paramsOpen ? (
+        {!overlay && notice !== null && (
+          // 回填结果一行绿字。做成按钮是为了点一下就能消掉——手机上没有别的地方放「关闭」
+          <button type="button" className="notice" onClick={() => setNotice(null)}>
+            {notice}
+          </button>
+        )}
+        {logOpen ? (
+          <LlmLog phase={llm.phase} lines={llm.lines} />
+        ) : paramsOpen ? (
           <Params workspace={workspace} meta={meta} onChange={updateWorkspace} />
         ) : (
           <TabBody tab={tab} meta={meta} workspace={workspace} onWorkspaceChange={updateWorkspace} />
         )}
       </main>
+      {!overlay && tab === 'workbench' && (
+        <Console
+          workspace={workspace}
+          presets={presets}
+          running={llm.running}
+          hasLog={llm.hasLog}
+          onChange={updateWorkspace}
+          onSend={send}
+          onOpenLog={openLog}
+          onOpenStyles={() => setTab('styles')}
+        />
+      )}
       <nav className="tabs">
-        {paramsOpen ? (
-          <button type="button" className="on" onClick={() => setParamsOpen(false)}>
-            ‹ 返回{TABS.find((t) => t.key === tab)?.label}
+        {overlay ? (
+          <button type="button" className="on" onClick={() => (logOpen ? setLogOpen(false) : setParamsOpen(false))}>
+            ‹ 返回{currentTabLabel}
           </button>
         ) : (
           TABS.map((t) => (
