@@ -98,13 +98,14 @@ function bearerToken(req: IncomingMessage): string | null {
 }
 
 /**
- * 允许用 `?token=` 代替请求头的路径。只有这一条：浏览器的 `EventSource` 没有任何办法带自定义
- * 请求头，SSE 要么把令牌放进查询串，要么干脆连不上。
+ * 允许用 `?token=` 代替请求头的路径。就这两条，都是浏览器压根没法带自定义请求头的场合：
+ * `EventSource`（SSE）与 `<img src>`（历史与出图的缩略图、原图）。图片改走 fetch + blob URL 也能
+ * 带上头，但每张图都要多一次内存拷贝与 revoke，手机上不值当。
  *
- * 其余接口一律只认 Authorization 头——查询串会进浏览器历史、服务器访问日志与 Referer，
- * 能少一条是一条。图片（`<img src>` 同样带不了请求头）将来要不要开这个口子，等真做到那一步再说。
+ * 其余接口一律只认 Authorization 头——查询串会进浏览器历史、服务器访问日志与 Referer，能少一条是一条。
+ * 这里的令牌只在局域网内、只对已配对设备有效，且随时能在设置页吊销。
  */
-const TOKEN_QUERY_PATHS: ReadonlySet<string> = new Set(['/api/events'])
+const TOKEN_QUERY_PATHS: ReadonlySet<string> = new Set(['/api/events', '/api/image'])
 
 function requestToken(req: IncomingMessage, pathname: string): string | null {
   const header = bearerToken(req)

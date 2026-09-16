@@ -356,7 +356,16 @@ describe('SSE', () => {
     await r.body!.cancel()
   })
 
-  it('?token= 只对 /api/events 放行，别的接口照旧只认请求头', async () => {
+  // <img src> 同样带不了请求头，图片是第二条、也是最后一条走查询串的路径
+  it('/api/image 认 ?token=：没有这条，手机上的缩略图全是 401', async () => {
+    const token = await pairToken()
+    const r = await fetch(`${base}/api/image?token=${encodeURIComponent(token)}&round=2026-09-16T00:00:00.000Z&file=nope.png`)
+    // 这里只测「令牌被认下来、放进了业务层」：本套件的 services 夹具没接 configStore，
+    // 业务层读配置会自己炸成 500。图片本身的 404/缩图行为在 image.test.ts 里测
+    expect(r.status).not.toBe(401)
+  })
+
+  it('?token= 只对 events 与 image 放行，别的接口照旧只认请求头', async () => {
     const token = await pairToken()
     expect((await fetch(`${base}/api/meta?token=${encodeURIComponent(token)}`)).status).toBe(401)
     expect((await fetch(`${base}/api/history?token=${encodeURIComponent(token)}`)).status).toBe(401)
