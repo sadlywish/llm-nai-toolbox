@@ -2,14 +2,18 @@ package com.lyf.llmnaitoolbox.mobile;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.net.Uri;
+import android.net.http.SslError;
 import android.os.Bundle;
 import android.view.ViewGroup;
+import android.webkit.SslErrorHandler;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Toast;
 
 /**
  * 手机端的壳：一个 WebView，先加载内置的连接页，填好地址后加载电脑托管的手机端页面。
@@ -64,12 +68,63 @@ public class MainActivity extends Activity {
                         return;
                     }
                     CharSequence reason = error.getDescription();
-                    Toast
-                        .makeText(MainActivity.this, "打不开：" + (reason == null ? "连接失败" : reason), Toast.LENGTH_LONG)
+                    showProblem("打不开这个地址", (reason == null ? "连接失败" : reason.toString()));
+                }
+
+                @Override
+                public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
+                    if (!request.isForMainFrame()) {
+                        return;
+                    }
+                    showProblem("服务器回了错误", "HTTP " + response.getStatusCode());
+                }
+
+                /**
+                 * 证书有问题时给用户选择权。
+                 *
+                 * 默认实现是**直接 cancel 且不触发 onReceivedError**——页面停在原地、一点动静都没有，
+                 * 实机上就是「点了连接毫无反应」（用户 2026-09-17 用 frp 的 https 地址正是卡在这）。
+                 * 浏览器会弹「继续访问」让人自己判断，壳里也照做：说清哪台主机、什么毛病，由用户决定。
+                 * 不无条件 proceed——那等于把 https 降成明文，连中间人都挡不住。
+                 */
+                @Override
+                public void onReceivedSslError(WebView view, final SslErrorHandler handler, SslError error) {
+                    String host = Uri.parse(error.getUrl()).getHost();
+                    String why;
+                    switch (error.getPrimaryError()) {
+                        case SslError.SSL_UNTRUSTED:
+                            why = "证书不是系统信任的机构签发的（自签证书就会这样）";
+                            break;
+                        case SslError.SSL_IDMISMATCH:
+                            why = "证书上的域名与这个地址对不上";
+                            break;
+                        case SslError.SSL_EXPIRED:
+                            why = "证书已过期";
+                            break;
+                        case SslError.SSL_NOTYETVALID:
+                            why = "证书还没到生效时间";
+                            break;
+                        case SslError.SSL_DATE_INVALID:
+                            why = "证书的有效期不对";
+                            break;
+                        default:
+                            why = "证书校验没通过";
+                            break;
+                    }
+                    new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("证书有问题")
+                        .setMessage(host + "：" + why + "。\n\n只有当这个地址确实是你自己的电脑时才继续。")
+                        .setPositiveButton("仍要继续", (dialog, which) -> handler.proceed())
+                        .setNegativeButton("取消", (dialog, which) -> handler.cancel())
+                        .setOnCancelListener(dialog -> handler.cancel())
                         .show();
                 }
             }
         );
+
+        // 允许用电脑的 Chrome 远程调试这个 WebView（chrome://inspect）。
+        // 这次排查「点了没反应」时手上没有任何日志，太被动
+        WebView.setWebContentsDebuggingEnabled(true);
 
         // 页面自己是深色的，WebView 底色跟着设，加载中间不会白闪
         web.setBackgroundColor(0xFF1E1E1E);
@@ -81,6 +136,11 @@ public class MainActivity extends Activity {
         } else {
             web.loadUrl(SHELL_PAGE);
         }
+    }
+
+    /** 出错就摆一个对话框：Toast 一闪而过，出了问题连是什么都来不及看 */
+    private void showProblem(String title, String detail) {
+        new AlertDialog.Builder(this).setTitle(title).setMessage(detail).setPositiveButton("知道了", null).show();
     }
 
     @Override
