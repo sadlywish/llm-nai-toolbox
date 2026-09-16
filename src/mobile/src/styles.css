@@ -545,6 +545,44 @@ img.gen-slot { padding: 0; object-fit: cover; }
   resize: none;
 }
 
+/* ── 历史页（计划 Task 16，界面稿第四节左边那张） ── */
+
+/* 列表顶部与详情顶部共用同一条：左边一句说明或返回按钮，右边留白或一个按钮 */
+.history-bar { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+.history-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+}
+
+/* 固定宽度 + aspect-ratio 撑高：不写死像素，列表缩略图统一按方图裁（同桌面端历史竖栏） */
+.history-thumb {
+  width: 56px;
+  aspect-ratio: 1 / 1;
+  flex: none;
+  border-radius: 4px;
+  background: var(--input);
+  object-fit: cover;
+}
+
+.history-thumb.empty { border: 1px dashed var(--line); }
+
+.history-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.history-title { font-weight: 600; font-size: 13px; }
+.history-sub { color: var(--ink-dim); font-size: 12px; }
+
 /* 回填成功后那句绿字，点一下消掉 */
 .notice {
   margin: 0;

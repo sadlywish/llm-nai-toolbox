@@ -10,6 +10,7 @@ import Console from './components/Console'
 import UsageLine from './components/UsageLine'
 import { statusTitle } from './llmPending'
 import Gen from './pages/Gen'
+import History from './pages/History'
 import LlmLog from './pages/LlmLog'
 import Params from './pages/Params'
 import Workbench from './pages/Workbench'
@@ -153,7 +154,7 @@ function TabBody({
   if (tab === 'workbench') return <Workbench workspace={workspace} meta={meta} onChange={onWorkspaceChange} />
   if (tab === 'gen')
     return <Gen gen={gen} meta={meta} client={client} workspace={workspace} onWorkspaceChange={onWorkspaceChange} />
-  if (tab === 'history') return <p className="hint">轮次列表与那一轮的图在这里。</p>
+  if (tab === 'history') return <History client={client} meta={meta} onWorkspaceChange={onWorkspaceChange} />
   return <p className="hint">画风列表与增删改在这里。</p>
 }
 
