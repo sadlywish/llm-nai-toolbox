@@ -11,6 +11,7 @@ import { newId } from '../../shared/ids'
 import { parseLlmRunInput, type LlmEvent, type LlmRunInput, type LlmRunResult } from '../../shared/llm'
 import {
   MOBILE_API_VERSION,
+  type GenRunStarted,
   type LlmRunStarted,
   type MobileEvent,
   type MobileLastLlmResult,
@@ -304,16 +305,6 @@ export function forwardGenEvents(events: AppEvents, hub: SseHub): () => void {
 
 /** 电脑正在出图时给手机的回话。同 LLM_BUSY_MESSAGE，会被原样显示，得是完整的中文一句话 */
 const GEN_BUSY_MESSAGE = '电脑正在出图，等这一轮结束再试'
-
-/**
- * `POST /api/gen/start` 的回话。手机拿它把随后 SSE 上的进度对上号——桌面端发起的那一轮
- * 也会推给手机（见 forwardGenEvents），不对号就分不清哪一轮是自己的。
- *
- * 类型落在这里而不是 shared/mobileApi.ts：Task 9 只动 server/。
- */
-export interface GenRunStarted {
-  roundId: string
-}
 
 /**
  * `POST /api/gen/start`：校验入参 → 开跑 → 立刻回 `{ roundId }`。

@@ -61,6 +61,11 @@ export interface MobileMeta {
   busy: { llm: boolean; gen: boolean }
 }
 
+/** `POST /api/gen/start` 的回话：开跑就回，进度与每张图走 SSE，roundId 用来对上历史里的那一轮 */
+export interface GenRunStarted {
+  roundId: string
+}
+
 export interface MobileStylesResult {
   styles: StylePreset[]
   presetId: string
