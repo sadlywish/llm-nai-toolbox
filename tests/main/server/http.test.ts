@@ -346,6 +346,26 @@ describe('SSE', () => {
     expect(new TextDecoder().decode(first.value)).toContain(':')
     await reader.cancel()
   })
+
+  // 浏览器的 EventSource 带不了自定义请求头，SSE 这一条只能把令牌放查询串里（Task 11）
+  it('/api/events 认 ?token=，不带请求头也能连上', async () => {
+    const token = await pairToken()
+    const r = await fetch(`${base}/api/events?token=${encodeURIComponent(token)}`)
+    expect(r.status).toBe(200)
+    expect(r.headers.get('content-type')).toContain('text/event-stream')
+    await r.body!.cancel()
+  })
+
+  it('?token= 只对 /api/events 放行，别的接口照旧只认请求头', async () => {
+    const token = await pairToken()
+    expect((await fetch(`${base}/api/meta?token=${encodeURIComponent(token)}`)).status).toBe(401)
+    expect((await fetch(`${base}/api/history?token=${encodeURIComponent(token)}`)).status).toBe(401)
+  })
+
+  it('?token= 不对时照样 401', async () => {
+    await pairToken()
+    expect((await fetch(`${base}/api/events?token=乱填的`)).status).toBe(401)
+  })
 })
 
 describe('createSseHub', () => {

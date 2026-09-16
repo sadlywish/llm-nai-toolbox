@@ -98,6 +98,23 @@ function bearerToken(req: IncomingMessage): string | null {
 }
 
 /**
+ * 允许用 `?token=` 代替请求头的路径。只有这一条：浏览器的 `EventSource` 没有任何办法带自定义
+ * 请求头，SSE 要么把令牌放进查询串，要么干脆连不上。
+ *
+ * 其余接口一律只认 Authorization 头——查询串会进浏览器历史、服务器访问日志与 Referer，
+ * 能少一条是一条。图片（`<img src>` 同样带不了请求头）将来要不要开这个口子，等真做到那一步再说。
+ */
+const TOKEN_QUERY_PATHS: ReadonlySet<string> = new Set(['/api/events'])
+
+function requestToken(req: IncomingMessage, pathname: string): string | null {
+  const header = bearerToken(req)
+  if (header !== null) return header
+  if (!TOKEN_QUERY_PATHS.has(pathname)) return null
+  const query = new URL(req.url ?? '/', 'http://localhost').searchParams.get('token')
+  return query === null || query === '' ? null : query
+}
+
+/**
  * 把请求路径解析成 staticDir 下的真实路径；逃出 staticDir 的一律返回 null。
  *
  * 一律当作「staticDir 下的相对路径」来解，`/../../x` 与 `/C:/x` 因此都会落到
@@ -207,7 +224,7 @@ export function createRequestHandler(
         await handlePair(req, res, deps.devices)
         return
       }
-      const device = deps.devices.verify(bearerToken(req))
+      const device = deps.devices.verify(requestToken(req, pathname))
       if (device === null) {
         sendError(res, 401, 'unauthorized', '这台手机还没配对或已被吊销，请重新配对')
         return
