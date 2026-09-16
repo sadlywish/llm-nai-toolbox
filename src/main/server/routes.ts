@@ -14,6 +14,7 @@ import { normalizeWorkspace } from '../../shared/workspace'
 import { loadRecentRounds } from '../nai/index-store'
 import type { PairedDevice } from './devices'
 import { sendJson, type ServerDeps } from './http'
+import { handleImage } from './image'
 
 /** 只读与写接口共用的上下文：ServerDeps 加上已经验过令牌的那台设备 */
 export type ApiContext = ServerDeps & { device: PairedDevice }
@@ -89,6 +90,10 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, ctx: 
   }
   if (pathname === '/api/usage' && req.method === 'GET') {
     sendJson(res, 200, await fetchUsageCached(ctx))
+    return true
+  }
+  if (pathname === '/api/image' && req.method === 'GET') {
+    await handleImage(req, res, ctx)
     return true
   }
 
