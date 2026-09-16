@@ -27,8 +27,10 @@ interface Props {
   onOpenLog: () => void
   /** 「去画风页换」：跳到画风标签（预设是电脑与手机共用的那一条） */
   onOpenStyles: () => void
-  /** 出图。Task 15 接上之前是 undefined，生成按钮就是灰的 */
-  onGenerate?: () => void
+  /** 出图：把手机这份工作区整包发过去，按跑图次数出图 */
+  onGenerate: () => void
+  /** 已经有一轮在跑（含 429 暂停）：再点一次只会被电脑那头 409 挡回来，这里先灰掉 */
+  generating: boolean
 }
 
 /** 一行一个开关。开关画成「开 / 关」按钮而不是 checkbox：手指的落点大一圈，状态也看得更清 */
@@ -68,6 +70,7 @@ export default function Console({
   onOpenLog,
   onOpenStyles,
   onGenerate,
+  generating,
 }: Props): JSX.Element {
   const [optionsOpen, setOptionsOpen] = useState(false)
   const inset = useKeyboardInset()
@@ -138,8 +141,8 @@ export default function Console({
             }}
           />
         </label>
-        <button type="button" className="btn gen" disabled={onGenerate === undefined} onClick={onGenerate}>
-          生成
+        <button type="button" className="btn gen" disabled={generating} onClick={onGenerate}>
+          {generating ? '出图中…' : '生成'}
         </button>
       </div>
 
@@ -221,7 +224,7 @@ export default function Console({
               label="回填后自动生成"
               on={opts.autoGenerate}
               disabled={running}
-              hint={onGenerate === undefined ? '出图还没接上，这一档先只记着' : '回填成功后直接按跑图次数出图'}
+              hint="回填成功后直接按跑图次数出图"
               onToggle={(v) => setOption('autoGenerate', v)}
             />
           </div>

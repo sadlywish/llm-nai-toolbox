@@ -1,6 +1,6 @@
 // 手机端的外壳（计划 Task 11）：没连上就是连接页，连上了就是顶栏 + 四个标签。
-// 工作台（Task 12）、参数（Task 13）、指令区与 LLM 日志（Task 14）已经填上，
-// 出图 / 历史 / 画风三个标签由 Task 15–17 往里填。
+// 工作台（Task 12）、参数（Task 13）、指令区与 LLM 日志（Task 14）、出图（Task 15）已经填上，
+// 历史 / 画风两个标签由 Task 16–17 往里填。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MobileMeta } from '@shared/mobileApi'
 import type { StylePreset } from '@shared/styles'
@@ -9,10 +9,12 @@ import { createApiClient, messageOf, normalizeBaseUrl, type ApiClient } from './
 import Console from './components/Console'
 import UsageLine from './components/UsageLine'
 import { statusTitle } from './llmPending'
+import Gen from './pages/Gen'
 import LlmLog from './pages/LlmLog'
 import Params from './pages/Params'
 import Workbench from './pages/Workbench'
 import { flushState, loadState, saveConnection, saveWorkspace, type Connection } from './state'
+import { useGenRun, type GenRunHandle } from './useGenRun'
 import { useLlmRun } from './useLlmRun'
 
 /** 令牌失效时给用户的那句话。桌面端「吊销」与换设备表都会走到这里 */
@@ -136,16 +138,21 @@ const TABS: { key: TabKey; label: string }[] = [
 function TabBody({
   tab,
   meta,
+  client,
+  gen,
   workspace,
   onWorkspaceChange,
 }: {
   tab: TabKey
   meta: MobileMeta | null
+  client: ApiClient
+  gen: GenRunHandle
   workspace: Workspace
   onWorkspaceChange: (update: (w: Workspace) => Workspace) => void
 }): JSX.Element {
   if (tab === 'workbench') return <Workbench workspace={workspace} meta={meta} onChange={onWorkspaceChange} />
-  if (tab === 'gen') return <p className="hint">参数、进度与结果网格在这里。</p>
+  if (tab === 'gen')
+    return <Gen gen={gen} meta={meta} client={client} workspace={workspace} onWorkspaceChange={onWorkspaceChange} />
   if (tab === 'history') return <p className="hint">轮次列表与那一轮的图在这里。</p>
   return <p className="hint">画风列表与增删改在这里。</p>
 }
@@ -162,6 +169,12 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
   const [logOpen, setLogOpen] = useState(false)
   /** 回填成功后那句绿色的「已回填: …」，点一下消掉 */
   const [notice, setNotice] = useState<string | null>(null)
+  /**
+   * 「回填后自动生成」的待办。回填是在这一轮的结局到达时写进 workspace 的，而那一份要等这次
+   * 渲染提交之后才读得到——所以这里只记一个标记，真正开跑放在下面那个 effect 里（那时
+   * workspace 已经是回填之后的）。直接在 handleFilled 里调 start 会按回填**之前**的参数出图。
+   */
+  const [autoGenPending, setAutoGenPending] = useState(false)
   /** 共用的画风列表（`GET /api/styles`）；null = 还没拉到 */
   const [presets, setPresets] = useState<StylePreset[] | null>(null)
   // 手机自己那一份工作区（规格 §4）。只存在手机本地，不走任何写桌面端工作区的接口
@@ -198,31 +211,64 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
   }, [client])
 
   const handleFilled = useCallback((summary: string) => {
-    // 回填成功就回工作台：接下来要看的是那十个块，不是日志（同桌面端「回填后收起抽屉」）。
-    // 「回填后自动生成」的接点也在这里：Task 15 接上出图之后，按回填之后的工作区与跑图次数开跑
+    // 回填成功就回工作台：接下来要看的是那十个块，不是日志（同桌面端「回填后收起抽屉」）
     setLogOpen(false)
     setParamsOpen(false)
     setTab('workbench')
     setNotice(summary)
+    // 开关在下面那个 effect 里看：这里看的话，「回填后自动生成」被关着时也要多留一个分支
+    setAutoGenPending(true)
   }, [])
 
   const llm = useLlmRun({ client, update: updateWorkspace, onFilled: handleFilled, api: meta?.llm ?? null })
+  const gen = useGenRun(client)
+  const startGen = gen.start
+
+  /** 出图：切到出图标签再开跑（界面稿第三节中间那张就是开跑之后的样子） */
+  const generate = useCallback(
+    (ws: Workspace) => {
+      setNotice(null)
+      setParamsOpen(false)
+      setLogOpen(false)
+      setTab('gen')
+      startGen(ws, ws.runCount)
+    },
+    [startGen],
+  )
+
+  useEffect(() => {
+    if (!autoGenPending) return
+    setAutoGenPending(false)
+    // 这里的 workspace 已经是回填之后的那一份：setWorkspace 在 handleFilled 之前调用，
+    // 就算两次更新没被合成一次渲染，先提交的也是工作区那一份
+    if (workspace.console.autoGenerate) generate(workspace)
+  }, [autoGenPending, workspace, generate])
 
   // 订阅整个连接期间只挂一条，所以回调里走 ref 读最新的那份 hook；
   // 把 llm.handleEvent 直接写进依赖会让 SSE 在每次状态变化时重连一次
   const llmRef = useRef(llm)
   llmRef.current = llm
+  const genRef = useRef(gen)
+  genRef.current = gen
   const onlineRef = useRef(false)
 
-  // SSE 只在这里开一条：LLM 的日志与结局分给 useLlmRun，顺带点亮状态点
+  // SSE 只在这里开一条：LLM 的日志与结局分给 useLlmRun，出图的进度与每张图分给 useGenRun，
+  // 顺带点亮状态点。两个 hook 各自只挑自己认得的事件，别的原样丢掉
   useEffect(
     () =>
       client.events(
-        (e) => llmRef.current.handleEvent(e),
+        (e) => {
+          llmRef.current.handleEvent(e)
+          genRef.current.handleEvent(e)
+        },
         (up) => {
           setOnline(up)
-          // 断线补偿之二：重连的那一刻查一次断线期间跑完的那一轮（锁屏、切后台都会把 SSE 断掉）
-          if (up && !onlineRef.current) llmRef.current.checkLast()
+          // 断线补偿之二：重连的那一刻查一次断线期间跑完的那一轮（锁屏、切后台都会把 SSE 断掉）。
+          // LLM 那一轮问 /api/llm/last，出图那一轮问 busy.gen + 历史
+          if (up && !onlineRef.current) {
+            llmRef.current.checkLast()
+            genRef.current.checkStalled()
+          }
           onlineRef.current = up
         },
       ),
@@ -287,9 +333,8 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
       {/* 独立一行而不是塞进 .head：额度那句话（点数 · V5 用量 · 恢复速率）在窄屏上和
           标题、按钮挤在同一行放不下，换行的话标题会被顶飞 */}
       <div className="usage-bar">
-        {/* refreshSignal 先不传：出图结束后刷新是 Task 15 接出图页时的事，那时候
-            只需给这里加一个「每次出图完成就变一次」的值，这个组件不用再改 */}
-        <UsageLine client={client} percentPerImage={meta?.usagePercentPerImage ?? 0} />
+        {/* finishedSignal 每跑完一轮 +1：出完图点数就变了，这时候显示的旧数字最容易误导人 */}
+        <UsageLine client={client} percentPerImage={meta?.usagePercentPerImage ?? 0} refreshSignal={gen.finishedSignal} />
       </div>
       <main className="body">
         {error !== null && <p className="alert">{error}</p>}
@@ -304,7 +349,14 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
         ) : paramsOpen ? (
           <Params workspace={workspace} meta={meta} onChange={updateWorkspace} />
         ) : (
-          <TabBody tab={tab} meta={meta} workspace={workspace} onWorkspaceChange={updateWorkspace} />
+          <TabBody
+            tab={tab}
+            meta={meta}
+            client={client}
+            gen={gen}
+            workspace={workspace}
+            onWorkspaceChange={updateWorkspace}
+          />
         )}
       </main>
       {!overlay && tab === 'workbench' && (
@@ -317,6 +369,8 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
           onSend={send}
           onOpenLog={openLog}
           onOpenStyles={() => setTab('styles')}
+          onGenerate={() => generate(workspace)}
+          generating={gen.live || gen.starting}
         />
       )}
       <nav className="tabs">
