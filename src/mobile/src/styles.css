@@ -56,8 +56,12 @@ body {
 
 .body {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   overflow-y: auto;
+  /* 兜底：真正的病根是网格/flex 子项撑爆列宽（见 .two、.field 的 min-width: 0），
+     这行只是不让那种情况在手机上表现成一条能拖的横向滚动条 */
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   padding: 12px;
   display: flex;
@@ -78,9 +82,17 @@ body {
   font-size: 12.5px;
 }
 
-.field { display: flex; flex-direction: column; gap: 4px; color: var(--ink-dim); font-size: 12.5px; }
+/*
+ * min-width: 0 是必须的：.field 在 .two 里是 grid 子项，默认 min-width: auto，
+ * 会按内容的 min-content 撑列宽——select 的 min-content 是它最宽那个选项的宽度
+ * （如 'nai-diffusion-4-5-curated'、'k_dpmpp_2s_ancestral'），一长就把 1fr 列撑爆，
+ * 右列被挤出屏幕、出现横向滚动条。.field 自身也是个 flex 容器（flex-direction: column），
+ * 同一条规则在这一层也要写，否则里面的 input/select 还是会把 .field 撑宽。
+ */
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; color: var(--ink-dim); font-size: 12.5px; }
 
 .field input {
+  width: 100%;
   background: var(--input);
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -94,6 +106,9 @@ body {
 .field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
 
 .field select {
+  /* min-width: 0 同上：select 是替换元素，不写这行它不会跟着容器收窄 */
+  width: 100%;
+  min-width: 0;
   background: var(--input);
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -124,8 +139,9 @@ body {
 .usage-bar .dim { color: var(--ink-faint); }
 
 /* ── 参数页（计划 Task 13） ── */
-.params-page { display: flex; flex-direction: column; gap: 10px; }
-.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.params-page { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+/* min-width: 0 同 .field 上那条注释的理由：.two 自己也是 .params-page 这个 flex 容器的子项 */
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; min-width: 0; }
 
 .field-check {
   display: flex;
