@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import QRCode from 'qrcode'
 import {
   API_TYPES,
   IMAGE_FORMATS,
@@ -14,7 +15,9 @@ import {
   type OpenAIReasoningDialect,
   type OpenAIReasoningEffort,
 } from '@shared/config'
+import type { MobileStatus } from '@shared/ipc'
 import { PIXEL_PRESETS, pixelPresetOf } from '@shared/naiOptions'
+import { formatRoundTime } from '../formatTime'
 import { useConfig } from '../state/config'
 import { isSettingsDirty, numericTextFrom, type NumericText } from '../settingsDraft'
 import AutoTextarea from './AutoTextarea'
@@ -77,6 +80,58 @@ interface Props {
   onDirtyChange: (dirty: boolean) => void
 }
 
+/** 手机端服务状态多久刷新一次：不需要实时，几秒钟发现设备变化或服务起停就够用 */
+const MOBILE_POLL_MS = 4000
+
+/** 配对码剩余时间，mm:ss；已过期显示 0:00（下一次刷新会把 code 换成 null，界面转去显示「生成中」） */
+function formatRemainingMs(expiresAt: number, now: number): string {
+  const totalSec = Math.max(0, Math.ceil((expiresAt - now) / 1000))
+  return `${Math.floor(totalSec / 60)}:${String(totalSec % 60).padStart(2, '0')}`
+}
+
+/**
+ * 手机端分组的服务状态：轮询 + 换码 / 吊销。这份状态与设置草稿无关——它读的是
+ * 服务的当前实况，不是「保存后会变成什么样」，所以单独一个 hook 而不是塞进 draft。
+ */
+function useMobileStatus(active: boolean): {
+  status: MobileStatus | null
+  refreshCode: () => void
+  revoke: (deviceId: string) => void
+} {
+  const [status, setStatus] = useState<MobileStatus | null>(null)
+
+  useEffect(() => {
+    // 不在设置标签时不必轮询：省一份定时器，也省一次跨进程调用
+    if (!active) return
+    let cancelled = false
+    const load = (): void => {
+      void window.api.mobileStatus().then((s) => {
+        if (!cancelled) setStatus(s)
+      })
+    }
+    load()
+    const timer = setInterval(load, MOBILE_POLL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [active])
+
+  useEffect(() => {
+    // 服务在跑但配对码没有或已经过期：自动续一个。界面不该在用户第一次点开这个
+    // 分组时空等一次手动点击才出现二维码——配对码本就是一次性的，续不续都不影响安全性
+    if (status === null || !status.running) return
+    if (status.code !== null && status.codeExpiresAt !== null && status.codeExpiresAt > Date.now()) return
+    void window.api.mobileNewCode().then(setStatus)
+  }, [status])
+
+  return {
+    status,
+    refreshCode: () => void window.api.mobileNewCode().then(setStatus),
+    revoke: (deviceId) => void window.api.mobileRevoke(deviceId).then(setStatus),
+  }
+}
+
 /**
  * 设置页：顶栏与「工作台」「画风维护」并排的第三个标签（界面稿 2026-09-15-settings-tab-mockup.html，方案 A）。
  * 单列居中，分组照原来的抽屉；保存栏钉在页底，切走标签草稿不丢。
@@ -99,6 +154,38 @@ export default function SettingsPage({ active, onDirtyChange }: Props): JSX.Elem
   const [numericText, setNumericText] = useState<NumericText>(() => numericTextFrom(config))
   const [saving, setSaving] = useState(false)
   const [savedNotice, setSavedNotice] = useState(false)
+
+  const mobile = useMobileStatus(active)
+  const [mobileQr, setMobileQr] = useState<string | null>(null)
+  const mobileFirstUrl = mobile.status?.running === true ? mobile.status.urls[0] : undefined
+  const mobileCode = mobile.status?.running === true ? mobile.status.code : null
+  useEffect(() => {
+    if (mobileFirstUrl === undefined || mobileCode === null) {
+      setMobileQr(null)
+      return
+    }
+    let cancelled = false
+    // 内容是「地址 + 配对码」：手机扫码即可跳过手输那两项（同界面稿「连接桌面端」页的提示）
+    void QRCode.toDataURL(`${mobileFirstUrl}/?code=${mobileCode}`)
+      .then((data) => {
+        if (!cancelled) setMobileQr(data)
+      })
+      .catch(() => {
+        if (!cancelled) setMobileQr(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [mobileFirstUrl, mobileCode])
+
+  // 配对码剩余时间要每秒跳一下；没有有效配对码时没必要开这个定时器
+  const [mobileNow, setMobileNow] = useState(() => Date.now())
+  const mobileCodeExpiresAt = mobile.status?.running === true ? mobile.status.codeExpiresAt : null
+  useEffect(() => {
+    if (mobileCodeExpiresAt === null) return
+    const timer = setInterval(() => setMobileNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [mobileCodeExpiresAt])
 
   /** 草稿、数值原文、三个密钥框全部回到已保存的样子 */
   function resetDraft(): void {
@@ -594,6 +681,73 @@ export default function SettingsPage({ active, onDirtyChange }: Props): JSX.Elem
 
             <Group title="网络">
               {textField('proxy', '代理', { placeholder: '留空跟随系统代理，例如 http://127.0.0.1:7890' })}
+            </Group>
+
+            <Group title="手机端">
+              {checkField('mobileServerEnabled', '开启手机端服务')}
+              {numberField('mobileServerPort', '端口', { hint: '1024–65535；开关或端口改动要保存后才生效' })}
+
+              {mobile.status === null && <span className="field-hint">读取手机端服务状态…</span>}
+
+              {mobile.status !== null && (
+                <>
+                  {!mobile.status.running ? (
+                    <div className="mobile-line">
+                      {mobile.status.error !== null ? `服务没能启动：${mobile.status.error}` : '服务未开启'}
+                    </div>
+                  ) : (
+                    <div className="mobile-connect">
+                      {mobileQr !== null && <img className="mobile-qr" src={mobileQr} alt="手机扫码配对" />}
+                      <div className="mobile-connect-info">
+                        <div className="mobile-urls">
+                          {mobile.status.urls.length > 0 ? (
+                            mobile.status.urls.map((u) => (
+                              <code key={u} className="mobile-url">
+                                {u}
+                              </code>
+                            ))
+                          ) : (
+                            <span className="field-hint">本机没有可用的局域网地址，检查一下网络连接</span>
+                          )}
+                        </div>
+                        <div className="mobile-code-row">
+                          <span>
+                            配对码 <code className="mobile-code">{mobile.status.code ?? '生成中…'}</code>
+                          </span>
+                          {mobile.status.code !== null && mobile.status.codeExpiresAt !== null && (
+                            <span className="field-hint">
+                              {formatRemainingMs(mobile.status.codeExpiresAt, mobileNow)} 内有效，用一次即失效
+                            </span>
+                          )}
+                          <button type="button" onClick={mobile.refreshCode}>
+                            换一个配对码
+                          </button>
+                        </div>
+                        <span className="field-hint">手机连同一个 WiFi，扫码或手输地址与配对码即可连接</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mobile-devices">
+                    <span className="settings-subtitle">已配对设备</span>
+                    {mobile.status.devices.length === 0 ? (
+                      <span className="field-hint">还没有设备配对</span>
+                    ) : (
+                      mobile.status.devices.map((d) => (
+                        <div key={d.id} className="mobile-device-row">
+                          <span className="mobile-device-name">{d.name}</span>
+                          <span className="field-hint">
+                            配对于 {formatRoundTime(d.pairedAt)} · 最后活跃 {formatRoundTime(d.lastSeenAt)}
+                          </span>
+                          <button type="button" onClick={() => mobile.revoke(d.id)}>
+                            吊销
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
             </Group>
 
             {/* 保存栏钉在页底：系统提示词很长，滚到哪都要能直接保存 */}

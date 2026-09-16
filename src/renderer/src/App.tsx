@@ -17,7 +17,7 @@ import { initGenSubscriptions, useGen } from './state/gen'
 import { initLlmEvents } from './state/llm'
 import { initStylesPersistence, useStyles } from './state/styles'
 import { useTagdb } from './state/tagdb'
-import { initWorkspacePersistence, useWorkspace } from './state/workspace'
+import { initPresetSync, initWorkspacePersistence, useWorkspace } from './state/workspace'
 
 export default function App(): JSX.Element {
   const [version, setVersion] = useState('')
@@ -62,6 +62,8 @@ export default function App(): JSX.Element {
   useEffect(() => initLlmEvents(), [])
   // 出图进度、单张结果、seed 回填都经事件推来；挂在 App 上，切到画风维护视图时照样收
   useEffect(() => initGenSubscriptions(), [])
+  // 手机上「选为预设画风」要立刻反映到指令区；挂在 App 上，切到画风维护视图时照样收
+  useEffect(() => initPresetSync(), [])
 
   /**
    * 从没保存过设置时，启动后自动切到设置标签（规格 §14.3）。

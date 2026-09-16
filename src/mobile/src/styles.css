@@ -1,0 +1,632 @@
+/*
+ * 手机端配色与桌面端同源（照界面稿的 :root，也就是 renderer/index.css 那套中性灰）。
+ * 这里只放外壳（顶栏、标签栏、连接页、按钮与输入框）的样式，各页面自己的样式由后续任务追加。
+ */
+:root {
+  --ground: #1e1e1e;
+  --panel: #252526;
+  --panel-2: #2d2d2d;
+  --input: #1a1a1a;
+  --line: #3c3c3c;
+  --ink: #d4d4d4;
+  --ink-dim: #9d9d9d;
+  --ink-faint: #707070;
+  --accent: #4a9eff;
+  --danger: #ff6b63;
+  --warn: #e5c07b;
+  --ok: #98c379;
+  --mono: "Cascadia Mono", Consolas, "Microsoft YaHei", ui-monospace, monospace;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  /* 手机上整页不该跟着手指弹，滚动只发生在 .body 里 */
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 100dvh 而不是 100vh：手机浏览器的地址栏会伸缩，100vh 会让底部标签栏被顶到屏幕外 */
+.app { display: flex; flex-direction: column; height: 100dvh; }
+
+.head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  padding-top: calc(8px + env(safe-area-inset-top));
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.head .title { font-weight: 600; }
+.head .grow { flex: 1; }
+.sec { color: var(--ink-faint); font-size: 12px; }
+
+/* 连接状态点：绿=SSE 连着，红=断了（界面稿 .m-dot） */
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: none; }
+.dot.off { background: var(--danger); }
+
+.body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  /* 兜底：真正的病根是网格/flex 子项撑爆列宽（见 .two、.field 的 min-width: 0），
+     这行只是不让那种情况在手机上表现成一条能拖的横向滚动条 */
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.body.connect { justify-content: center; }
+
+.hint { color: var(--ink-dim); font-size: 12.5px; margin: 0; }
+
+.alert {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  color: var(--danger);
+  font-size: 12.5px;
+}
+
+/*
+ * min-width: 0 是必须的：.field 在 .two 里是 grid 子项，默认 min-width: auto，
+ * 会按内容的 min-content 撑列宽——select 的 min-content 是它最宽那个选项的宽度
+ * （如 'nai-diffusion-4-5-curated'、'k_dpmpp_2s_ancestral'），一长就把 1fr 列撑爆，
+ * 右列被挤出屏幕、出现横向滚动条。.field 自身也是个 flex 容器（flex-direction: column），
+ * 同一条规则在这一层也要写，否则里面的 input/select 还是会把 .field 撑宽。
+ */
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; color: var(--ink-dim); font-size: 12.5px; }
+
+.field input {
+  width: 100%;
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  padding: 10px;
+  font: inherit;
+  /* 16px 是 iOS 的红线：比这小的输入框一获得焦点，Safari 就会把整页放大 */
+  font-size: 16px;
+}
+
+.field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+
+.field select {
+  /* min-width: 0 同上：select 是替换元素，不写这行它不会跟着容器收窄 */
+  width: 100%;
+  min-width: 0;
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  padding: 10px;
+  font: inherit;
+  /* 16px 同 .field input：比这小的下拉一获得焦点，iOS Safari 会把整页放大 */
+  font-size: 16px;
+}
+
+.field.is-disabled { opacity: 0.6; }
+.field-hint { color: var(--ink-faint); font-size: 12px; }
+
+/* ── 顶部额度行（UsageLine，计划 Task 13） ── */
+.usage-bar {
+  padding: 4px 12px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--ink-dim);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+}
+
+.usage-bar .low { color: var(--warn); }
+.usage-bar .dim { color: var(--ink-faint); }
+
+/* ── 参数页（计划 Task 13） ── */
+.params-page { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+/* min-width: 0 同 .field 上那条注释的理由：.two 自己也是 .params-page 这个 flex 容器的子项 */
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; min-width: 0; }
+
+.field-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  color: var(--ink-dim);
+  font-size: 12.5px;
+}
+
+/* checkbox 原生默认太小，手指按不准；18px 是能兼顾观感与落点的折中，外面那圈 min-height 补足 40px */
+.field-check input { width: 18px; height: 18px; }
+
+.btn {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  /* 手指的最小落点，比桌面端按钮高一圈 */
+  min-height: 44px;
+  padding: 10px 14px;
+  font: inherit;
+}
+
+.btn.pri { background: var(--accent); border-color: var(--accent); color: #0b1b2b; font-weight: 600; }
+.btn:disabled { opacity: 0.5; }
+
+.tabs {
+  display: flex;
+  border-top: 1px solid var(--line);
+  background: var(--panel-2);
+  /* 全面屏底部的手势指示条要让开，否则最后一个标签按不到 */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.tabs button {
+  flex: 1;
+  background: none;
+  border: none;
+  box-shadow: inset 0 2px 0 transparent;
+  color: var(--ink-dim);
+  padding: 11px 0 12px;
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.tabs button.on { color: var(--ink); box-shadow: inset 0 2px 0 var(--accent); }
+
+/* ── 工作台：一行一块（界面稿第二节「方案 A」的 .blk） ── */
+
+.blk {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  width: 100%;
+  /* 手指的最小落点。界面稿里 .blk 只有 padding，照抄出来单行块才 32px，按不准 */
+  min-height: 40px;
+  padding: 8px;
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+}
+
+.blk i {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 3px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  /* 徽章底色由 BlockRow 按 FieldSpec.hue 给，这里只定形状 */
+}
+
+/* 没有对应 FieldSpec 的行（画面文字、负面词、坐标）：中性灰，不冒充提示词字段 */
+.blk i.plain { background: var(--line); color: var(--ink-dim); }
+
+.blk span {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  /* 提示词里多的是超长的连写标签，不 break-all 会把整行撑出屏幕 */
+  word-break: break-all;
+}
+
+.blk span.empty { color: var(--ink-faint); font-family: inherit; }
+
+.tokens { margin: 0; color: var(--ink-faint); font-size: 12px; }
+.tokens.over { color: var(--danger); }
+
+/* 分区标题行（角色） */
+.sect { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.sect-name { font-weight: 600; }
+.sect .grow { flex: 1; }
+
+.btn.sm { min-height: 34px; padding: 6px 10px; font-size: 12.5px; }
+
+/* 角色页签：横着滚，角色多了也不占竖向的位置 */
+.chips { display: flex; gap: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+
+.chip {
+  flex: none;
+  min-height: 40px;
+  padding: 8px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.chip.on { border-color: var(--accent); color: var(--ink); }
+
+/* ── 底部编辑弹层（界面稿第二节的 .m-sheet） ── */
+
+.sheet-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: rgba(0, 0, 0, 0.55);
+  /* 遮罩上滑动不该带着底下的列表一起滚 */
+  overscroll-behavior: contain;
+}
+
+.sheet {
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  border-radius: 12px 12px 0 0;
+  padding: 10px 12px;
+  /* 全面屏底部手势条要让开；软键盘顶起时由 .sheet-mask 的 padding-bottom 再补一段 */
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /*
+   * 不写死高度：红字有几行、说明有多长都不一样，撑不下时弹层自己滚。
+   * 用 100% 而不是 80dvh —— 百分比是照遮罩的内容盒算的，软键盘顶起时遮罩的
+   * padding-bottom 已经把键盘那段扣掉了，dvh 则扣不掉，弹层会从顶上溢出去。
+   */
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sheet-head { display: flex; align-items: center; gap: 8px; }
+.sheet-head b { color: var(--ink); font-family: var(--mono); font-size: 13px; }
+.sheet-head .grow { flex: 1; }
+
+.sheet textarea {
+  background: var(--input);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--ink);
+  padding: 8px;
+  font-family: var(--mono);
+  /* 16px 是 iOS 的红线：比这小的输入框一获得焦点，Safari 就会把整页放大 */
+  font-size: 16px;
+  line-height: 1.5;
+  /* 短内容也给够 4 行的手感，长内容到 32vh 就自己滚，键盘弹起来时不会把「完成」挤出屏幕 */
+  min-height: 96px;
+  max-height: 32vh;
+  resize: none;
+}
+
+.sheet textarea:focus { outline: none; }
+
+/* enum 字段（角色的 count）：一排选项按钮，没有输入框可打 */
+.sheet-opts { display: flex; gap: 8px; flex-wrap: wrap; }
+.sheet-opts .btn { flex: 1; min-width: 72px; }
+.sheet-opts .btn.on { border-color: var(--accent); color: var(--accent); }
+
+/* 问题清单：跟着输入实时刷新，写完再说哪儿不对人已经切走了 */
+.sheet-warn {
+  margin: 0;
+  color: var(--danger);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* ── 指令区（界面稿第二节方案 A 的 .m-dock，计划 Task 14） ── */
+
+.dock {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 12px;
+  background: var(--panel-2);
+  border-top: 1px solid var(--line);
+}
+
+.dock-sum { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+.dock-sum .sum-text {
+  /* min-width: 0 + 省略号：摘要一长（`多角色 位置由模型安排 · …`）就会把右边的「选项 ▾」挤出屏幕 */
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 11.5px;
+  text-align: left;
+}
+
+.dock-sum .sum-link { flex: none; background: none; border: none; padding: 2px 0; color: var(--accent); font: inherit; font-size: 11.5px; }
+
+.dock .ask {
+  width: 100%;
+  min-width: 0;
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  padding: 8px;
+  font: inherit;
+  /* 16px 是 iOS 的红线：比这小的输入框一获得焦点，Safari 就会把整页放大 */
+  font-size: 16px;
+  line-height: 1.5;
+  /* 四行的手感；再长就自己滚，免得把发送那一行挤出屏幕 */
+  min-height: 62px;
+  max-height: 22dvh;
+  resize: none;
+}
+
+.dock .ask:focus { outline: none; border-color: var(--accent); }
+.dock .ask:disabled { opacity: 0.6; }
+
+.dock-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dock-row .grow { flex: 1; min-width: 0; }
+
+/* 跑图次数：参数页里也有同一个值，这里放一个是因为发之前最常改的就是它 */
+.run-count { display: flex; align-items: center; gap: 6px; flex: none; color: var(--ink-dim); font-size: 12.5px; }
+
+.run-count input {
+  width: 52px;
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  padding: 6px;
+  font: inherit;
+  font-size: 16px;
+  text-align: center;
+}
+
+.run-count input:focus { outline: none; border-color: var(--accent); }
+
+.btn.gen { flex: none; border-color: var(--accent); color: var(--accent); }
+.btn.danger { border-color: var(--danger); color: var(--danger); }
+.btn.on { border-color: var(--accent); color: var(--accent); }
+
+/* 选项面板的一行：左边说明，右边「开 / 关」 */
+.opt-row { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 40px; }
+.opt-label { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.opt-row .btn.sm { flex: none; min-width: 60px; }
+
+.preset-line {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink-dim);
+  font-size: 12.5px;
+}
+
+.ok { color: var(--ok); }
+.dim { color: var(--ink-faint); }
+
+/* ── LLM 日志页（界面稿第三节 .m-log） ── */
+
+.log {
+  /* 自己滚而不是让整页滚：下面那句「回填的是手机上这一份」要一直看得见 */
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* 工具结果里成串的英文标签不断行会撑出屏幕；anywhere 比 break-all 少切断中文词 */
+.log .ln { overflow-wrap: anywhere; }
+.log .ln .t { color: var(--ink-faint); }
+.log .ln .lv { color: var(--ink-dim); }
+.log .ln.ok { color: var(--ok); }
+.log .ln.w { color: var(--warn); }
+.log .ln.e { color: var(--danger); }
+
+/* ── 出图页（界面稿第三节中间那张，计划 Task 15） ── */
+.gen-page { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+.gen-bar { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* min-width: 0 + 省略号：状态行带上失败数之后会比按钮先长出去，挤走「取消」 */
+.gen-status { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gen-bar .grow { flex: none; }
+
+/* 两列。390px 宽下一列太浪费，三列的缩略图小到看不出画的是什么 */
+.gen-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; min-width: 0; }
+
+.gen-slot {
+  width: 100%;
+  min-width: 0;
+  /* 高度由 aspect-ratio 撑（出图页按那一轮的宽高比给），不写死像素：竖图方图差得远 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink-faint);
+  font-size: 12px;
+  text-align: center;
+  overflow: hidden;
+}
+
+/* 缩略图铺满整格：上面那点内边距是给「生成中 / 失败原因」这类文字占位用的 */
+img.gen-slot { padding: 0; object-fit: cover; }
+
+.gen-slot.is-running { border-color: var(--accent); color: var(--accent); }
+.gen-slot.is-failed { border-color: var(--danger); color: var(--danger); overflow-wrap: anywhere; }
+
+.gen-where { margin: 0; overflow-wrap: anywhere; }
+.gen-where code { font-family: var(--mono); color: var(--ink-dim); }
+
+/* ── 点开一张：大图 + 这张的参数（界面稿第三节右边那张） ── */
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  background: var(--ground);
+}
+
+.viewer-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  padding-top: calc(8px + env(safe-area-inset-top));
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.viewer-head .grow { flex: 1; }
+.viewer-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 13px; }
+
+.viewer-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 宽度撑满、高度自己按比例来；上限留给参数行与两个按钮，免得竖图把它们顶到屏幕外 */
+.viewer-img { width: 100%; max-height: 62vh; object-fit: contain; border-radius: 6px; background: var(--panel); }
+
+.viewer-actions { display: flex; gap: 8px; min-width: 0; }
+.viewer-actions .btn { flex: 1; min-width: 0; }
+
+/* 复制不了时摊开让人自己长按选 */
+.viewer-fallback {
+  width: 100%;
+  min-height: 96px;
+  padding: 8px 10px;
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  resize: none;
+}
+
+/* ── 历史页（计划 Task 16，界面稿第四节左边那张） ── */
+
+/* 列表顶部与详情顶部共用同一条：左边一句说明或返回按钮，右边留白或一个按钮 */
+.history-bar { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+.history-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+}
+
+/* 固定宽度 + aspect-ratio 撑高：不写死像素，列表缩略图统一按方图裁（同桌面端历史竖栏） */
+.history-thumb {
+  width: 56px;
+  aspect-ratio: 1 / 1;
+  flex: none;
+  border-radius: 4px;
+  background: var(--input);
+  object-fit: cover;
+}
+
+.history-thumb.empty { border: 1px dashed var(--line); }
+
+.history-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.history-title { font-weight: 600; font-size: 13px; }
+.history-sub { color: var(--ink-dim); font-size: 12px; }
+
+/* ── 画风页（计划 Task 17，界面稿第四节中间那张） ── */
+
+.style-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+
+.style-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+/* 固定宽度：只有当前预设那一条画出圆点，其余留白对齐，名字列不因为有没有点而错位 */
+.style-dot { flex: none; width: 12px; text-align: center; color: var(--ok); font-size: 9px; }
+
+.style-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.style-name { font-weight: 600; font-size: 13px; }
+
+.style-tags {
+  color: var(--ink-faint);
+  font-size: 11.5px;
+  font-family: var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.style-tags.is-empty { font-family: inherit; }
+
+/* 回填成功后那句绿字，点一下消掉 */
+.notice {
+  margin: 0;
+  padding: 8px 10px;
+  background: none;
+  border: 1px solid var(--ok);
+  border-radius: 6px;
+  color: var(--ok);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: left;
+  overflow-wrap: anywhere;
+}

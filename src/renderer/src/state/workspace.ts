@@ -86,3 +86,22 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
 
   dismissSaveError: () => set({ saveError: null }),
 }))
+
+/**
+ * 订阅手机端的「选为预设画风」。由 App 挂载时调用一次，返回值即 cleanup
+ * （同 initWorkspacePersistence：不在模块求值期挂，vitest 的 node 环境一 import 就撞 window）。
+ *
+ * 走 update 而不是直接 set：这样它跟桌面端自己改预设走同一条路，会排进防抖存盘，
+ * 内存态与磁盘态就此对上——否则渲染进程下一次存盘会把服务端写进去的 presetId 覆盖回旧值。
+ * 只碰 console.presetId，工作区别的字段一个不动（手机端那边改的也只有这一个）。
+ *
+ * 工作区还没载入时 update 是空操作，这里不补救：那种时序下 load() 从磁盘读回来的
+ * 内容本来就带着新的 presetId。
+ */
+export function initPresetSync(): () => void {
+  return window.api.onPresetChanged((presetId) =>
+    useWorkspace.getState().update((ws) => {
+      ws.console.presetId = presetId
+    }),
+  )
+}

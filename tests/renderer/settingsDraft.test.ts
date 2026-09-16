@@ -53,6 +53,24 @@ describe('isSettingsDirty', () => {
     expect(isSettingsDirty({ ...state, numericText: { ...state.numericText, [key]: '1e' } }, saved)).toBe(true)
   })
 
+  it('手机端「开启」开关改了：算改过，改回去就不算了', () => {
+    const { saved, state } = clean()
+    const dirty = { ...state, draft: { ...saved, mobileServerEnabled: !saved.mobileServerEnabled } }
+    expect(isSettingsDirty(dirty, saved)).toBe(true)
+    expect(isSettingsDirty({ ...dirty, draft: { ...dirty.draft, mobileServerEnabled: saved.mobileServerEnabled } }, saved)).toBe(false)
+  })
+
+  it('手机端端口改了：算改过，撤销（原文与草稿都退回）就不算了', () => {
+    const { saved, state } = clean()
+    const dirty = {
+      ...state,
+      draft: { ...saved, mobileServerPort: 8080 },
+      numericText: { ...state.numericText, mobileServerPort: '8080' },
+    }
+    expect(isSettingsDirty(dirty, saved)).toBe(true)
+    expect(isSettingsDirty(state, saved)).toBe(false)
+  })
+
   it('任一密钥框有输入：算改过', () => {
     const { saved, state } = clean()
     expect(isSettingsDirty({ ...state, secrets: ['', '', 'k'] }, saved)).toBe(true)

@@ -67,6 +67,11 @@ export class GenRunner {
 
   constructor(private readonly deps: GenRunnerDeps) {}
 
+  /** 是否有一轮在途；手机端 HTTP 服务的 GET /api/meta 拿它拼 busy.gen（计划 Task 5） */
+  get busy(): boolean {
+    return this.running
+  }
+
   async start(input: GenStartInput, config: AppConfig, token: string): Promise<RunProgress> {
     if (this.running) throw new Error('已有一轮正在进行中。请先等待它结束或取消。')
     this.running = true

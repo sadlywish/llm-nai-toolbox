@@ -9,12 +9,14 @@ import {
   type MagicListResult,
   type MagicSearchResult,
   type MagicTreeResult,
+  type MobileStatus,
   type TagdbCompleteInput,
 } from '@shared/ipc'
 import { parseGenStartInput, type ReadImageInput } from '@shared/gen'
-import { parseLlmRunInput, type LlmEvent, type LlmRunResult } from '@shared/llm'
+import { parseLlmRunInput, type LlmRunResult } from '@shared/llm'
 import { normalizeStyles } from '@shared/styles'
 import { normalizeWorkspace } from '@shared/workspace'
+import { AppEvents } from './appEvents'
 import { ConfigStore } from './config-store'
 import { createDanbooruClient, fail as danbooruFail, type DanbooruClient } from './danbooru/client'
 import { GenRunner } from './gen/runner'
@@ -22,7 +24,7 @@ import { createClaudeChat } from './llm/claude'
 import { prepareTagData } from './llm/data'
 import { createOpenAIChat } from './llm/openai'
 import { TAG_MANUALS, TAG_MANUAL_TOC, TAG_SKILL_CORE } from './llm/resources'
-import { runLlm } from './llm/runner'
+import { LlmSession } from './llm/session'
 import { generateImage } from './nai/client'
 import { loadRecentRounds, readRoundImage, readRoundImageMeta } from './nai/index-store'
 import { fetchSubscription } from './nai/user'
@@ -77,9 +79,55 @@ function asReadImageInput(v: unknown): ReadImageInput | null {
   return typeof roundStartedAt === 'string' && typeof file === 'string' ? { roundStartedAt, file } : null
 }
 
+/**
+ * 主进程里「有状态、要被复用」的那几样。IPC 与手机端 HTTP 服务必须拿到**同一份**：
+ * 各造一份的话，在途保护（同一时刻只跑一轮）与事件订阅就会各说各话——
+ * 电脑和手机能同时发起一轮，回填互相覆盖。所以 registerIpc 把它们交出来，
+ * 由 index.ts 转手给服务层，而不是让服务层自己 new。
+ */
+export interface MainServices {
+  configStore: ConfigStore
+  secrets: SecretStore
+  stylesStore: JsonStore<unknown>
+  workspaceStore: JsonStore<unknown>
+  genRunner: GenRunner
+  llmSession: LlmSession
+  events: AppEvents
+}
+
+/**
+ * index.ts 往里填的回调。做成「可后填的对象」而不是 registerIpc 的必填参数，是因为
+ * 手机端服务要拿 registerIpc 的返回值才能构造——先有 IPC 才有服务，回调只能晚一步挂上来。
+ * 这样 ipc.ts 不必 import server/http.ts，依赖方向仍是 index.ts → ipc.ts、index.ts → server。
+ */
+export interface IpcHooks {
+  /** 保存设置后开关或端口变了；实现方负责按新配置重启服务 */
+  onMobileServerSettingsChanged?: (settings: { enabled: boolean; port: number }) => void
+  /**
+   * 设置页「手机端」分组的三个操作，由 index.ts 在服务与设备表建好之后注入（同
+   * onMobileServerSettingsChanged 的理由：ipc.ts 不能 import server/http.ts）。
+   * 注册 IPC 处理器时钩子可能还没填上（服务还没起），未注入时给一份「未运行」的状态。
+   */
+  getMobileStatus?: () => MobileStatus
+  newMobileCode?: () => MobileStatus
+  revokeMobileDevice?: (deviceId: string) => MobileStatus
+}
+
+/** 钩子还没注入时的兜底状态：不代表真的关闭，只是「还不知道」，界面按未运行处理 */
+const NO_MOBILE_STATUS: MobileStatus = {
+  running: false,
+  port: null,
+  urls: [],
+  code: null,
+  codeExpiresAt: null,
+  devices: [],
+  error: null,
+}
+
 export function registerIpc(
   appInfo: { isPackaged: boolean; resourcesPath: string; appRoot: string; userDataDir: string },
-): void {
+  hooks: IpcHooks = {},
+): MainServices {
   if (registered) {
     throw new Error('registerIpc 只能在整个应用生命周期里调用一次，见函数注释')
   }
@@ -90,6 +138,8 @@ export function registerIpc(
   // 读进来的形状不可信，一律交给 normalizeWorkspace，所以这里存 unknown
   const workspaceStore = new JsonStore<unknown>(join(appInfo.userDataDir, 'workspace.json'), () => null)
   const stylesStore = new JsonStore<unknown>(join(appInfo.userDataDir, 'styles.json'), () => [])
+  // 主进程事件总线。出图事件原本直接广播给窗口，现在先进总线——手机端 HTTP 服务要订同一份
+  const events = new AppEvents()
 
   const danbooruCacheDir = join(appInfo.userDataDir, 'danbooru-cache')
   // 用户名与 Key 在构造时读一次；保存设置后整个重建（令牌桶、内存缓存跟着换新，磁盘缓存不受影响）
@@ -128,12 +178,24 @@ export function registerIpc(
     const config = mergeConfig(input.config)
     const errors = Object.values(validateConfig(config))
     if (errors.length > 0) throw new Error(`配置不合法：${errors.join('；')}`)
+    // 写盘前先读一份旧的：手机端服务只在开关或端口真的变了时才重启，
+    // 每次保存设置都重启会把正在看进度的手机踢下线
+    const before = configStore.read()
     configStore.write(config)
     // 去掉首尾空白：复制粘贴的 Key 常带一个换行，带着它请求会被判 401
     if (typeof input.llmApiKey === 'string') secrets.write('llmApiKey', input.llmApiKey.trim())
     if (typeof input.naiToken === 'string') secrets.write('naiToken', input.naiToken.trim())
     if (typeof input.danbooruApiKey === 'string') secrets.write('danbooruApiKey', input.danbooruApiKey.trim())
     danbooru = buildDanbooru()
+    if (
+      before.mobileServerEnabled !== config.mobileServerEnabled ||
+      before.mobileServerPort !== config.mobileServerPort
+    ) {
+      hooks.onMobileServerSettingsChanged?.({
+        enabled: config.mobileServerEnabled,
+        port: config.mobileServerPort,
+      })
+    }
     // 代理是 session 级设置，改了立刻重新应用，否则就是「填了要重启才生效」
     void applyProxy(config.proxy)
       .then((r) => {
@@ -141,6 +203,14 @@ export function registerIpc(
       })
       .catch((e: unknown) => console.warn('[proxy] 应用代理失败：', e))
   })
+
+  // 设置页「手机端」分组：状态是只读查询，换码与吊销是写操作，三个都直接回最新状态，
+  // 省得设置页再补一次查询才能刷新界面
+  ipcMain.handle(IPC.mobileStatus, (): MobileStatus => hooks.getMobileStatus?.() ?? NO_MOBILE_STATUS)
+  ipcMain.handle(IPC.mobileNewCode, (): MobileStatus => hooks.newMobileCode?.() ?? NO_MOBILE_STATUS)
+  ipcMain.handle(IPC.mobileRevoke, (_e, deviceId: unknown): MobileStatus =>
+    typeof deviceId === 'string' ? (hooks.revokeMobileDevice?.(deviceId) ?? NO_MOBILE_STATUS) : NO_MOBILE_STATUS,
+  )
 
   ipcMain.handle(IPC.pickDirectory, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
@@ -319,46 +389,41 @@ export function registerIpc(
     }
   })
 
-  /** 正在跑的那一轮。同一时刻只允许一轮：两轮并发写同一份工作区，回填结果谁先谁后说不清 */
-  let currentRun: AbortController | null = null
+  /**
+   * 同一时刻只允许一轮，闸在 LlmSession 里（手机端 HTTP 服务要用同一道闸）。
+   * 每轮的依赖在开跑那一刻现做：配置在发送那一刻读一次，这一轮跑完之前改设置不影响这一轮
+   */
+  const llmSession = new LlmSession((_input, signal, emit) => {
+    const config = configStore.read()
+    return {
+      config,
+      // 明文 Key 只在主进程里用，不进入参、返回值与日志
+      apiKey: secrets.read('llmApiKey').trim(),
+      chat: config.apiType === 'claude' ? createClaudeChat(appFetch) : createOpenAIChat(appFetch),
+      prepareData: (log) => prepareTagData(loader, extras, config, log),
+      manuals: TAG_MANUALS,
+      manualToc: TAG_MANUAL_TOC,
+      skillCore: TAG_SKILL_CORE,
+      signal,
+      emit,
+    }
+  })
 
+  // 保持 async：入参不合法时原来是「返回被拒的 Promise」，同步抛出在 ipcMain.handle 里是另一条路径
   ipcMain.handle(IPC.llmRun, async (event, raw: unknown): Promise<LlmRunResult> => {
     // IPC 边界不能假定调用方守规矩：入参先校验，工作区快照过 normalizeWorkspace
     const input = parseLlmRunInput(raw)
     if (typeof input === 'string') throw new Error(input)
-    if (currentRun !== null) throw new Error('上一轮还在运行，先等它结束或中止')
-
-    // 配置在发送那一刻读一次：这一轮跑完之前改设置，不影响这一轮
-    const config = configStore.read()
-    const controller = new AbortController()
-    currentRun = controller
     const sender = event.sender
-    try {
-      const result = await runLlm(input, {
-        config,
-        // 明文 Key 只在主进程里用，不进入参、返回值与日志
-        apiKey: secrets.read('llmApiKey').trim(),
-        chat: config.apiType === 'claude' ? createClaudeChat(appFetch) : createOpenAIChat(appFetch),
-        prepareData: (log) => prepareTagData(loader, extras, config, log),
-        manuals: TAG_MANUALS,
-        manualToc: TAG_MANUAL_TOC,
-        skillCore: TAG_SKILL_CORE,
-        signal: controller.signal,
-        // 只推给发起这一轮的窗口；窗口关了就不推
-        emit: (e) => {
-          if (!sender.isDestroyed()) sender.send(IPC.llmEvent, e)
-        },
-      })
-      // 收尾经事件送达：与日志同一条通道，保证排在最后一行日志之后
-      if (!sender.isDestroyed()) sender.send(IPC.llmEvent, { kind: 'finished', result } satisfies LlmEvent)
-      return result
-    } finally {
-      currentRun = null
-    }
+    // LLM 事件只推给发起这一轮的窗口（与出图不同：出图是广播），窗口关了就不推。
+    // 收尾的 finished 也走这条通道，保证排在最后一行日志之后
+    return llmSession.run(input, (e) => {
+      if (!sender.isDestroyed()) sender.send(IPC.llmEvent, e)
+    })
   })
 
   ipcMain.handle(IPC.llmAbort, () => {
-    currentRun?.abort()
+    llmSession.abort()
   })
 
   /** 出图事件广播给当前所有窗口（同 tagdb 状态）：跑图中重开的窗口也要能看到进度 */
@@ -367,6 +432,28 @@ export function registerIpc(
       if (!w.isDestroyed()) w.webContents.send(channel, payload)
     }
   }
+
+  // 出图事件先进总线再由这里广播，手机端 HTTP 服务订同一份总线（计划 Task 8、9）。
+  // llm 事件不在这里处理：它只发给发起那一轮的窗口，广播出去会串到别的窗口上
+  events.on((e) => {
+    switch (e.kind) {
+      case 'gen-progress':
+        broadcast(IPC.genProgress, e.progress)
+        break
+      case 'gen-image':
+        broadcast(IPC.genImage, e.image)
+        break
+      case 'gen-seed':
+        broadcast(IPC.genSeed, e.seed)
+        break
+      // 手机端选了预设画风。同出图事件广播给所有窗口：哪个窗口显示着指令区都得跟着换名字
+      case 'preset-changed':
+        broadcast(IPC.workspacePresetChanged, e.presetId)
+        break
+      default:
+        break
+    }
+  })
 
   const genRunner = new GenRunner({
     generate: (body, config, token) =>
@@ -381,9 +468,9 @@ export function registerIpc(
         body,
       ),
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-    onProgress: (p) => broadcast(IPC.genProgress, p),
-    onImage: (e) => broadcast(IPC.genImage, e),
-    onSeedResolved: (seed) => broadcast(IPC.genSeed, seed),
+    onProgress: (p) => events.emit({ kind: 'gen-progress', progress: p }),
+    onImage: (e) => events.emit({ kind: 'gen-image', image: e }),
+    onSeedResolved: (seed) => events.emit({ kind: 'gen-seed', seed }),
     now: () => new Date(),
     randomSeed: () => Math.floor(Math.random() * 4294967295),
   })
@@ -423,4 +510,6 @@ export function registerIpc(
   })
 
   void loader.load()
+
+  return { configStore, secrets, stylesStore, workspaceStore, genRunner, llmSession, events }
 }

@@ -132,6 +132,11 @@ export interface AppConfig {
 
   // ── 网络 ──
   proxy: string
+
+  // ── 手机端 ──
+  /** 默认关闭：局域网 HTTP 服务会暴露出图与 LLM 能力，不能默认开着 */
+  mobileServerEnabled: boolean
+  mobileServerPort: number
 }
 
 /** 每次都新建对象：配置会被就地修改，共享一个对象会让改一处连带改掉别处 */
@@ -199,6 +204,9 @@ export function defaultAppConfig(): AppConfig {
     danbooruLogin: '',
 
     proxy: '',
+
+    mobileServerEnabled: false,
+    mobileServerPort: 7321,
   }
 }
 
@@ -249,6 +257,8 @@ export const NUMBER_RULES: Record<NumericKey, NumberRule> = {
   tagQueryGeneralMax: { min: 0, integer: true },
   tagQuerySeriesMax: { min: 0, integer: true },
   tagQueryWikiLength: { min: 0, integer: true },
+  // 局域网服务端口；越界的值（如手改配置文件填了系统保留端口）回到默认值 7321
+  mobileServerPort: { min: 1024, max: 65535, integer: true },
 }
 
 function numberRuleError(rule: NumberRule, value: number): string | null {

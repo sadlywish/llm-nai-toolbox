@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit=cover：全面屏手机要自己让开刘海与底部指示条，让位靠 styles.css 里的 env(safe-area-inset-*) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- 只有深色一套配色（与桌面端同源），告诉浏览器别再给表单控件套浅色 -->
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#1e1e1e" />
+    <!-- 「添加到主屏幕」之后按全屏应用打开（规格 §2） -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>llm-nai-toolbox 手机端</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

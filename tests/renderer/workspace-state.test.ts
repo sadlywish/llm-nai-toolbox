@@ -8,17 +8,30 @@ let api: {
   loadWorkspace: ReturnType<typeof vi.fn>
   saveWorkspace: ReturnType<typeof vi.fn>
   flushWorkspace: ReturnType<typeof vi.fn>
+  onPresetChanged: ReturnType<typeof vi.fn>
 }
+/** initPresetSync 挂上来的那个回调；测试用它冒充主进程推来的一条 preset-changed */
+let pushPreset: (presetId: string) => void
+let offPreset: ReturnType<typeof vi.fn>
 let win: { api: typeof api; addEventListener: ReturnType<typeof vi.fn>; removeEventListener: ReturnType<typeof vi.fn> }
 
 beforeEach(async () => {
   vi.useFakeTimers()
   vi.resetModules()
+  offPreset = vi.fn()
+  pushPreset = () => {
+    throw new Error('还没调用 initPresetSync')
+  }
   api = {
     loadWorkspace: vi.fn().mockResolvedValue(emptyWorkspace()),
     saveWorkspace: vi.fn().mockResolvedValue(undefined),
     flushWorkspace: vi.fn().mockReturnValue(true),
+    onPresetChanged: vi.fn(),
   }
+  api.onPresetChanged.mockImplementation((cb: unknown) => {
+    pushPreset = cb as (presetId: string) => void
+    return offPreset
+  })
   win = { api, addEventListener: vi.fn(), removeEventListener: vi.fn() }
   ;(globalThis as Record<string, unknown>).window = win
   mod = await import('../../src/renderer/src/state/workspace')
@@ -114,5 +127,45 @@ describe('useWorkspace', () => {
     const handler = win.addEventListener.mock.calls[0][1]
     off()
     expect(win.removeEventListener).toHaveBeenCalledWith('beforeunload', handler)
+  })
+})
+
+describe('initPresetSync（手机端改了预设画风）', () => {
+  it('只改 console.presetId，工作区别的字段原样不动', async () => {
+    await mod.useWorkspace.getState().load()
+    mod.useWorkspace.getState().update((ws) => {
+      ws.main.artist = 'artist:wlop'
+      ws.negative = '原有负面词'
+      ws.params.steps = 40
+      ws.console.instruction = '画个猫'
+      ws.console.presetId = 'st-old'
+    })
+    const before = mod.useWorkspace.getState().workspace!
+
+    mod.initPresetSync()
+    pushPreset('st-new')
+
+    const after = mod.useWorkspace.getState().workspace!
+    expect(after.console.presetId).toBe('st-new')
+    expect(after.main).toEqual(before.main)
+    expect(after.negative).toBe(before.negative)
+    expect(after.params).toEqual(before.params)
+    expect(after.console.instruction).toBe(before.console.instruction)
+  })
+
+  it('改动走防抖存盘，磁盘上那份也跟着换成新预设', async () => {
+    await mod.useWorkspace.getState().load()
+    mod.initPresetSync()
+    pushPreset('st-new')
+    await vi.advanceTimersByTimeAsync(mod.SAVE_DEBOUNCE_MS)
+    expect(api.saveWorkspace).toHaveBeenCalledTimes(1)
+    expect(api.saveWorkspace.mock.calls[0][0].console.presetId).toBe('st-new')
+  })
+
+  it('返回的函数摘掉订阅', () => {
+    const off = mod.initPresetSync()
+    expect(api.onPresetChanged).toHaveBeenCalledTimes(1)
+    off()
+    expect(offPreset).toHaveBeenCalledTimes(1)
   })
 })

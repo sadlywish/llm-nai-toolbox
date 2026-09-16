@@ -239,6 +239,18 @@ describe('NovelAI 设置项', () => {
   })
 })
 
+describe('手机端服务', () => {
+  it('手机端服务默认关闭，端口 7321', () => {
+    const c = defaultAppConfig()
+    expect([c.mobileServerEnabled, c.mobileServerPort]).toEqual([false, 7321])
+  })
+  it('端口越界回到默认值', () => {
+    expect(mergeConfig({ mobileServerPort: 80 }).mobileServerPort).toBe(7321)
+    expect(mergeConfig({ mobileServerPort: 70000 }).mobileServerPort).toBe(7321)
+    expect(mergeConfig({ mobileServerPort: 8080 }).mobileServerPort).toBe(8080)
+  })
+})
+
 describe('OpenAI 兼容接口的思维链与附加参数', () => {
   it('默认值：reasoning_effort 写法、high、不发预算、没有附加参数', () => {
     const cfg = defaultAppConfig()

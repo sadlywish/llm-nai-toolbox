@@ -17,6 +17,7 @@ import {
   type MagicListResult,
   type MagicSearchResult,
   type MagicTreeResult,
+  type MobileStatus,
   type TagdbCompleteInput,
   type TagdbCompleteResult,
   type TagdbStatus,
@@ -47,6 +48,11 @@ const api = {
   loadConfig: (): Promise<ConfigLoadResult> => ipcRenderer.invoke(IPC.configLoad),
 
   saveConfig: (input: ConfigSaveInput): Promise<void> => ipcRenderer.invoke(IPC.configSave, input),
+
+  /** 设置页「手机端」分组：服务状态、地址、配对码、已配对设备，三个都直接回最新状态 */
+  mobileStatus: (): Promise<MobileStatus> => ipcRenderer.invoke(IPC.mobileStatus),
+  mobileNewCode: (): Promise<MobileStatus> => ipcRenderer.invoke(IPC.mobileNewCode),
+  mobileRevoke: (deviceId: string): Promise<MobileStatus> => ipcRenderer.invoke(IPC.mobileRevoke, deviceId),
 
   /** 系统的选择文件夹对话框；取消返回空串 */
   pickDirectory: (): Promise<string> => ipcRenderer.invoke(IPC.pickDirectory),
@@ -103,6 +109,13 @@ const api = {
     const handler = (_e: unknown, seed: number): void => cb(seed)
     ipcRenderer.on(IPC.genSeed, handler)
     return () => ipcRenderer.off(IPC.genSeed, handler)
+  },
+
+  /** 手机端改了预设画风；返回取消订阅的函数（同 onTagdbStatus） */
+  onPresetChanged: (cb: (presetId: string) => void): (() => void) => {
+    const handler = (_e: unknown, presetId: string): void => cb(presetId)
+    ipcRenderer.on(IPC.workspacePresetChanged, handler)
+    return () => ipcRenderer.off(IPC.workspacePresetChanged, handler)
   },
 
   /** 保存目录下最近「历史保留天数」天的轮次，最新的在前 */
