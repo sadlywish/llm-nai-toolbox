@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Capacitor 模板引用了这三个但没给值，缺了编译过不去 -->
+    <color name="colorPrimary">#1E1E1E</color>
+    <color name="colorPrimaryDark">#121212</color>
+    <color name="colorAccent">#4A9EFF</color>
+    <!-- 壳的底色，与手机端页面的底色一致（见 src/mobile/src/styles.css 里的 ground 变量） -->
+    <color name="shellBackground">#1E1E1E</color>
+</resources>

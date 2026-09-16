@@ -7,7 +7,6 @@
   },
   "server": {
     "cleartext": true,
-    "androidScheme": "http",
-    "allowNavigation": ["*"]
+    "androidScheme": "http"
   }
 }

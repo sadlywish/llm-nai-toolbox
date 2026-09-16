@@ -60,16 +60,23 @@
   var codeBox = document.getElementById('code')
   var errBox = document.getElementById('err')
   var recentBox = document.getElementById('recent')
+  var goBtn = document.getElementById('go')
 
   var last = null
   try { last = localStorage.getItem(KEY) } catch (e) { last = null }
   if (last) urlBox.value = last
 
-  // 只写了 ip:port 的写法最常见，补成完整地址；末尾斜杠去掉，免得拼出 //?code=
+  // 没写协议时替用户补一个：IP 或 localhost 按局域网算（http），域名按穿透算（https）。
+  // 穿透地址补成 http 连不上，局域网补成 https 同样连不上，所以按形态分开猜。
+  // 末尾斜杠去掉，免得拼出 //?code=
   function normalize(raw) {
     var v = String(raw || '').trim()
     if (!v) return null
-    if (!/^https?:\/\//i.test(v)) v = 'http://' + v
+    if (!/^https?:\/\//i.test(v)) {
+      var head = v.split('/')[0].split(':')[0]
+      var looksLikeIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(head) || head === 'localhost'
+      v = (looksLikeIp ? 'http://' : 'https://') + v
+    }
     v = v.replace(/\/+$/, '')
     try {
       var u = new URL(v)
@@ -86,11 +93,22 @@
     }
     try { localStorage.setItem(KEY, origin) } catch (e) {}
     var code = codeBox.value.trim()
+    // 点了就给回声：壳里没有地址栏也没有转圈，不给反馈的话「点了没反应」和
+    // 「正在连、但连不上」看起来一模一样（2026-09-17 实机就卡在这个分不清上）
+    errBox.textContent = ''
+    goBtn.disabled = true
+    goBtn.textContent = '正在打开 ' + origin + ' …'
     // 配对码经查询串带过去，电脑端那边的页面会自动填好并配对
     location.href = code ? origin + '/?code=' + encodeURIComponent(code) : origin + '/'
+    // 到点还停在这一页，说明那头没应答（壳那边还会弹一条打不开的提示）
+    setTimeout(function () {
+      goBtn.disabled = false
+      goBtn.textContent = '连接'
+      errBox.textContent = '还没打开 ' + origin + '，检查地址与端口，以及电脑上的手机端服务是否开着'
+    }, 8000)
   }
 
-  document.getElementById('go').addEventListener('click', connect)
+  goBtn.addEventListener('click', connect)
   codeBox.addEventListener('keydown', function (e) { if (e.key === 'Enter') connect() })
   urlBox.addEventListener('keydown', function (e) { if (e.key === 'Enter') connect() })
 
