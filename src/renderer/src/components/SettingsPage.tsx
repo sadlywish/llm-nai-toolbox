@@ -686,6 +686,12 @@ export default function SettingsPage({ active, onDirtyChange }: Props): JSX.Elem
             <Group title="手机端">
               {checkField('mobileServerEnabled', '开启手机端服务')}
               {numberField('mobileServerPort', '端口', { hint: '1024–65535；开关或端口改动要保存后才生效' })}
+              {checkField('mobileAllowRemote', '允许局域网以外的来源（用内网穿透时才需要）')}
+              <span className="field-hint">
+                默认只接受局域网来的连接。用 frp、cloudflared、Tailscale 这类穿透工具时，转进来的地址不一定是局域网地址，
+                得打开这一项。打开后仍然要配对令牌才能取到任何数据，但服务就暴露在穿透链路上了——别把穿透地址随手发出去，
+                不用的时候在这里关掉。
+              </span>
 
               {mobile.status === null && <span className="field-hint">读取手机端服务状态…</span>}
 

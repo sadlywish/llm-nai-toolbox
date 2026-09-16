@@ -29,9 +29,13 @@ let base: string
  * events 是例外——服务一启动就要往总线上挂出图事件的转推（Task 9），
  * 它必须是真的；AppEvents 本来也不碰 electron。
  */
-function makeDeps(): ServerDeps {
+function makeDeps(over: { allowRemote?: boolean } = {}): ServerDeps {
   return {
-    services: { events: new AppEvents() } as unknown as MainServices,
+    // 来源校验要读配置里的 mobileAllowRemote，夹具给一份最小的 configStore
+    services: {
+      events: new AppEvents(),
+      configStore: { read: () => ({ mobileAllowRemote: over.allowRemote === true }) },
+    } as unknown as MainServices,
     devices,
     staticDir,
     makeThumbnail: (png) => png,
@@ -145,6 +149,27 @@ describe('来源校验', () => {
     const handler = createRequestHandler(makeDeps(), createSseHub())
     const { res, captured } = fakeResponse()
     await handler(fakeRequest(undefined, '/'), res)
+    expect(captured.status).toBe(403)
+  })
+
+  it('开了「允许局域网以外的来源」后，公网来源不再 403，改由令牌把关', async () => {
+    const handler = createRequestHandler(makeDeps({ allowRemote: true }), createSseHub())
+    const { res, captured } = fakeResponse()
+    await handler(fakeRequest('203.0.113.9', '/api/meta'), res)
+    // 401 而不是 403：来源这一层放过了，挡住它的是没有配对令牌
+    expect(captured.status).toBe(401)
+  })
+
+  it('配置读不出来时按最保守处理（仍然挡掉外网来源）', async () => {
+    const deps = makeDeps()
+    ;(deps.services as unknown as { configStore: { read: () => unknown } }).configStore = {
+      read: () => {
+        throw new Error('配置文件坏了')
+      },
+    }
+    const handler = createRequestHandler(deps, createSseHub())
+    const { res, captured } = fakeResponse()
+    await handler(fakeRequest('8.8.8.8', '/api/meta'), res)
     expect(captured.status).toBe(403)
   })
 

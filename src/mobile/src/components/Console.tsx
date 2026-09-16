@@ -4,7 +4,7 @@
 // 多角色 / 在现有内容上修改 / 透明背景 / 画风 / 回填后自动生成。
 // 平时收在指令框上方的一行摘要里，点开是完整面板——手机屏幕放不下六行控件加一个输入框。
 // 开关值存在手机本地那份工作区的 console 里，跟电脑上的指令区互不影响（规格 §4）。
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { clearStalePreset, currentPresetOf, presetSelectionStale } from '@shared/consoleRun'
 import { MULTI_CHARACTER_MODES } from '@shared/llm'
 import type { StylePreset } from '@shared/styles'
@@ -76,8 +76,31 @@ export default function Console({
   const [optionsOpen, setOptionsOpen] = useState(false)
   const inset = useKeyboardInset()
 
+  /**
+   * 指令框：光标在里面时按内容撑高，不在时回到 CSS 那个两行的固定高度（同桌面端指令区）。
+   * 手机屏幕窄，一直撑着会把提示词列表挤没；只在写的时候展开，写完收回去。
+   *
+   * 是否展开以 document.activeElement 为准而不是 focused 状态：发送后框被禁用，
+   * Chromium 不一定补发 blur（桌面端踩过），光靠状态会让它在运行中一直撑着。
+   */
+  const askRef = useRef<HTMLTextAreaElement>(null)
+  const [askFocused, setAskFocused] = useState(false)
+
   const opts = workspace.console
   const preset = currentPresetOf(opts, presets ?? [])
+
+  useLayoutEffect(() => {
+    const el = askRef.current
+    if (el === null) return
+    // 先清掉行内高度回到 CSS 的固定高度；没聚焦（或正在跑）就到此为止
+    el.style.height = ''
+    if (running || document.activeElement !== el) return
+    const min = el.offsetHeight
+    // 压到 0 再量 scrollHeight，量到的才是内容本身的高度；再把上下边框加回去
+    el.style.height = '0px'
+    const needed = el.scrollHeight + (el.offsetHeight - el.clientHeight)
+    el.style.height = String(Math.max(min, needed)) + 'px'
+  }, [askFocused, running, opts.instruction])
 
   // 当前预设被电脑那头删掉或清空时，预设变「未选择」、预设档退回「不覆盖」（同桌面端指令区）。
   // 画风列表还没拉到时不判断，免得刚进页面就把选择误清掉
@@ -114,11 +137,14 @@ export default function Console({
       </div>
 
       <textarea
+        ref={askRef}
         className="ask"
         value={opts.instruction}
         disabled={running}
         placeholder="想画什么，直接说"
         spellCheck={false}
+        onFocus={() => setAskFocused(true)}
+        onBlur={() => setAskFocused(false)}
         onChange={(e) => setOption('instruction', e.target.value)}
       />
 

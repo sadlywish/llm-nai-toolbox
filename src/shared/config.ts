@@ -99,6 +99,11 @@ export interface AppConfig {
   naiMaxCharacters: number
   /** 宽高比换算宽高时的总像素上限 */
   naiMaxPixels: number
+  /**
+   * 手机端服务放行局域网以外的来源。内网穿透（frp、cloudflared、Tailscale 之类）转进来的连接
+   * 未必是私有网段地址，不放开就会被来源校验挡成 403。放开后仍然要配对令牌才能拿到任何数据。
+   */
+  mobileAllowRemote: boolean
   /** 每张图消耗的按时额度百分比，用来估算「还能画几张」；0 = 不估算。官方接口只给百分比，这个值按实测填 */
   naiUsagePercentPerImage: number
 
@@ -207,6 +212,7 @@ export function defaultAppConfig(): AppConfig {
 
     mobileServerEnabled: false,
     mobileServerPort: 7321,
+    mobileAllowRemote: false,
   }
 }
 

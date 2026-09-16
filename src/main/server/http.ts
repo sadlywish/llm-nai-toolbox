@@ -202,15 +202,30 @@ async function handlePair(req: IncomingMessage, res: ServerResponse, devices: De
  * 请求处理函数。单独导出是为了能直接喂一个远端地址是公网的假请求进来——
  * 来源校验是这个服务最要紧的一道闸，从真实 socket 那头没法伪造出公网来源。
  */
+/**
+ * 配置里有没有放开「局域网以外的来源」。读不出配置（测试里的精简夹具）时按最保守的 false 处理——
+ * 宁可把外网来源挡掉，也不要因为读配置失败而默认敞开
+ */
+function allowsRemote(deps: ServerDeps): boolean {
+  try {
+    return deps.services.configStore.read().mobileAllowRemote === true
+  } catch {
+    return false
+  }
+}
+
 export function createRequestHandler(
   deps: ServerDeps,
   hub: SseHub,
 ): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
   return async (req, res) => {
     try {
-      // 第一道闸：只服务局域网。绑定 0.0.0.0 是为了手机能连进来，放行与否只看来源地址
-      if (!isPrivateAddress(req.socket.remoteAddress)) {
-        sendError(res, 403, 'unauthorized', '手机端服务只对局域网开放')
+      // 第一道闸：默认只服务局域网。绑定 0.0.0.0 是为了手机能连进来，放行与否只看来源地址。
+      // 开了「允许局域网以外的来源」就跳过这一层——内网穿透转进来的连接未必是私有网段地址
+      // （frp、cloudflared 这类在本机转发的看到的是回环地址，Tailscale 那种则是 100.64.x.x）。
+      // 这一层只是纵深防御，真正的闸是配对令牌：跳过它不等于谁都能拿到数据
+      if (!allowsRemote(deps) && !isPrivateAddress(req.socket.remoteAddress)) {
+        sendError(res, 403, 'unauthorized', '手机端服务只对局域网开放。要从外网连，去「设置 → 手机端」打开「允许局域网以外的来源」')
         return
       }
       // 只取路径：req.url 可能带查询串，也可能是代理形式的绝对 URL

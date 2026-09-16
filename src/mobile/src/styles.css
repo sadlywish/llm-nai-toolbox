@@ -381,9 +381,11 @@ body {
   /* 16px 是 iOS 的红线：比这小的输入框一获得焦点，Safari 就会把整页放大 */
   font-size: 16px;
   line-height: 1.5;
-  /* 四行的手感；再长就自己滚，免得把发送那一行挤出屏幕 */
-  min-height: 62px;
-  max-height: 22dvh;
+  /* 两行起步，按内容自适应（高度由 JS 量着改，同桌面端指令框）；
+     长到 38% 屏高就停住、内部自己滚，免得把发送那一行挤出屏幕 */
+  min-height: 44px;
+  max-height: 38dvh;
+  overflow-y: auto;
   resize: none;
 }
 
