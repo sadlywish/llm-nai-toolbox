@@ -6,6 +6,7 @@ import HistoryRail from './components/HistoryRail'
 import LlmConsole from './components/LlmConsole'
 import LlmLogDrawer from './components/LlmLogDrawer'
 import MagicBook from './components/MagicBook'
+import NaiUsageBar from './components/NaiUsageBar'
 import PromptPane from './components/PromptPane'
 import SettingsPage from './components/SettingsPage'
 import StyleManager from './components/StyleManager'
@@ -31,6 +32,7 @@ export default function App(): JSX.Element {
   const configLoadError = useConfig((s) => s.loadError)
   const loadConfig = useConfig((s) => s.load)
   const configExists = useConfig((s) => s.configExists)
+  const hasNaiToken = useConfig((s) => s.hasNaiToken)
   const tagdbStatus = useTagdb((s) => s.status)
   const initTagdb = useTagdb((s) => s.init)
   const loadStyles = useStyles((s) => s.load)
@@ -110,6 +112,7 @@ export default function App(): JSX.Element {
             )}
           </button>
         </div>
+        <NaiUsageBar hasNaiToken={hasNaiToken} percentPerImage={config.naiUsagePercentPerImage} />
       </header>
 
       {tagdbStatus !== null && tagdbStatus.state !== 'ready' && (

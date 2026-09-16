@@ -5,6 +5,7 @@ import { snapshotLlmOf } from '@shared/llmProvenance'
 import { emptyWorkspace, type Workspace } from '@shared/workspace'
 import { ipcErrorMessage } from '../ipcError'
 import { tokenBudget } from '../prompt/tokenBudget'
+import { useNaiUsage } from './naiUsage'
 import { useWorkspace } from './workspace'
 
 interface GenState {
@@ -74,6 +75,8 @@ export const useGen = create<GenState>((set, get) => ({
     try {
       await window.api.genStart(input)
       set({ history: await window.api.loadHistory(), starting: null })
+      // 这一轮刚花掉的点数与额度立刻反映到顶栏（界面稿 2026-09-16-nai-usage-mockup.html 第四节）
+      void useNaiUsage.getState().refresh()
     } catch (err) {
       // 预检类失败（在途、没设目录、没填 Token）没有轮次可看，把刚弹出的弹窗收回去；
       // 中止（fatal）走的是 resolve 不是 reject，弹窗保留，继续显示已出的图与失败格

@@ -25,6 +25,7 @@ import {
 import type { GenImageEvent, GenStartInput, ImageMeta, ReadImageInput, RoundRecord, RunProgress } from '@shared/gen'
 import type { LlmEvent, LlmRunInput, LlmRunResult } from '@shared/llm'
 import type { TagGloss } from '@shared/magicbook'
+import type { NaiSubscriptionResult } from '@shared/naiUser'
 import type { StylePreset } from '@shared/styles'
 import type { Workspace } from '@shared/workspace'
 
@@ -126,6 +127,9 @@ const api = {
   magicbookTree: (): Promise<MagicTreeResult> => ipcRenderer.invoke(IPC.magicbookTree),
   magicbookList: (cat: string): Promise<MagicListResult> => ipcRenderer.invoke(IPC.magicbookList, cat),
   magicbookSearch: (query: string, cat?: string): Promise<MagicSearchResult> => ipcRenderer.invoke(IPC.magicbookSearch, query, cat),
+
+  /** NovelAI 账号额度：失败一律返回 { ok: false }，从不 reject */
+  naiSubscription: (): Promise<NaiSubscriptionResult> => ipcRenderer.invoke(IPC.naiSubscription),
 
   writeClipboardText: (text: string): Promise<void> => ipcRenderer.invoke(IPC.clipboardWriteText, text),
 

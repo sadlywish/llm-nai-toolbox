@@ -246,6 +246,8 @@ llm:event finished { LlmRunResult：filled（带 FillResult）/ noParams / faile
 
 **「加入」**：`editorRegistry.insertIntoLastEditor` 取最后聚焦的正向提示词编辑器与其当前选区，按 `insertTagAt` 规则（光标所在单元非空则插到单元末尾，自动补「, 」分隔）改写该字段并把焦点还回去；插不进去（从没聚焦过、那个框已卸载、改动被分块守卫拒绝）就退回 `clipboard:write-text` 并在词条头下方提示「已复制到剪贴板」。插入文本：画师是 `artist:` + 名字，所有 `_` 换成空格。
 
+**NovelAI 额度**：顶栏那条来自 `GET {naiBaseUrl}/user/subscription`（移植自插件 `src/backend/nai-usage.ts`）。一次响应里既有剩余点数（`trainingStepsLeft`，赠送 + 购买）也有 V5 按时限额（`usage`）。`timeUntilNextPercent` 是「再涨 1% 需要多久」的恒定速率量，不是倒计时，文案必须写成「每 X +1%」。张数由设置里的 naiUsagePercentPerImage 换算——官方不给张数。查询走主进程（Token 不进渲染层），失败只在顶栏写一行，不影响出图。
+
 **DText**：`shared/dtext.ts` 把 wiki 正文解析成节点树（标题降两级、列表、引用、代码块、行内样式、`[[内链]]`、外链、`!post #id` 内嵌图），`DText.tsx` 只负责渲染，不拼 HTML 字符串。内链点击在栏内切换词条；外链渲染成 `target="_blank"`，交给主进程 `setWindowOpenHandler`（只放行 http/https）用系统浏览器打开；站内相对链接补全成绝对地址。See also：识别标题文字为「see also」（不分大小写）的一节，把其中的内链收集成一行芯片，该节本身不进正文渲染。
 
 Danbooru 失败是唯一的静默降级：不弹窗，只在词条头/正文/例图各自的区块里写一行灰字「D 站请求失败：原因」；本地标签库那部分（中文别名、分类）照常显示。

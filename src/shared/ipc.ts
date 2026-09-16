@@ -27,6 +27,8 @@ export const IPC = {
   /** 关窗前的同步冲刷（sendSync），同 workspace:flush */
   stylesFlush: 'styles:flush',
   /** 开跑一轮出图；整轮结束才返回最终进度 */
+  /** NovelAI 账号额度：剩余点数与 V5 按时限额 */
+  naiSubscription: 'nai:subscription',
   genStart: 'gen:start',
   genResume: 'gen:resume',
   genCancel: 'gen:cancel',
