@@ -71,6 +71,13 @@ body {
 
 .body.connect { justify-content: center; }
 
+/*
+ * .body 是纵向 flex 容器，里面的每一项默认 flex-shrink: 1——内容一多（长 tags、整段 nltags、
+ * 一串负面词），浏览器就把这些项压到比内容还矮，文字直接糊到下一块上面（实机上很明显）。
+ * 纵向列表里没有任何一项该被压缩，一律禁掉。
+ */
+.body > * { flex-shrink: 0; }
+
 .hint { color: var(--ink-dim); font-size: 12.5px; margin: 0; }
 
 .alert {

@@ -121,11 +121,11 @@ export default function Console({
         onChange={(e) => setOption('instruction', e.target.value)}
       />
 
+      {/* 出图在左、发送在右（用户 2026-09-17 要求对换）：跑图次数是「生成」的附属，跟着它一起挪 */}
       <div className="dock-row">
-        <button type="button" className="btn pri" disabled={running || opts.instruction.trim() === ''} onClick={onSend}>
-          {running ? '运行中…' : '发送'}
+        <button type="button" className="btn gen" disabled={generating} onClick={onGenerate}>
+          {generating ? '出图中…' : '生成'}
         </button>
-        <span className="grow" />
         <label className="run-count">
           跑图
           <input
@@ -141,8 +141,9 @@ export default function Console({
             }}
           />
         </label>
-        <button type="button" className="btn gen" disabled={generating} onClick={onGenerate}>
-          {generating ? '出图中…' : '生成'}
+        <span className="grow" />
+        <button type="button" className="btn pri" disabled={running || opts.instruction.trim() === ''} onClick={onSend}>
+          {running ? '运行中…' : '发送'}
         </button>
       </div>
 
