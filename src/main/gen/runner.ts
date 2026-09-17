@@ -94,7 +94,7 @@ export class GenRunner {
 
       // 快照记「本轮实际用了什么」：固定模式填 -1 时实际用的是随机出来的值，
       // 快照里仍记 -1 的话，「复制信息」回参数区后下一轮又会随机一个新的
-      const snapshot = takeSnapshot(workspace, fixedSeed)
+      const snapshot = takeSnapshot(workspace, fixedSeed, config)
       const assembled = assemble(snapshot, config)
 
       const roundId = newId('round')

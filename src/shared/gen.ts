@@ -72,6 +72,12 @@ export interface GenSnapshot {
    * 读的时候一律过 readSnapshotLlm
    */
   llm?: SnapshotLlm | null
+  /**
+   * 出图时设置里的整图 / 角色字段顺序（原串）。拼接结果按它拼，溯源里的块按它排——
+   * 之后改设置不影响已出的图。这项功能之前落盘的记录没有这两个键，读的时候一律过 snapshotSpecs
+   */
+  promptOrder?: string
+  naiCharPromptOrder?: string
 }
 
 export interface NaiCenter {

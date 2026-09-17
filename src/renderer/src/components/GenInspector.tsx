@@ -4,7 +4,8 @@ import { applyRoundToWorkspace } from '@shared/copyInfo'
 import type { FieldSpec } from '@shared/fields'
 import type { ImageMeta, ImageRecord, RoundRecord } from '@shared/gen'
 import { readSnapshotLlm, type SnapshotLlm } from '@shared/llmProvenance'
-import type { GenParams, Workspace } from '@shared/workspace'
+import { paramsLine, snapshotSpecs } from '@shared/toolParams'
+import type { Workspace } from '@shared/workspace'
 import { API_LABELS, MULTI_LABELS, STYLE_MODE_LABELS } from '../llmLabels'
 
 export interface InspectedImage {
@@ -15,7 +16,7 @@ export interface InspectedImage {
 
 interface Props {
   item: InspectedImage
-  /** 块的先后照当前的字段顺序显示 */
+  /** 当前设置的字段顺序。块的先后照快照里存的出图时顺序；旧记录没存，才按这个排 */
   mainSpecs: readonly FieldSpec[]
   charSpecs: readonly FieldSpec[]
   update: (fn: (draft: Workspace) => void) => void
@@ -40,11 +41,6 @@ function Blocks({ values, specs }: { values: FieldValues; specs: readonly FieldS
       ))}
     </div>
   )
-}
-
-/** 尺寸不在这一行：它和 Seed 一起单独放在最前面 */
-function paramsLine(p: GenParams): string {
-  return `${p.model} · steps ${p.steps} · CFG ${p.scale} · CFG Rescale ${p.cfgRescale} · ${p.sampler} · ${p.noiseSchedule} · 透明背景 ${p.transparentBackground ? '开' : '关'}`
 }
 
 const onOff = (v: boolean): string => (v ? '开' : '关')
@@ -102,6 +98,7 @@ function prettyJson(text: string): string {
 export default function GenInspector({ item, mainSpecs, charSpecs, update, onOpenViewer, onCopied }: Props): JSX.Element {
   const { round, record, url } = item
   const snapshot = round.snapshot
+  const specs = snapshotSpecs(snapshot, { main: mainSpecs, character: charSpecs })
   const [tab, setTab] = useState<'tool' | 'meta'>('tool')
   const [meta, setMeta] = useState<MetaState>({ kind: 'loading' })
   const [copying, setCopying] = useState(false)
@@ -176,8 +173,8 @@ export default function GenInspector({ item, mainSpecs, charSpecs, update, onOpe
           </div>
           <LlmRequest llm={readSnapshotLlm(snapshot.llm)} />
           <div className="gen-field">
-            <span className="gen-field-label">整图</span>
-            <Blocks values={snapshot.main} specs={mainSpecs} />
+            <span className="gen-field-label">整图{specs.legacy && '（旧记录，按当前字段顺序排列）'}</span>
+            <Blocks values={snapshot.main} specs={specs.main} />
           </div>
           <div className="gen-field">
             <span className="gen-field-label">画面文字</span>
@@ -192,7 +189,7 @@ export default function GenInspector({ item, mainSpecs, charSpecs, update, onOpe
               <span className="gen-field-label">
                 角色 {i + 1} · 坐标 {c.position.trim() || '居中'}
               </span>
-              <Blocks values={c.fields} specs={charSpecs} />
+              <Blocks values={c.fields} specs={specs.character} />
               <span className="gen-field-value">负面：{c.negative.trim() || '（无）'}</span>
             </div>
           ))}

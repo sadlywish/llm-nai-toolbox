@@ -3,6 +3,9 @@ import { defaultAppConfig } from '../../../src/shared/config'
 import { createCharacter, emptyWorkspace } from '../../../src/shared/workspace'
 import { assemble, takeSnapshot } from '../../../src/main/gen/snapshot'
 
+const ARTIST_FIRST = 'artist, count, style, character, appearance, tags, environment, series, nltags, quality'
+const CHAR_REVERSED = 'character, count, appearance, tags, nltags'
+
 function workspace() {
   const ws = emptyWorkspace()
   ws.main.count = '1girl'
@@ -27,7 +30,7 @@ function workspace() {
 describe('takeSnapshot', () => {
   it('只收参与本轮的角色；是副本，之后改工作区不影响快照', () => {
     const ws = workspace()
-    const s = takeSnapshot(ws, null)
+    const s = takeSnapshot(ws, null, defaultAppConfig())
     expect(s.characters.map((c) => c.fields.character)).toEqual(['miku', 'len'])
     expect(s.characters[0]).toEqual({ fields: ws.characters[0].fields, negative: ' bad hands ', position: '0.3,0.5' })
     ws.main.count = 'changed'
@@ -37,14 +40,20 @@ describe('takeSnapshot', () => {
     expect([s.text, s.negative, s.useCoords, s.params.seed]).toEqual(['', ' lowres ', true, 7])
   })
 
+  it('记下出图时设置里的两个字段顺序（原串）', () => {
+    const cfg = { ...defaultAppConfig(), promptOrder: ARTIST_FIRST, naiCharPromptOrder: CHAR_REVERSED }
+    const s = takeSnapshot(workspace(), null, cfg)
+    expect([s.promptOrder, s.naiCharPromptOrder]).toEqual([ARTIST_FIRST, CHAR_REVERSED])
+  })
+
   it('固定 seed 解析出的值写进快照的 params.seed', () => {
-    expect(takeSnapshot(workspace(), 123).params.seed).toBe(123)
+    expect(takeSnapshot(workspace(), 123, defaultAppConfig()).params.seed).toBe(123)
   })
 })
 
 describe('assemble', () => {
   it('按字段顺序拼接，再经画面文字处理；角色按角色字段顺序拼接', () => {
-    const a = assemble(takeSnapshot(workspace(), null), defaultAppConfig())
+    const a = assemble(takeSnapshot(workspace(), null, defaultAppConfig()), defaultAppConfig())
     expect(a.positive).toBe('1girl , artist:wlop, no text')
     expect(a.negative).toBe('lowres')
     expect(a.characters).toEqual([
@@ -53,9 +62,20 @@ describe('assemble', () => {
     ])
   })
 
-  it('字段顺序取设置里的 promptOrder', () => {
-    const cfg = { ...defaultAppConfig(), promptOrder: 'artist, count, style, character, appearance, tags, environment, series, nltags, quality' }
-    expect(assemble(takeSnapshot(workspace(), null), cfg).positive).toBe('artist:wlop , 1girl, no text')
+  it('字段顺序取快照里存的顺序：出图后改了设置，拼出来的仍是出图时的顺序', () => {
+    const snapshot = takeSnapshot(workspace(), null, { ...defaultAppConfig(), promptOrder: ARTIST_FIRST, naiCharPromptOrder: CHAR_REVERSED })
+    const a = assemble(snapshot, defaultAppConfig())
+    expect(a.positive).toBe('artist:wlop , 1girl, no text')
+    expect(a.characters[0].prompt).toBe('miku , girl ,')
+  })
+
+  it('旧快照没存顺序：退回设置里的 promptOrder / naiCharPromptOrder', () => {
+    const snapshot = takeSnapshot(workspace(), null, defaultAppConfig())
+    delete snapshot.promptOrder
+    delete snapshot.naiCharPromptOrder
+    const a = assemble(snapshot, { ...defaultAppConfig(), promptOrder: ARTIST_FIRST, naiCharPromptOrder: CHAR_REVERSED })
+    expect(a.positive).toBe('artist:wlop , 1girl, no text')
+    expect(a.characters[0].prompt).toBe('miku , girl ,')
   })
 
   it('有画面文字时按插件规则接到末尾', () => {
@@ -65,11 +85,11 @@ describe('assemble', () => {
     // koishi 源算法验证过这不是移植偏差；brief 手算的期望值漏看了这一步。
     const ws = workspace()
     ws.text = 'Hello'
-    expect(assemble(takeSnapshot(ws, null), defaultAppConfig()).positive).toBe('1girl, artist:wlop, text, english text, "Hello", text: Hello')
+    expect(assemble(takeSnapshot(ws, null, defaultAppConfig()), defaultAppConfig()).positive).toBe('1girl, artist:wlop, text, english text, "Hello", text: Hello')
   })
 
   it('角色负面词独立：角色没写就是空，不拿整图负面词补', () => {
-    const a = assemble(takeSnapshot(workspace(), null), defaultAppConfig())
+    const a = assemble(takeSnapshot(workspace(), null, defaultAppConfig()), defaultAppConfig())
     expect(a.characters[1].negative).toBe('')
   })
 })

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyRoundToWorkspace } from '../../src/shared/copyInfo'
 import { takeSnapshot } from '../../src/main/gen/snapshot'
+import { defaultAppConfig } from '../../src/shared/config'
 import {
   attachLlm,
   contentFingerprint,
@@ -115,10 +116,10 @@ describe('snapshotLlmOf', () => {
     ws.params.seedMode = 'fixed'
     ws.params.seed = -1
     attachLlm(ws, request, false)
-    const s = takeSnapshot(ws, 2961054388)
+    const s = takeSnapshot(ws, 2961054388, defaultAppConfig())
     expect(s.params.seed).toBe(2961054388)
     expect(s.llm).toEqual({ request, stale: false })
-    expect(takeSnapshot(emptyWorkspace(), null).llm).toBeNull()
+    expect(takeSnapshot(emptyWorkspace(), null, defaultAppConfig()).llm).toBeNull()
   })
 })
 
@@ -149,7 +150,7 @@ describe('读回的形状', () => {
 describe('复制信息带上来源', () => {
   it('LLM 来源跟着内容带过来，指纹按复制之后的内容算：紧接着生成不算手改', () => {
     const src = filledWorkspace()
-    const snapshot = takeSnapshot(src, null)
+    const snapshot = takeSnapshot(src, null, defaultAppConfig())
     const ws = emptyWorkspace()
     applyRoundToWorkspace(ws, snapshot, 42)
     expect(ws.llm?.request).toEqual(request)
@@ -162,17 +163,17 @@ describe('复制信息带上来源', () => {
     const src = filledWorkspace()
     src.main.tags = 'edited'
     const ws = emptyWorkspace()
-    applyRoundToWorkspace(ws, takeSnapshot(src, null), 42)
+    applyRoundToWorkspace(ws, takeSnapshot(src, null, defaultAppConfig()), 42)
     expect(snapshotLlmOf(ws)?.stale).toBe(true)
   })
 
   it('纯手工与旧记录清掉工作区原有的来源', () => {
-    const manual = takeSnapshot(emptyWorkspace(), null)
+    const manual = takeSnapshot(emptyWorkspace(), null, defaultAppConfig())
     const ws = filledWorkspace()
     applyRoundToWorkspace(ws, manual, 1)
     expect(ws.llm).toBeNull()
 
-    const legacy = { ...takeSnapshot(emptyWorkspace(), null) }
+    const legacy = { ...takeSnapshot(emptyWorkspace(), null, defaultAppConfig()) }
     delete legacy.llm
     const ws2 = filledWorkspace()
     applyRoundToWorkspace(ws2, legacy, 1)

@@ -3,14 +3,19 @@ import { CHARACTER_FIELDS, MAIN_FIELDS, orderSpecs } from '@shared/fields'
 import type { AssembledPrompt, GenSnapshot } from '@shared/gen'
 import { snapshotLlmOf } from '@shared/llmProvenance'
 import { buildPositivePrompt, buildPrompt } from '@shared/prompt'
+import { snapshotSpecs } from '@shared/toolParams'
 import type { Workspace } from '@shared/workspace'
 import { positionToCenter } from '../nai/payload'
 
 /**
  * 按下「生成」那一刻的本工具格式快照。全部是副本：生成途中改编辑器不影响这一轮，
- * 快照也不会被之后的编辑悄悄改掉。只收参与本轮的角色。
+ * 快照也不会被之后的编辑悄悄改掉。只收参与本轮的角色。字段顺序记设置里当时的值。
  */
-export function takeSnapshot(ws: Workspace, resolvedFixedSeed: number | null): GenSnapshot {
+export function takeSnapshot(
+  ws: Workspace,
+  resolvedFixedSeed: number | null,
+  orders: Pick<AppConfig, 'promptOrder' | 'naiCharPromptOrder'>,
+): GenSnapshot {
   return {
     main: { ...ws.main },
     text: ws.text,
@@ -22,21 +27,26 @@ export function takeSnapshot(ws: Workspace, resolvedFixedSeed: number | null): G
     params: resolvedFixedSeed === null ? { ...ws.params } : { ...ws.params, seed: resolvedFixedSeed },
     // 手改判断要拿按下生成时的工作区比，不能拿上面换过 seed 的 params
     llm: snapshotLlmOf(ws),
+    promptOrder: orders.promptOrder,
+    naiCharPromptOrder: orders.naiCharPromptOrder,
   }
 }
 
 /**
- * 快照 → 真正发出去的拼接结果。字段顺序取设置里的 promptOrder / naiCharPromptOrder，
+ * 快照 → 真正发出去的拼接结果。字段顺序取快照里存的（与溯源里块的先后同源），
+ * 快照没存时才用设置里的 promptOrder / naiCharPromptOrder。
  * 画面文字按插件规则接到正向提示词末尾；角色负面词独立，只 trim。
  */
 export function assemble(s: GenSnapshot, config: AppConfig): AssembledPrompt {
-  const mainSpecs = orderSpecs(MAIN_FIELDS, config.promptOrder)
-  const charSpecs = orderSpecs(CHARACTER_FIELDS, config.naiCharPromptOrder)
+  const specs = snapshotSpecs(s, {
+    main: orderSpecs(MAIN_FIELDS, config.promptOrder),
+    character: orderSpecs(CHARACTER_FIELDS, config.naiCharPromptOrder),
+  })
   return {
-    positive: buildPositivePrompt(s.main, s.text, mainSpecs),
+    positive: buildPositivePrompt(s.main, s.text, specs.main),
     negative: s.negative.trim(),
     characters: s.characters.map((c) => ({
-      prompt: buildPrompt(c.fields, charSpecs),
+      prompt: buildPrompt(c.fields, specs.character),
       negative: c.negative.trim(),
       center: positionToCenter(c.position),
     })),

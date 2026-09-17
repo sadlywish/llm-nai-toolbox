@@ -6,6 +6,7 @@ import type { ImageRecord, RoundRecord } from '../../../src/shared/gen'
 import { emptyWorkspace } from '../../../src/shared/workspace'
 import { IndexStore, loadRecentRounds } from '../../../src/main/nai/index-store'
 import { takeSnapshot } from '../../../src/main/gen/snapshot'
+import { defaultAppConfig } from '../../../src/shared/config'
 
 let root: string
 
@@ -24,7 +25,7 @@ function round(id = 'r1'): RoundRecord {
     finishedAt: null,
     status: 'running',
     count: 1,
-    snapshot: takeSnapshot(emptyWorkspace(), null),
+    snapshot: takeSnapshot(emptyWorkspace(), null, defaultAppConfig()),
     assembled: { positive: '1girl , no text', negative: '', characters: [] },
     images: [],
   }
@@ -48,6 +49,9 @@ describe('IndexStore', () => {
     expect(idx.rounds).toHaveLength(1)
     expect(idx.rounds[0].snapshot.params.steps).toBe(28)
     expect(idx.rounds[0].assembled.positive).toBe('1girl , no text')
+    // 出图时的字段顺序跟着快照落盘：溯源与手机端按它排块，读回来丢了就只能按当前设置排
+    expect(idx.rounds[0].snapshot.promptOrder).toBe(defaultAppConfig().promptOrder)
+    expect(idx.rounds[0].snapshot.naiCharPromptOrder).toBe(defaultAppConfig().naiCharPromptOrder)
   })
 
   it('putImage 把图记进对应的轮次', () => {
