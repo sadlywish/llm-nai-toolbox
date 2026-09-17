@@ -10,7 +10,9 @@ import type { Workspace } from '@shared/workspace'
 import { messageOf, type ApiClient } from '../api'
 import ImageViewer from '../components/ImageViewer'
 import { applyRoundToMobile } from '../slots'
+import { BACK_PRIORITY } from '../backStack'
 import { summarize } from '../summarize'
+import { useBackHandler } from '../useBackHandler'
 
 interface Props {
   client: ApiClient
@@ -121,6 +123,8 @@ export default function History({ client, meta, onWorkspaceChange }: Props): JSX
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // 详情页按返回键回列表（同左上角「‹ 历史」），再按才回工作台
+  useBackHandler(selectedId !== null, () => setSelectedId(null), BACK_PRIORITY.subpage)
   // 点一下「刷新」就把它加一，effect 依赖它重新拉一次——不额外造一个 refresh() 函数存到 state 里
   const [refreshSignal, setRefreshSignal] = useState(0)
 

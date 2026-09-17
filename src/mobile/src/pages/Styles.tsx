@@ -8,6 +8,7 @@ import { nextStyleName, type StylePreset } from '@shared/styles'
 import { messageOf, type ApiClient } from '../api'
 import EditSheet from '../components/EditSheet'
 import { moveId } from '../moveId'
+import { useBackHandler } from '../useBackHandler'
 
 interface Props {
   client: ApiClient
@@ -77,6 +78,8 @@ export default function Styles({ client, onOverrideArtist }: Props): JSX.Element
   )
 
   const closeMenu = (): void => setMenu(null)
+  // 返回键关操作菜单（删除确认那一步也整个关掉，同点遮罩）；编辑框自己在 EditSheet 里登记
+  useBackHandler(menu !== null, closeMenu)
   const menuTarget = menu === null ? null : (presets?.find((p) => p.id === menu.id) ?? null)
   const menuIndex = menuTarget === null ? -1 : (presets?.findIndex((p) => p.id === menuTarget.id) ?? -1)
 

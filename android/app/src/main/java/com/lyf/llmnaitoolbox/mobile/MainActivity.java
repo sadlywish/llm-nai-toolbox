@@ -29,6 +29,13 @@ public class MainActivity extends Activity {
     /** 连接页由 Capacitor 的 sync 拷进 assets/public（webDir 指向 src/mobile-shell） */
     private static final String SHELL_PAGE = "file:///android_asset/public/index.html";
 
+    /**
+     * 问页面要不要自己处理返回键。只认严格的 true：页面没装 NaiBack、正在加载、脚本抛错，
+     * 回来的都不是 "true"，一律按「页面不管」走后退，不会把返回键吞掉
+     */
+    private static final String ASK_PAGE_BACK =
+        "(function(){try{return typeof window.NaiBack==='function'&&window.NaiBack()===true}catch(e){return false}})()";
+
     private WebView web;
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -153,14 +160,30 @@ public class MainActivity extends Activity {
         web.saveState(outState);
     }
 
-    /** 返回键先在页面里后退，退到底再退出——从电脑页面退回连接页换地址就靠它 */
+    /**
+     * 返回键先问页面，页面不管才在 WebView 里后退、退到底再退出。
+     *
+     * 手机端页面里的弹窗与页签切换都不产生浏览记录，只做 goBack 的话无论停在哪都是直接退回连接页
+     * （用户 2026-09-17 反馈）。页面的 window.NaiBack() 负责：关最上层弹窗、详情页回列表、
+     * 其他页签回工作台、工作台上连按两次才放行（见 src/mobile/src/backStack.ts）。
+     * 连接页本身没有 NaiBack，回的是 false，照旧后退或退出。
+     */
     @Override
     public void onBackPressed() {
-        if (web.canGoBack()) {
-            web.goBack();
-        } else {
+        if (web == null) {
             super.onBackPressed();
+            return;
         }
+        web.evaluateJavascript(ASK_PAGE_BACK, value -> {
+            if ("true".equals(value) || web == null) {
+                return;
+            }
+            if (web.canGoBack()) {
+                web.goBack();
+            } else {
+                super.onBackPressed();
+            }
+        });
     }
 
     @Override

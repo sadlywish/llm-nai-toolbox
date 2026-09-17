@@ -744,3 +744,19 @@ img.gen-slot { padding: 0; object-fit: cover; }
   text-align: left;
   overflow-wrap: anywhere;
 }
+
+/* 工作台上第一次按返回键时那句「再按一次回到连接页」：浮在标签栏上方，不占版面，也不拦触摸 */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(64px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 30;
+  padding: 6px 14px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #eee;
+  font-size: 13px;
+  white-space: nowrap;
+  pointer-events: none;
+}

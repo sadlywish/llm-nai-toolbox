@@ -7,6 +7,7 @@ import type { MobileMeta } from '@shared/mobileApi'
 import type { StylePreset } from '@shared/styles'
 import type { Workspace } from '@shared/workspace'
 import { createApiClient, messageOf, normalizeBaseUrl, type ApiClient } from './api'
+import { BACK_PRIORITY, confirmLeave, LEAVE_CONFIRM_MS } from './backStack'
 import Console from './components/Console'
 import UsageLine from './components/UsageLine'
 import { statusTitle } from './llmPending'
@@ -17,6 +18,7 @@ import Params from './pages/Params'
 import Styles from './pages/Styles'
 import Workbench from './pages/Workbench'
 import { flushState, loadState, saveConnection, saveWorkspace, type Connection } from './state'
+import { useBackHandler } from './useBackHandler'
 import { useGenRun, type GenRunHandle } from './useGenRun'
 import { useLlmRun } from './useLlmRun'
 
@@ -173,6 +175,32 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
   const [paramsOpen, setParamsOpen] = useState(false)
   // LLM 日志页同理盖在标签内容上：它只属于「刚发出去的那一轮」，不是第五个标签
   const [logOpen, setLogOpen] = useState(false)
+
+  // 返回键（规则见 backStack.ts）：两个覆盖页算弹窗，关掉回到原来的标签；
+  // 其余标签回工作台；工作台上第一次只提示，窗口内再按才交给壳退回连接页
+  useBackHandler(paramsOpen, () => setParamsOpen(false))
+  useBackHandler(logOpen, () => setLogOpen(false))
+  const lastBackRef = useRef(0)
+  const [leaveHint, setLeaveHint] = useState(false)
+  useBackHandler(
+    true,
+    () => {
+      if (tab !== 'workbench') {
+        setTab('workbench')
+        return true
+      }
+      const { leave, next } = confirmLeave(lastBackRef.current, Date.now())
+      lastBackRef.current = next
+      if (!leave) setLeaveHint(true)
+      return !leave
+    },
+    BACK_PRIORITY.page,
+  )
+  useEffect(() => {
+    if (!leaveHint) return undefined
+    const timer = setTimeout(() => setLeaveHint(false), LEAVE_CONFIRM_MS)
+    return () => clearTimeout(timer)
+  }, [leaveHint])
   /** 回填成功后那句绿色的「已回填: …」，点一下消掉 */
   const [notice, setNotice] = useState<string | null>(null)
   /**
@@ -392,6 +420,11 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
           onGenerate={() => generate(workspace)}
           generating={gen.live || gen.starting}
         />
+      )}
+      {leaveHint && (
+        <div className="toast" role="status">
+          再按一次回到连接页
+        </div>
       )}
       <nav className="tabs">
         {overlay ? (

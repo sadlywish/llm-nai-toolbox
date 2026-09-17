@@ -31,6 +31,7 @@ import {
   type View,
 } from '../pinchZoom'
 import { shareImage, shareMessage } from '../share'
+import { useBackHandler } from '../useBackHandler'
 import ToolParams from './ToolParams'
 
 interface Props {
@@ -60,6 +61,9 @@ export default function ImageViewer({ index, file, seed, round, meta, client, on
   /** 分享给不出面板时那一句（成功与用户自己取消都是 null，不打扰） */
   const [shareHint, setShareHint] = useState<string | null>(null)
   const [showParams, setShowParams] = useState(false)
+  // 返回键：参数页开着先关参数页（它后打开，先处理），再按一次关大图
+  useBackHandler(true, onClose)
+  useBackHandler(showParams, () => setShowParams(false))
 
   const [view, setView] = useState<View>(IDENTITY)
   const stageRef = useRef<HTMLDivElement>(null)

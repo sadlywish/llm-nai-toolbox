@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FieldInput } from '@shared/fields'
 import { copyText } from '../clipboard'
 import { fieldWarnings } from '../fieldWarnings'
+import { useBackHandler } from '../useBackHandler'
 import { useKeyboardInset } from '../useKeyboardInset'
 
 interface Props {
@@ -41,6 +42,8 @@ export default function EditSheet({
   const inset = useKeyboardInset()
   const area = useRef<HTMLTextAreaElement>(null)
   const [copied, setCopied] = useState(false)
+  // 返回键 = 「完成」（工作台与画风页的编辑框都是这个组件）
+  useBackHandler(true, onClose)
 
   useEffect(() => {
     // 用户是点了这一行才进来的，光标直接落进输入框，省一次点击；

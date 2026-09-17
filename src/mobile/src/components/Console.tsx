@@ -12,6 +12,7 @@ import type { ConsoleOptions, StyleMode, Workspace } from '@shared/workspace'
 import { MULTI_LABELS, STYLE_MODE_LABELS } from '@renderer/llmLabels'
 import { optionsSummary } from '../optionsSummary'
 import NumberField from './NumberField'
+import { useBackHandler } from '../useBackHandler'
 import { useKeyboardInset } from '../useKeyboardInset'
 
 const STYLE_MODES: readonly StyleMode[] = ['none', 'preset', 'current']
@@ -74,6 +75,7 @@ export default function Console({
   generating,
 }: Props): JSX.Element {
   const [optionsOpen, setOptionsOpen] = useState(false)
+  useBackHandler(optionsOpen, () => setOptionsOpen(false))
   const inset = useKeyboardInset()
 
   /**
