@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- 自适应图标的背景层：与 build/icon.png 四周的黑边同色，前景缩小后多出的地方和图连成一片（见 scripts/make-android-icon.js） -->
+    <color name="ic_launcher_background">#000000</color>
 </resources>
