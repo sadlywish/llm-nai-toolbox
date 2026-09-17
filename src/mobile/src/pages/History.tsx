@@ -19,7 +19,7 @@ interface Props {
   onWorkspaceChange: (update: (w: Workspace) => Workspace) => void
 }
 
-/** 详情页顶上那行只读参数，同 ImageViewer 的 paramsLine（那里没导出，这里是一样的一行） */
+/** 详情页顶上那行只读参数：尺寸、步数、CFG、采样器（完整参数在大图的「本工具参数」页） */
 function paramsLine(round: RoundRecord): string {
   const p = round.snapshot.params
   return `${p.width}×${p.height} · ${p.steps} 步 · CFG ${p.scale} · ${p.sampler}`

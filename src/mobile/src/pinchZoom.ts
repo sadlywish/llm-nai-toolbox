@@ -9,9 +9,7 @@
 /** 1x 就是「整张图正好摆满」，再缩下去只会在四周留黑边，没意义 */
 export const MIN_SCALE = 1
 export const MAX_SCALE = 6
-/** 双击放大到这一档（照相册类应用的手感：一下就到能看清细节的程度，不用捏好几次） */
-export const DOUBLE_TAP_SCALE = 2.5
-/** 两次点按之间最多这么久、这么远才算双击 */
+/** 两次点按之间最多这么久、这么远才算双击（大图里双击是关闭） */
 export const DOUBLE_TAP_MS = 300
 export const DOUBLE_TAP_SLOP = 30
 /** 一次点按里手指挪过这么多 px 就不再算「点」，只算拖 */
@@ -98,12 +96,6 @@ export function clampOffset(view: View, content: Size, viewport: Size): View {
     x: clampAxis(view.x, content.width * view.scale, viewport.width),
     y: clampAxis(view.y, content.height * view.scale, viewport.height),
   }
-}
-
-/** 双击的目标倍数：已经放大了就回 1x，否则跳到 2.5x（来回切换） */
-export function doubleTapScale(current: number): number {
-  // 留一点余量：捏到 1.02x 停手后再双击，人的意思是「复位」而不是「再放大」
-  return current > MIN_SCALE + 0.05 ? MIN_SCALE : DOUBLE_TAP_SCALE
 }
 
 export interface Tap {

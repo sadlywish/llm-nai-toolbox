@@ -501,58 +501,31 @@ img.gen-slot { padding: 0; object-fit: cover; }
 .gen-where { margin: 0; overflow-wrap: anywhere; }
 .gen-where code { font-family: var(--mono); color: var(--ink-dim); }
 
-/* ── 点开一张：大图 + 这张的参数（界面稿第三节右边那张） ── */
+/* ── 点开一张：全屏看图（界面稿 2026-09-17 第四节方案 Y） ── */
+/*
+ * 黑底铺满，图完整显示；标题、「本工具参数」、关闭与三个按钮浮在图的上下两端。
+ * 浮层本身不接触摸（pointer-events: none），只有里面的按钮与复制兜底框接——手指落在渐变那一截也是在操作图。
+ */
 .viewer {
   position: fixed;
   inset: 0;
   z-index: 20;
-  display: flex;
-  flex-direction: column;
-  background: var(--ground);
+  overflow: hidden;
+  background: #000;
 }
 
-.viewer-head {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 12px;
-  padding-top: calc(8px + env(safe-area-inset-top));
-  background: var(--panel-2);
-  border-bottom: 1px solid var(--line);
-}
-
-.viewer-head .grow { flex: 1; }
-.viewer-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 13px; }
-
-.viewer-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 12px;
-  padding-bottom: calc(12px + env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-/*
- * 放大用的取景框：图放大后超出的部分裁在这里，不许溢出去顶到参数行与按钮。
- * touch-action: none 是关键——不写的话双指会先被浏览器当成整页缩放，页面自己一个事件都收不到。
- */
+/* 整屏都是取景框。touch-action: none 是关键——不写的话双指会先被浏览器当成整页缩放，页面自己一个事件都收不到 */
 .viewer-stage {
-  flex: none;
-  min-width: 0;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
   touch-action: none;
-  border-radius: 6px;
-  background: var(--panel);
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-/* 宽度撑满、高度自己按比例来；上限留给参数行与按钮，免得竖图把它们顶到屏幕外 */
+/* 元素铺满取景框，图靠 object-fit 完整装在里面；ImageViewer 的 measure 用 fitContain 按这个关系算图的实际显示框 */
 .viewer-img {
   width: 100%;
-  max-height: 62vh;
+  height: 100%;
   object-fit: contain;
   display: block;
   /* pinchZoom.ts 的算术是按「中心为原点」推的，这行改了那边全错 */
@@ -561,6 +534,62 @@ img.gen-slot { padding: 0; object-fit: cover; }
   /* 长按仍要能唤出浏览器自己的「保存图片」（那是第三档分享的退路） */
   -webkit-user-select: none;
   user-select: none;
+}
+
+.viewer-top,
+.viewer-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  pointer-events: none;
+}
+
+.viewer-top button,
+.viewer-bottom button,
+.viewer-bottom textarea { pointer-events: auto; }
+
+.viewer-top {
+  top: 0;
+  align-items: center;
+  padding-top: calc(10px + env(safe-area-inset-top));
+  padding-bottom: 28px;
+  background: linear-gradient(rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
+}
+
+.viewer-bottom {
+  bottom: 0;
+  flex-direction: column;
+  padding-top: 28px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.75));
+}
+
+.viewer-bottom .hint { color: #cfcfcf; }
+
+.viewer-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 13px; color: #eee; }
+
+/* 压在图上的按钮垫一层半透明黑，浅色图上也看得清 */
+.viewer-top .btn,
+.viewer-bottom .btn { background: rgba(0, 0, 0, 0.45); }
+
+.viewer-close {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.45);
+  border: none;
+  border-radius: 50%;
+  color: #ddd;
+  font: inherit;
+  font-size: 24px;
+  line-height: 1;
 }
 
 /* 三个按钮：390px 宽放得下就平分，放不下整个换行，不许把屏幕撑出横向滚动 */
@@ -581,6 +610,54 @@ img.gen-slot { padding: 0; object-fit: cover; }
   line-height: 1.6;
   resize: none;
 }
+
+/* 「本工具参数」：盖在全屏上的一整页，底栏仍是那三个按钮 */
+.viewer-page {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--ground);
+}
+
+.viewer-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  padding-top: calc(8px + env(safe-area-inset-top));
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.viewer-page-title { flex: none; font-weight: 600; }
+.viewer-head .viewer-title { color: var(--ink-dim); text-align: right; }
+
+.viewer-page-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; }
+
+.viewer-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  background: var(--panel-2);
+  border-top: 1px solid var(--line);
+}
+
+/* 本工具参数的内容（ToolParams） */
+.tp { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.tp-hot { display: flex; gap: 8px; }
+.tp-kv { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+.tp-kv b { font-family: var(--mono); font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.tp-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tp-stale { margin: 0; color: var(--warn); font-size: 12.5px; }
+.tp-instr { padding: 8px; background: var(--input); border: 1px solid var(--line); border-radius: 6px; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tp-opts { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; }
+.tp-opts i { font-style: normal; color: var(--ink-faint); margin-right: 4px; }
+.tp-line { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); overflow-wrap: anywhere; }
+.tp-pre { margin: 0; padding: 8px; background: var(--input); border: 1px solid var(--line); border-radius: 6px; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+
+/* 只读的块（BlockRow 不给 onClick）：不是按钮，不必撑到手指落点的高度 */
+.blk.is-static { min-height: 0; }
 
 /* ── 历史页（计划 Task 16，界面稿第四节左边那张） ── */
 

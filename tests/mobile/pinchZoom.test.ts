@@ -3,8 +3,6 @@ import {
   clampOffset,
   clampScale,
   distance,
-  DOUBLE_TAP_SCALE,
-  doubleTapScale,
   fitContain,
   IDENTITY,
   isDoubleTap,
@@ -90,29 +88,6 @@ describe('clampOffset', () => {
     expect(clamped.x).toBeCloseTo((357.86 * 2 - 366) / 2, 1)
     // 按元素框（366）算会多给 8px，那 8px 拖出来就是一条黑边
     expect(clamped.x).toBeLessThan((366 * 2 - 366) / 2)
-  })
-})
-
-describe('doubleTapScale', () => {
-  it('双击在 1x 与 2.5x 之间来回', () => {
-    expect(doubleTapScale(1)).toBe(DOUBLE_TAP_SCALE)
-    expect(doubleTapScale(DOUBLE_TAP_SCALE)).toBe(1)
-    expect(doubleTapScale(6)).toBe(1)
-    // 捏到一点点就停手，双击的意思仍是「放大」
-    expect(doubleTapScale(1.02)).toBe(DOUBLE_TAP_SCALE)
-  })
-
-  it('放大再双击能完全回到原样', () => {
-    const content = { width: 360, height: 520 }
-    const viewport = { width: 360, height: 520 }
-    const focus = { x: 100, y: 60 }
-
-    const zoomed = clampOffset(zoomAt(IDENTITY, doubleTapScale(IDENTITY.scale), focus), content, viewport)
-    expect(zoomed.scale).toBe(DOUBLE_TAP_SCALE)
-    expect(zoomed.x).not.toBe(0)
-
-    const back = clampOffset(zoomAt(zoomed, doubleTapScale(zoomed.scale), focus), content, viewport)
-    expect(back).toEqual({ scale: 1, x: 0, y: 0 })
   })
 })
 

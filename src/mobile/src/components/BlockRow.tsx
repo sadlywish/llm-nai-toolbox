@@ -16,7 +16,8 @@ interface Props {
   value: string
   /** 值为空时显示的字，默认「空」。角色坐标空着是「居中」而不是没填，需要另说一句 */
   emptyText?: string
-  onClick: () => void
+  /** 不给就是只读的一行（大图的「本工具参数」页）：画成普通块，不是按钮，也不占手指落点的高度 */
+  onClick?: () => void
 }
 
 export default function BlockRow({ label, hue, value, emptyText = '空', onClick }: Props): JSX.Element {
@@ -26,12 +27,19 @@ export default function BlockRow({ label, hue, value, emptyText = '空', onClick
   // 界面稿的 .blk i 是 hsl(var(--h) 48% 58%)，文字压深色
   const badge: CSSProperties = hue === null ? {} : { background: `hsl(${hue} 48% 58%)`, color: '#0f1115' }
 
-  return (
-    <button type="button" className="blk" onClick={onClick}>
+  const content = (
+    <>
       <i className={hue === null ? 'plain' : undefined} style={badge}>
         {label}
       </i>
       <span className={empty ? 'empty' : undefined}>{empty ? emptyText : value}</span>
+    </>
+  )
+
+  if (onClick === undefined) return <div className="blk is-static">{content}</div>
+  return (
+    <button type="button" className="blk" onClick={onClick}>
+      {content}
     </button>
   )
 }
