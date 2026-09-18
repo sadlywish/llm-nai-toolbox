@@ -249,6 +249,10 @@
 
 SD WebUI / Forge 后端、LoRA、参考图（Vibe Transfer / Character Reference）、多轮对话记忆。
 
+## 交流
+
+用着有问题、想提需求，或者想看看别人怎么用：**QQ 群 1080795165**。
+
 ## 来源
 
 LLM 交互层来自 `koishi-plugin-reforge`，界面与工程骨架来自 `画师串工具箱`。
