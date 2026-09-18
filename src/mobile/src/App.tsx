@@ -17,9 +17,10 @@ import LlmLog from './pages/LlmLog'
 import Params from './pages/Params'
 import Styles from './pages/Styles'
 import Workbench from './pages/Workbench'
-import { flushState, loadState, saveConnection, saveWorkspace, type Connection } from './state'
+import { flushState, loadState, loadTab, saveConnection, saveTab, saveWorkspace, type Connection } from './state'
 import { useBackHandler } from './useBackHandler'
 import { useGenRun, type GenRunHandle } from './useGenRun'
+import { shouldReconnect, useResume } from './useResume'
 import { useLlmRun } from './useLlmRun'
 
 /** 令牌失效时给用户的那句话。桌面端「吊销」与换设备表都会走到这里 */
@@ -139,6 +140,8 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'styles', label: '画风' },
 ]
 
+const TAB_KEYS: TabKey[] = TABS.map((t) => t.key)
+
 /** 四个标签的内容 */
 function TabBody({
   tab,
@@ -166,7 +169,8 @@ function TabBody({
 }
 
 function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: () => void }): JSX.Element {
-  const [tab, setTab] = useState<TabKey>('workbench')
+  // 停在哪个标签也存起来：跑图/LLM 等待期间切出去，页面被系统回收再回来时还在原地
+  const [tab, setTab] = useState<TabKey>(() => loadTab(TAB_KEYS, 'workbench'))
   const [meta, setMeta] = useState<MobileMeta | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [online, setOnline] = useState(false)
@@ -300,7 +304,9 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
   const onlineRef = useRef(false)
 
   // SSE 只在这里开一条：LLM 的日志与结局分给 useLlmRun，出图的进度与每张图分给 useGenRun，
-  // 顺带点亮状态点。两个 hook 各自只挑自己认得的事件，别的原样丢掉
+  // 顺带点亮状态点。两个 hook 各自只挑自己认得的事件，别的原样丢掉。
+  // epoch 变一次就重开一条连接——回前台时用它把后台冻出来的半死连接换掉
+  const [sseEpoch, setSseEpoch] = useState(0)
   useEffect(
     () =>
       client.events(
@@ -319,8 +325,18 @@ function Shell({ connection, onRevoked }: { connection: Connection; onRevoked: (
           onlineRef.current = up
         },
       ),
-    [client],
+    [client, sseEpoch],
   )
+
+  useEffect(() => saveTab(tab), [tab])
+
+  // 回到前台：主动补一次，不等 SSE 自己报错——后台冻过之后它常常是「连着但什么都不来」。
+  // 离开久了顺手把连接也换一条（见 useResume 的说明）
+  useResume((hiddenMs) => {
+    if (shouldReconnect(hiddenMs)) setSseEpoch((n) => n + 1)
+    llmRef.current.checkLast()
+    genRef.current.checkStalled()
+  })
 
   // 画风列表：进工作台时拉一次（指令区的预设档要用），从画风标签改完切回来也会再拉一次。
   // 预设本身是电脑与手机共用的那一条（Global Constraints：画风共用），以电脑那份为准

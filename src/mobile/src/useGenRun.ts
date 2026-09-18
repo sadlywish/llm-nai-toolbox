@@ -8,7 +8,8 @@ import type { GenImageEvent, RoundRecord, RunProgress } from '@shared/gen'
 import type { MobileEvent } from '@shared/mobileApi'
 import type { Workspace } from '@shared/workspace'
 import { messageOf, type ApiClient } from './api'
-import { catchUpFrom, isLiveStatus, mergeImage, needsCatchUp, slotsOf, type Slot } from './slots'
+import { catchUpFrom, isLiveStatus, mergeImage, needsCatchUp, restoreRound, slotsOf, type Slot } from './slots'
+import { loadGenRound, saveGenRound } from './state'
 
 export interface GenRunHandle {
   progress: RunProgress | null
@@ -55,6 +56,9 @@ export function useGenRun(client: ApiClient): GenRunHandle {
     }
     // 换了一轮就把上一轮的记录丢掉：留着的话图片地址会拼上别人那一轮的日期目录
     if (was !== null && was.roundId !== next.roundId) setRound(null)
+    // 记下轮次 id：页面被系统回收后重新加载时靠它把这一轮找回来（跑完的也要，
+    // 「切出去等着，回来发现出图页一片空白」就是这么来的）
+    saveGenRound(next.roundId)
     setProgress(next)
   }, [])
 
@@ -122,6 +126,28 @@ export function useGenRun(client: ApiClient): GenRunHandle {
       })
       // 这一次没问到（还在断网、电脑没醒）就算了：下次重连或下次进出图页再问
       .catch(() => undefined)
+  }, [client, settle])
+
+  // 重新加载之后把上次那一轮接回来（页面被系统回收、手动刷新都会走到这儿）。
+  // 只做一次，且只在本地还什么都没有时做：SSE 已经推来进度的话那份更新
+  useEffect(() => {
+    const saved = loadGenRound()
+    if (saved === null) return undefined
+    let alive = true
+    void Promise.all([client.meta(), client.history(1)])
+      .then(([m, rounds]) => {
+        if (!alive || progressRef.current !== null) return
+        const found = restoreRound(saved, rounds, m.busy.gen)
+        if (found === null) return
+        setImages(found.images)
+        setRound(found.record)
+        settle(found.progress)
+      })
+      // 这一次没问到（电脑没开、还在断网）就算了，不必报错：出图页照旧显示「还没出过图」
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
   }, [client, settle])
 
   const handleEvent = useCallback(

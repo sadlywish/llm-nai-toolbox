@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GenImageEvent, GenSnapshot, ImageRecord, RoundRecord, RunProgress } from '../../src/shared/gen'
 import { emptyWorkspace, type Workspace } from '../../src/shared/workspace'
-import { applyRoundToMobile, catchUpFrom, genStatusText, mergeImage, needsCatchUp, slotsOf } from '../../src/mobile/src/slots'
+import { applyRoundToMobile, catchUpFrom, genStatusText, mergeImage, needsCatchUp, restoreRound, slotsOf } from '../../src/mobile/src/slots'
 
 /**
  * 出图页那点判断全在这里测（计划 Task 15）。
@@ -177,6 +177,37 @@ describe('catchUpFrom', () => {
   it('本地本来就不在跑图中就不补（别把已经收到的结局覆盖掉）', () => {
     expect(catchUpFrom(progressOf({ status: 'done', current: null }), [roundOf([])])).toBe(null)
     expect(catchUpFrom(null, [roundOf([])])).toBe(null)
+  })
+})
+
+describe('restoreRound', () => {
+  const images: ImageRecord[] = [
+    { index: 0, file: 'a.png', seed: 11, status: 'ok', error: null },
+    { index: 1, file: '', seed: 12, status: 'failed', error: '超时' },
+  ]
+
+  it('重新加载后按 id 找回那一轮：跑完的也要（切出去等结果，回来就是这种情形）', () => {
+    const got = restoreRound('round-1', [roundOf(images)], false)
+    expect(got?.progress).toEqual({
+      roundId: 'round-1', status: 'done', total: 4, done: 1, failed: 1, pauseReason: null, abortReason: null, current: null,
+    })
+    expect(got?.images.map((i) => i.roundId)).toEqual(['round-1', 'round-1'])
+    expect(got?.record?.id).toBe('round-1')
+  })
+
+  it('电脑还在跑这一轮：状态照记录里的，不收成已中断', () => {
+    const got = restoreRound('round-1', [roundOf(images, { status: 'running', finishedAt: null })], true)
+    expect(got?.progress.status).toBe('running')
+  })
+
+  it('电脑已经不忙了，记录却还停在跑图中：收成已中断（跨重启的残留轮次）', () => {
+    const got = restoreRound('round-1', [roundOf(images, { status: 'running', finishedAt: null })], false)
+    expect(got?.progress.status).toBe('aborted')
+  })
+
+  it('历史里没有这一轮就返回 null，不拿最近一轮充数', () => {
+    expect(restoreRound('round-9', [roundOf(images)], false)).toBeNull()
+    expect(restoreRound('round-1', [], true)).toBeNull()
   })
 })
 

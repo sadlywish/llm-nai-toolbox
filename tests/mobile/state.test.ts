@@ -48,6 +48,31 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+describe('标签与轮次（切出去再回来要接上）', () => {
+  const tabs = ['workbench', 'gen', 'history', 'styles'] as const
+
+  it('没存过就回默认标签；存过的读回来', () => {
+    expect(mod.loadTab(tabs, 'workbench')).toBe('workbench')
+    mod.saveTab('gen')
+    expect(mod.loadTab(tabs, 'workbench')).toBe('gen')
+  })
+
+  it('存的值不认识（换过版本、被人改过）也回默认，不让页面渲染不出来', () => {
+    store[mod.MOBILE_TAB_KEY] = JSON.stringify('magic')
+    expect(mod.loadTab(tabs, 'workbench')).toBe('workbench')
+    store[mod.MOBILE_TAB_KEY] = JSON.stringify(42)
+    expect(mod.loadTab(tabs, 'workbench')).toBe('workbench')
+  })
+
+  it('出图轮次 id 存得住；没存过与空串都当没有', () => {
+    expect(mod.loadGenRound()).toBeNull()
+    mod.saveGenRound('round-7')
+    expect(mod.loadGenRound()).toBe('round-7')
+    store[mod.MOBILE_GEN_ROUND_KEY] = JSON.stringify('')
+    expect(mod.loadGenRound()).toBeNull()
+  })
+})
+
 describe('loadState', () => {
   it('没存过时给一份空工作区，连接信息为 null', () => {
     expect(mod.loadState()).toEqual({ workspace: emptyWorkspace(), connection: null })

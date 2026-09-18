@@ -14,6 +14,13 @@ export const MOBILE_STATE_KEY = 'nai-mobile:v1'
 export const MOBILE_CONN_KEY = 'nai-mobile:v1:conn'
 
 /**
+ * 停在哪个标签、上次看的是哪一轮出图。都是为了「切出去等结果，回来还在原地」——
+ * 手机上页面随时可能被系统回收再重新加载，不存的话回来就是一张白纸（2026-09-18）。
+ */
+export const MOBILE_TAB_KEY = 'nai-mobile:v1:tab'
+export const MOBILE_GEN_ROUND_KEY = 'nai-mobile:v1:gen-round'
+
+/**
  * 工作区写盘防抖。手机上打字、拖滑块都会连着改状态，每次都 JSON.stringify 整份工作区
  * 会在低端机上卡出肉眼可见的顿挫。
  */
@@ -85,6 +92,29 @@ export function saveConnection(connection: Connection | null): void {
 }
 
 /** 读的时候一律过 normalizeWorkspace：存进去的可能是旧版本的形状，也可能被手改过 */
+/**
+ * 上次停在哪个标签。存的值不在 `allowed` 里（换过版本、被人改过）就回工作台——
+ * 标签是外壳的骨架，宁可回默认也不能因为一个坏值让页面渲染不出来。
+ */
+export function loadTab<T extends string>(allowed: readonly T[], fallback: T): T {
+  const raw = readKey(MOBILE_TAB_KEY)
+  return typeof raw === 'string' && (allowed as readonly string[]).includes(raw) ? (raw as T) : fallback
+}
+
+export function saveTab(tab: string): void {
+  writeKey(MOBILE_TAB_KEY, tab)
+}
+
+/** 上次看的那一轮出图的 id；没有为 null */
+export function loadGenRound(): string | null {
+  const raw = readKey(MOBILE_GEN_ROUND_KEY)
+  return typeof raw === 'string' && raw !== '' ? raw : null
+}
+
+export function saveGenRound(roundId: string): void {
+  writeKey(MOBILE_GEN_ROUND_KEY, roundId)
+}
+
 export function loadWorkspace(): Workspace {
   return normalizeWorkspace(readKey(MOBILE_STATE_KEY))
 }

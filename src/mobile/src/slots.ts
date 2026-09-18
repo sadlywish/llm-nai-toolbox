@@ -95,6 +95,35 @@ function runStatusOf(record: RoundRecord): RunStatus {
   return 'aborted'
 }
 
+/** 记录 → 进度。`live` 为 true 表示电脑那头还在跑这一轮（这时记录里的 running/paused 是真的） */
+function progressOf(record: RoundRecord, live: boolean): RunProgress {
+  const status: RunStatus = live && (record.status === 'running' || record.status === 'paused') ? record.status : runStatusOf(record)
+  return {
+    roundId: record.id,
+    status,
+    total: record.count,
+    done: record.images.filter((i) => i.status === 'ok').length,
+    failed: record.images.filter((i) => i.status === 'failed').length,
+    pauseReason: null,
+    abortReason: null,
+    // 记录里没有「正在发哪一张」，留空即可：格子按已有的图画，空格一律是等待
+    current: null,
+  }
+}
+
+/**
+ * 重新加载页面之后找回上次那一轮（页面被系统回收、手动刷新都会走到这儿）。
+ *
+ * 与 catchUpFrom 的差别：那个是「本地还停在跑图中」时的补齐，这里本地什么都没有，
+ * 靠存下来的 roundId 去历史里认。同样只认 id 对得上的那一条——拿最近一轮充数会把
+ * 电脑自己跑的那轮显示成「你刚才那一轮」。
+ */
+export function restoreRound(roundId: string, rounds: readonly RoundRecord[], busyGen: boolean): CatchUp | null {
+  const record = rounds.find((r) => r.id === roundId)
+  if (record === undefined) return null
+  return { progress: progressOf(record, busyGen), images: imagesOf(record), record }
+}
+
 /** 事件里的图片比记录里的多一个 roundId，补上就能和 SSE 推来的那些混在一起用 */
 export function imagesOf(record: RoundRecord): GenImageEvent[] {
   return record.images.map((img) => ({ ...img, roundId: record.id }))
@@ -117,20 +146,8 @@ export function catchUpFrom(local: RunProgress | null, rounds: readonly RoundRec
       record: null,
     }
   }
-  return {
-    progress: {
-      roundId: record.id,
-      status: runStatusOf(record),
-      total: record.count,
-      done: record.images.filter((i) => i.status === 'ok').length,
-      failed: record.images.filter((i) => i.status === 'failed').length,
-      pauseReason: null,
-      abortReason: null,
-      current: null,
-    },
-    images: imagesOf(record),
-    record,
-  }
+  // 走到这儿说明电脑那头已经不忙了（needsCatchUp 的前提），记录里的状态就是结局
+  return { progress: progressOf(record, false), images: imagesOf(record), record }
 }
 
 /**
