@@ -50,21 +50,6 @@ export function parseCharacterCsv(text: string): CharacterFeatureDb {
   return db
 }
 
-/**
- * 照插件 executeCharacterSearch：查询词小写、空格换下划线；先精确，再取第一个包含它的键。
- * 空查询直接返回 undefined——插件没拦，空串会「包含」于每个键，于是返回表里第一个角色。
- */
-export function findCharacterFeature(db: CharacterFeatureDb, name: string): CharacterFeature | undefined {
-  const query = name.trim().toLowerCase().replace(/ /g, '_')
-  if (!query) return undefined
-  const exact = db.get(query)
-  if (exact) return exact
-  for (const [key, value] of db) {
-    if (key.includes(query)) return value
-  }
-  return undefined
-}
-
 export interface FeatureTextFlags {
   series: boolean
   appearance: boolean
@@ -78,14 +63,4 @@ export function characterFeatureText(feat: CharacterFeature, flags: FeatureTextF
   if (flags.appearance && feat.appearance) rows.push(`  外貌: ${escapeNaiTagList(feat.appearance)}`)
   if (flags.clothing && feat.clothing) rows.push(`  服装: ${escapeNaiTagList(feat.clothing)}`)
   return rows.join('\n')
-}
-
-/** search_character_features 命中一个角色时的返回块 */
-export function characterSearchBlock(feat: CharacterFeature): string {
-  return [
-    `角色: ${escapeNaiTag(feat.character)}`,
-    `作品: ${escapeNaiTag(feat.copyright)}`,
-    `外貌标签: ${escapeNaiTagList(feat.appearance)} → 放入 appearance 字段`,
-    `服装标签: ${escapeNaiTagList(feat.clothing)} → 放入 appearance 字段`,
-  ].join('\n')
 }

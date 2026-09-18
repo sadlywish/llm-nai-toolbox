@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  characterFeatureText,
-  characterSearchBlock,
-  findCharacterFeature,
-  parseCharacterCsv,
-} from '../../src/main/tagdb/charfeat'
+import { characterFeatureText, parseCharacterCsv } from '../../src/main/tagdb/charfeat'
 import { escapeNaiTag, escapeNaiTagList } from '../../src/main/tagdb/escape'
 
 const CSV = [
@@ -45,27 +40,6 @@ describe('parseCharacterCsv', () => {
   })
 })
 
-describe('findCharacterFeature', () => {
-  const db = parseCharacterCsv(CSV)
-
-  it('大小写不敏感、空格当下划线，精确命中优先于排在前面的包含匹配', () => {
-    expect(findCharacterFeature(db, 'Hatsune Miku')?.character).toBe('hatsune_miku')
-    // saber_(fate) 排在前面且包含 saber：去掉精确分支的话会返回它
-    const shadowed = parseCharacterCsv('character,copyright,appearance,clothing\nsaber_(fate),fate,a,b\nsaber,other,c,d\n')
-    expect(findCharacterFeature(shadowed, 'Saber')?.character).toBe('saber')
-  })
-
-  it('精确没有时取第一个包含查询词的键', () => {
-    expect(findCharacterFeature(db, 'miku')?.character).toBe('hatsune_miku')
-    expect(findCharacterFeature(db, 'append')?.character).toBe('miku_append')
-  })
-
-  it('查不到或查询词为空时给 undefined', () => {
-    expect(findCharacterFeature(db, 'nobody')).toBeUndefined()
-    expect(findCharacterFeature(db, '   ')).toBeUndefined()
-  })
-})
-
 describe('角色特征文本', () => {
   const feat = parseCharacterCsv(CSV).get('hatsune_miku')!
 
@@ -79,14 +53,4 @@ describe('角色特征文本', () => {
     expect(characterFeatureText(feat, { series: false, appearance: false, clothing: false })).toBe('')
   })
 
-  it('search_character_features 的返回块', () => {
-    expect(characterSearchBlock(feat)).toBe(
-      [
-        '角色: hatsune miku',
-        '作品: vocaloid',
-        '外貌标签: long hair, twintails, aqua hair → 放入 appearance 字段',
-        '服装标签: necktie, detached sleeves → 放入 appearance 字段',
-      ].join('\n'),
-    )
-  })
 })

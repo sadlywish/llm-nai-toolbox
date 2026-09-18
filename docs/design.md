@@ -48,7 +48,7 @@ llm-nai-toolbox 的架构与关键取舍。使用方法见 [README](../README.md
   2. user   = [标签释义] + 指令 + [质量词] + [负面词]
             修改模式：<现有参数>（取自工作区）+ [用户的修改要求]
   3. 循环 ≤ maxToolRounds：
-       工具集 = 生成工具 + search_tags + search_character_features + load_tag_manual + browse_tags
+       工具集 = 生成工具 + search_tags + load_tag_manual + browse_tags
        调端点；日志行逐条推 llm:event
        检索类本地执行、结果喂回；没有检索调用就收口
        搜索全部 ≥0.85 且开着 autoSkipSearch → 之后撤掉 search_tags

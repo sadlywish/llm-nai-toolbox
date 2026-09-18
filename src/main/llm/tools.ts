@@ -12,14 +12,12 @@ import type { JsonObject, ToolDefinition } from './types'
 export const GENERATE_TOOL_NAME = 'generate_image'
 export const GENERATE_CHARACTERS_TOOL_NAME = 'generate_image_characters'
 export const SEARCH_TAGS_TOOL_NAME = 'search_tags'
-export const CHARACTER_FEATURES_TOOL_NAME = 'search_character_features'
 export const BROWSE_TAGS_TOOL_NAME = 'browse_tags'
 export const LOAD_MANUAL_TOOL_NAME = 'load_tag_manual'
 
 /** 需要把结果喂回 LLM 再往下走的工具。循环靠它判断「还要不要继续」 */
 export const SEARCH_TOOL_NAMES: ReadonlySet<string> = new Set([
   SEARCH_TAGS_TOOL_NAME,
-  CHARACTER_FEATURES_TOOL_NAME,
   BROWSE_TAGS_TOOL_NAME,
   LOAD_MANUAL_TOOL_NAME,
 ])
@@ -222,25 +220,6 @@ const SEARCH_TAGS_TOOL: ToolDefinition = {
   },
 }
 
-const SEARCH_CHARACTER_TOOL: ToolDefinition = {
-  name: CHARACTER_FEATURES_TOOL_NAME,
-  description:
-    '查询角色的官方外貌和服装标签。使用角色的 Danbooru 标签名查询（可从 search_tags 结果获得）。' +
-    '返回角色的作品、外貌标签和服装标签。生成角色图片时必须参考返回的标签，不要凭印象臆造角色外貌。' +
-    '可一次查询多个角色，支持部分名称匹配。',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      names: {
-        type: 'array',
-        items: { type: 'string' },
-        description: '角色标签名列表。如: ["hatsune_miku", "saber"]',
-      },
-    },
-    required: ['names'],
-  },
-}
-
 const BROWSE_TAGS_TOOL: ToolDefinition = {
   name: BROWSE_TAGS_TOOL_NAME,
   description:
@@ -314,7 +293,6 @@ export function generateTool(multi: boolean, promptOrder: string): ToolDefinitio
 
 export interface ToolAvailability {
   searchTags: boolean
-  characterFeatures: boolean
   browse: boolean
   manual: boolean
 }
@@ -339,7 +317,6 @@ export function selectRoundTools(o: RoundToolsOptions): ToolDefinition[] {
   if (o.round === o.maxRounds - 1) return [gen]
   const tools: ToolDefinition[] = [gen]
   if (!o.skipSearch && o.available.searchTags) tools.push(SEARCH_TAGS_TOOL)
-  if (o.available.characterFeatures) tools.push(SEARCH_CHARACTER_TOOL)
   if (o.available.manual) tools.push(LOAD_MANUAL_TOOL)
   if (o.available.browse) tools.push(BROWSE_TAGS_TOOL)
   return tools

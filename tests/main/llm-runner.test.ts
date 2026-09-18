@@ -128,7 +128,7 @@ describe('runLlm：跑通一轮', () => {
     expect(firstUserText(h.seen[0])).toBe('画初音未来\n\n[质量词: masterpiece]\n[负面词: lowres]')
     expect(h.seen[0].system).toContain('CORE')
     expect(h.seen[0].system).toContain('### 标签分类目录')
-    expect(h.lines()).toContain('[I] 本轮工具集: generate_image, search_tags, search_character_features, browse_tags')
+    expect(h.lines()).toContain('[I] 本轮工具集: generate_image, search_tags, browse_tags')
     expect(h.lines()).toContain('[I] 多轮 tool_use: 第 1 轮，1 个搜索调用')
     expect(h.lines()).toContain('[I] Token 累计: 第2轮 100in/10out, 总计 200in/20out')
     expect(h.lines()).toContain('[I] [查询覆盖] 第2轮 LLM 停止检索，累计 1 个查询词、0 次分类浏览')

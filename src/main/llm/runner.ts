@@ -10,7 +10,7 @@ import { RunLog } from './log'
 import { appendToolRound, appendTruncationRetry, userMessage, type ToolOutput } from './messages'
 import { buildSystemPrompt, buildUserPrompt, effectiveMultiCharacter, resolveStyleLock, workspaceToEditArgs } from './prompt'
 import { manualTopicCount } from './resources'
-import { executeBrowse, executeCharacterFeatures, executeLoadManual, executeSearchTags } from './toolExec'
+import { executeBrowse, executeLoadManual, executeSearchTags } from './toolExec'
 import { GENERATE_CHARACTERS_TOOL_NAME, SEARCH_TOOL_NAMES, isGenerateTool, selectRoundTools } from './tools'
 import type { ChatFn, ChatMessage, ChatResult } from './types'
 
@@ -98,7 +98,6 @@ export async function runLlm(input: LlmRunInput, deps: RunnerDeps): Promise<LlmR
     const browse = data.browse !== null && data.browse.cats.size > 0 ? data.browse : null
     const available = {
       searchTags: data.categories !== null,
-      characterFeatures: data.characters !== null,
       browse: browse !== null,
       manual: manualEnabled,
     }
@@ -182,9 +181,6 @@ export async function runLlm(input: LlmRunInput, deps: RunnerDeps): Promise<LlmR
             content = o.text
             break
           }
-          case 'search_character_features':
-            content = executeCharacterFeatures(pc.args, data)
-            break
           case 'browse_tags':
             totalBrowses++
             content = executeBrowse(pc.args, data, config, log)

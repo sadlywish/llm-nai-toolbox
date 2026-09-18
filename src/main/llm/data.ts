@@ -74,7 +74,7 @@ export async function prepareTagData(index: IndexSource, extras: ExtrasSource, c
     ),
     gloss: take(gloss, (v) => `标签语义字典已加载: ${v.size} 条`, '标签释义不可用（输入扫描注入与搜索结果释义）'),
     deprecated: take(deprecated, (v) => `废弃标签表已加载: ${v.size} 条`, '废弃标签提醒不可用'),
-    characters: take(characters, (v) => `角色特征数据库已加载: ${v.size} 条`, 'search_character_features 已从工具集摘掉'),
+    characters: take(characters, (v) => `角色特征数据库已加载: ${v.size} 条`, 'search_tags 的结果不再附带角色官方外貌/服装'),
     wikiMap: wiki === null ? null : take(wiki, (v) => `标签 wiki 已加载: ${v.size} 条`, '搜索结果不带 wiki 摘要'),
   }
 }

@@ -11,7 +11,7 @@ import type { JsonObject } from '../../src/main/llm/types'
 
 const ORDER = 'quality, count, style, character, artist, appearance, tags, environment, series, nltags'
 const props = (schema: JsonObject): JsonObject => schema.properties as JsonObject
-const all: ToolAvailability = { searchTags: true, characterFeatures: true, browse: true, manual: true }
+const all: ToolAvailability = { searchTags: true, browse: true, manual: true }
 
 describe('generateTool', () => {
   it('generate_image：描述里的拼接顺序按设置生成', () => {
@@ -59,7 +59,7 @@ describe('selectRoundTools', () => {
     )
 
   it('普通轮次：生成工具在前，其余按插件顺序', () => {
-    expect(names({})).toEqual(['generate_image', 'search_tags', 'search_character_features', 'load_tag_manual', 'browse_tags'])
+    expect(names({})).toEqual(['generate_image', 'search_tags', 'load_tag_manual', 'browse_tags'])
   })
 
   it('最后一轮只给生成工具；只有一轮时第一轮就是最后一轮', () => {
@@ -68,11 +68,11 @@ describe('selectRoundTools', () => {
   })
 
   it('搜索高置信后撤掉 search_tags，其余保留', () => {
-    expect(names({ skipSearch: true })).toEqual(['generate_image', 'search_character_features', 'load_tag_manual', 'browse_tags'])
+    expect(names({ skipSearch: true })).toEqual(['generate_image', 'load_tag_manual', 'browse_tags'])
   })
 
   it('数据不可用的工具不注册', () => {
-    expect(names({ available: { searchTags: false, characterFeatures: false, browse: true, manual: false } })).toEqual([
+    expect(names({ available: { searchTags: false, browse: true, manual: false } })).toEqual([
       'generate_image',
       'browse_tags',
     ])
@@ -85,7 +85,7 @@ describe('selectRoundTools', () => {
 
 describe('工具名集合', () => {
   it('四个检索工具；两个生成工具', () => {
-    expect([...SEARCH_TOOL_NAMES].sort()).toEqual(['browse_tags', 'load_tag_manual', 'search_character_features', 'search_tags'])
+    expect([...SEARCH_TOOL_NAMES].sort()).toEqual(['browse_tags', 'load_tag_manual', 'search_tags'])
     expect(isGenerateTool('generate_image')).toBe(true)
     expect(isGenerateTool('generate_image_characters')).toBe(true)
     expect(isGenerateTool('search_tags')).toBe(false)

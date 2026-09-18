@@ -76,6 +76,16 @@ function truncate(s: string, max: number): string {
   return t.length <= max ? t : t.slice(0, max).trimEnd() + '…'
 }
 
+/**
+ * 这条查询实际列给 LLM 看的那几条匹配（截断规则见 formatSearchResults 里的说明）。
+ * 附带角色特征时也用它——特征只该给模型看得见的候选，附了它看不到的候选只会让它引用不存在的行。
+ */
+export function visibleMatches(result: SearchResult, display?: TagQueryDisplayMap): SearchResult['matches'] {
+  const conf = display?.[result.type] || DEFAULT_DISPLAY
+  const limit = conf.max > 0 ? Math.min(conf.max, HARD_MAX_MATCHES) : HARD_MAX_MATCHES
+  return result.matches.slice(0, limit)
+}
+
 export function formatSearchResults(
   results: SearchResult[],
   seriesDb: TagEntry[],
@@ -95,8 +105,7 @@ export function formatSearchResults(
     // 就没有任何东西挡着。实测查单个字母 "W" 匹配到 6819 条角色、格式化出
     // 168 万字符，一次调用把 100 万 token 的上下文顶爆，请求直接 400。
     // 单次工具返回本就不该有能力做到这件事，所以这道闸不受配置控制。
-    const limit = conf.max > 0 ? Math.min(conf.max, HARD_MAX_MATCHES) : HARD_MAX_MATCHES
-    const shown = r.matches.slice(0, limit)
+    const shown = visibleMatches(r, display)
     const omitted = r.matches.length - shown.length
 
     const lines = shown.map((m, i) => {

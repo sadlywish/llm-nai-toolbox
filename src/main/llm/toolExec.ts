@@ -1,9 +1,9 @@
 import type { AppConfig } from '@shared/config'
 import { searchTags } from '@shared/tagdb/search'
 import { browseCategory, buildBrowseHint } from '../tagdb/browse'
-import { characterFeatureText, characterSearchBlock, findCharacterFeature } from '../tagdb/charfeat'
+import { characterFeatureText } from '../tagdb/charfeat'
 import { escapeNaiTag } from '../tagdb/escape'
-import { displayMapFromConfig, formatSearchResults } from '../tagdb/format'
+import { displayMapFromConfig, formatSearchResults, visibleMatches } from '../tagdb/format'
 import { toCharacterList, toQueryList } from './args'
 import type { TagData } from './data'
 import type { RunLog } from './log'
@@ -11,9 +11,12 @@ import { manualFileName } from './resources'
 import type { JsonObject } from './types'
 
 /**
- * 四个检索工具的本地执行。插件 index.ts 第 2272–2418 行（去掉了搜索日志落库与 LoRA）。
+ * 三个检索工具的本地执行。插件 index.ts 第 2272–2418 行（去掉了搜索日志落库与 LoRA）。
  * 工具只在数据可用时注册（tools.ts），这里对数据为 null 的兜底只防模型调用了没提供的工具。
  */
+
+/** 每条角色查询最多给前几个候选附官方外貌/服装（再多是把上下文喂给模型用不上的同名角色） */
+const FEATURE_MATCHES = 3
 
 export interface SearchOutcome {
   text: string
@@ -36,7 +39,9 @@ export function executeSearchTags(args: JsonObject, data: TagData, config: AppCo
   if (data.categories === null) return { text: '标签索引不可用，无法查询。', allHigh: false, queryCount }
 
   const sr = searchTags(data.categories, data.wikiMap ?? undefined, artistList, charList, conceptList, seriesList)
-  const formatted = formatSearchResults(sr, data.categories.series.entries, displayMapFromConfig(config), data.gloss ?? undefined)
+  // 同一份显示配置：格式化与下面的角色特征富化都按它截断，两边列出的候选才对得上
+  const display = displayMapFromConfig(config)
+  const formatted = formatSearchResults(sr, data.categories.series.entries, display, data.gloss ?? undefined)
   // 返回体积一直没打，正是「单次查询把上下文顶爆」当初看不见的原因
   log.info(`search_tags 返回 ${formatted.length} 字符 (${sr.map((r) => `${r.query}:${r.matches.length}条`).join(', ')})`)
 
@@ -60,37 +65,41 @@ export function executeSearchTags(args: JsonObject, data: TagData, config: AppCo
       sr.map((r) => ({ q: r.query, score: r.matches[0]?.score ?? 0, type: r.type })),
     )
   }
-  // 自动富化：角色搜索结果附带外貌/服装标签
+  // 自动富化：角色搜索结果附带外貌/服装标签。
+  //
+  // 覆盖前 FEATURE_MATCHES 个候选而不只是第一名：同名角色分属不同作品是常事，
+  // 模型未必选第一条，只给第一条的特征它就只能凭印象编另一条（原来那个
+  // search_character_features 工具就是拿来补这一手的，2026-09-18 移除，改由这里覆盖）。
+  // 候选取「模型实际看得见的那几条」，附上它看不到的候选只会让它引用不存在的行。
   if (data.characters !== null) {
+    const flags = {
+      series: config.tagQueryCharacterSeries,
+      appearance: config.tagQueryCharacterAppearance,
+      clothing: config.tagQueryCharacterClothing,
+    }
+    const seen = new Set<string>()
+    const blocks: string[] = []
     for (const r of sr) {
-      if (r.type !== '角色' || r.matches.length === 0) continue
-      const topTag = r.matches[0].tag
-      const feat = data.characters.get(topTag.toLowerCase())
-      if (!feat) continue
-      const ft = characterFeatureText(feat, {
-        series: config.tagQueryCharacterSeries,
-        appearance: config.tagQueryCharacterAppearance,
-        clothing: config.tagQueryCharacterClothing,
-      })
-      if (ft) {
-        text += `\n\n[角色特征] ${escapeNaiTag(topTag)}:\n${ft}\n  → 外貌和服装标签放入 appearance 字段，不要凭印象臆造，如果用户提示词有其他要求则覆盖角色特征`
+      if (r.type !== '角色') continue
+      for (const m of visibleMatches(r, display).slice(0, FEATURE_MATCHES)) {
+        const key = m.tag.toLowerCase()
+        // 几条查询命中同一个角色时只附一次
+        if (seen.has(key)) continue
+        const feat = data.characters.get(key)
+        if (!feat) continue
+        const ft = characterFeatureText(feat, flags)
+        if (!ft) continue
+        seen.add(key)
+        blocks.push(`[角色特征] ${escapeNaiTag(m.tag)}:\n${ft}`)
       }
+    }
+    if (blocks.length > 0) {
+      text += `\n\n${blocks.join('\n\n')}`
+      text += '\n  → 外貌和服装标签放入 appearance 字段，不要凭印象臆造，如果用户提示词有其他要求则覆盖角色特征'
+      if (blocks.length > 1) text += '\n  → 列出了多个候选时，只取你实际采用的那个角色的特征'
     }
   }
   return { text, allHigh, queryCount }
-}
-
-export function executeCharacterFeatures(args: JsonObject, data: TagData): string {
-  const names = toQueryList(args.names)
-  if (names.length === 0) return '请提供角色名称。'
-  const db = data.characters
-  if (db === null) return '角色特征数据库不可用。'
-  return names
-    .map((name) => {
-      const feat = findCharacterFeature(db, name)
-      return feat ? characterSearchBlock(feat) : `未找到角色 "${name}"`
-    })
-    .join('\n\n')
 }
 
 export function executeBrowse(args: JsonObject, data: TagData, config: AppConfig, log: RunLog): string {

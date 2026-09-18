@@ -8,7 +8,7 @@ import { parseGlossDb } from '../../src/main/tagdb/gloss'
 import type { TagdbCategories } from '../../src/main/tagdb/loader'
 import type { TagData } from '../../src/main/llm/data'
 import { RunLog } from '../../src/main/llm/log'
-import { executeBrowse, executeCharacterFeatures, executeLoadManual, executeSearchTags } from '../../src/main/llm/toolExec'
+import { executeBrowse, executeLoadManual, executeSearchTags } from '../../src/main/llm/toolExec'
 
 const e = (tag: string, count: number, extra: Partial<TagEntry> = {}): TagEntry => ({
   tag, count, zh: [], zhFull: [], zhShort: [], zhNick: [], ja: [], en: [], other: [], series: [], ...extra,
@@ -32,6 +32,20 @@ function data(over: Partial<TagData> = {}): TagData {
     characters: parseCharacterCsv('character,copyright,appearance,clothing\nhatsune_miku,vocaloid,"aqua_hair, twintails",necktie\n'),
     ...over,
   }
+}
+
+/** 同名角色一堆的库：查 saber 会命中四个，用来验「前几名都附特征」与上限 */
+function sabers(): TagData {
+  const names = ['saber', 'saber_alter', 'saber_lily', 'saber_bride']
+  return data({
+    categories: {
+      ...categories,
+      characters: cat(names.map((n, i) => e(n, 9000 - i * 1000, { en: [n.replace(/_/g, ' ')] }))),
+    },
+    characters: parseCharacterCsv(
+      ['character,copyright,appearance,clothing', ...names.map((n) => `${n},fate,"blonde_hair, green_eyes",armor`)].join('\n'),
+    ),
+  })
 }
 
 function logger() {
@@ -66,20 +80,35 @@ describe('executeSearchTags', () => {
     expect(o.text).toContain('     释义: 从上往下看的视角')
   })
 
+  it('一个查询命中多个同名角色时，前几个候选都附特征，收尾提示只写一次', () => {
+    const o = executeSearchTags({ characters: 'saber' }, sabers(), defaultAppConfig(), logger().log)
+    // 顺序跟着搜索结果的排序走，这里只认「是哪三个」
+    const tags = [...o.text.matchAll(/\[角色特征\] (.+?):/g)].map((m) => m[1]).sort()
+    expect(tags).toEqual(['saber', 'saber alter', 'saber lily'])
+    // 上限 3：第四个候选（saber bride）不附，免得把上下文喂给用不上的同名角色
+    expect(o.text).not.toContain('saber bride:')
+    expect(o.text.match(/→ 外貌和服装标签放入 appearance 字段/g)).toHaveLength(1)
+    expect(o.text).toContain('→ 列出了多个候选时，只取你实际采用的那个角色的特征')
+  })
+
+  it('只给模型看得见的候选附特征：返回条数设成 1 时就只附第一个', () => {
+    const config = { ...defaultAppConfig(), tagQueryCharacterMax: 1 }
+    const o = executeSearchTags({ characters: 'saber' }, sabers(), config, logger().log)
+    expect([...o.text.matchAll(/\[角色特征\] (.+?):/g)].map((m) => m[1])).toEqual(['saber'])
+    // 单个候选时不写那句「多个候选」
+    expect(o.text).not.toContain('只取你实际采用的那个角色的特征')
+  })
+
+  it('两条查询命中同一个角色时只附一次', () => {
+    const o = executeSearchTags({ characters: ['saber', 'saber'] }, sabers(), defaultAppConfig(), logger().log)
+    expect(o.text.match(/\[角色特征\] saber:/g)).toHaveLength(1)
+  })
+
   it('分类库不可用时不附工具选择提示；角色特征三个开关全关时不附特征', () => {
     const config = { ...defaultAppConfig(), tagQueryCharacterSeries: false, tagQueryCharacterAppearance: false, tagQueryCharacterClothing: false }
     const o = executeSearchTags({ characters: '初音未来', concepts: ['俯视'] }, data({ browse: null }), config, logger().log)
     expect(o.text).not.toContain('[工具选择提示]')
     expect(o.text).not.toContain('[角色特征]')
-  })
-})
-
-describe('executeCharacterFeatures', () => {
-  it('按名字查；查不到逐个说明；没给名字时提示', () => {
-    expect(executeCharacterFeatures({ names: ['Hatsune Miku', 'nobody'] }, data())).toBe(
-      '角色: hatsune miku\n作品: vocaloid\n外貌标签: aqua hair, twintails → 放入 appearance 字段\n服装标签: necktie → 放入 appearance 字段\n\n未找到角色 "nobody"',
-    )
-    expect(executeCharacterFeatures({}, data())).toBe('请提供角色名称。')
   })
 })
 
