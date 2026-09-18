@@ -10,6 +10,7 @@
 // 缩放的算术全在 pinchZoom.ts 里，这里只做三件事：把手指位置翻成点、量元素、把结果写进 style。
 import { useEffect, useRef, useState } from 'react'
 import type { GenSnapshot, RoundRecord } from '@shared/gen'
+import { readSnapshotLlm } from '@shared/llmProvenance'
 import type { MobileMeta } from '@shared/mobileApi'
 import type { ApiClient } from '../api'
 import { copyText } from '../clipboard'
@@ -55,7 +56,7 @@ function pointOf(touch: { clientX: number; clientY: number }): Point {
 
 export default function ImageViewer({ index, file, seed, round, meta, client, onClose, onApply }: Props): JSX.Element {
   const [applied, setApplied] = useState(false)
-  /** 复制不了时把提示词摊开让人自己长按选（明文 HTTP 页面里 Clipboard API 常常不可用） */
+  /** 复制不了时把内容摊开让人自己长按选（明文 HTTP 页面里 Clipboard API 常常不可用） */
   const [fallback, setFallback] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
   /** 分享给不出面板时那一句（成功与用户自己取消都是 null，不打扰） */
@@ -188,11 +189,13 @@ export default function ImageViewer({ index, file, seed, round, meta, client, on
     onClose()
   }
 
+  /** 产出这一轮提示词的那条 LLM 指令原文；没经过 LLM（或旧记录没存）就是空，按钮禁用 */
+  const instruction = readSnapshotLlm(round.snapshot.llm)?.request.instruction.trim() ?? ''
+
   const copy = (): void => {
-    // 复制那一轮实际发出去的正向提示词：按手机现在拿到的字段顺序重新拼，出图后改过设置就对不上
-    const positive = round.assembled.positive
-    void copyText(positive).then((ok) => {
-      setFallback(ok ? null : positive)
+    if (instruction === '') return
+    void copyText(instruction).then((ok) => {
+      setFallback(ok ? null : instruction)
     })
   }
 
@@ -229,8 +232,8 @@ export default function ImageViewer({ index, file, seed, round, meta, client, on
         <button type="button" className="btn sm" onClick={apply}>
           {applied ? '已写回手机' : '参数写回手机'}
         </button>
-        <button type="button" className="btn sm" onClick={copy}>
-          复制正面提示词
+        <button type="button" className="btn sm" onClick={copy} disabled={instruction === ''}>
+          复制 LLM 输入
         </button>
         <button type="button" className="btn sm" onClick={share} disabled={sharing}>
           {sharing ? '分享中…' : '分享'}
